@@ -6,7 +6,8 @@ import kotlinx.coroutines.runBlocking
 class ChapterVaultApp {
 
     fun run() = runBlocking {
-        Logger.setLevel(Logger.Level.DEBUG)
+        Logger.logToFile(false)
+
         Logger.info("App started", tag = "Main")
 
     }
