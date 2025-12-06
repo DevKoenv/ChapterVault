@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class ChapterVaultApp {
 
-    private val appScope = CoroutineScope(Dispatchers.Default)
     private val shuttingDown = AtomicBoolean(false)
 
     /**
