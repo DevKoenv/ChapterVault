@@ -15,7 +15,7 @@ import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.primaryConstructor
 
 /**
- * **ConfigManager V2**
+ * **ConfigManager**
  *
  * Centralized manager for loading, storing, updating, and persisting strongly-typed configuration objects.
  * Supports YAML files, default constructor values, and environment variable overrides.
