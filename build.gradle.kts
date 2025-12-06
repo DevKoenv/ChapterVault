@@ -1,5 +1,6 @@
 plugins {
-    kotlin("jvm") version "2.0.10"
+    kotlin("jvm") version libs.versions.kotlin.get()
+    kotlin("plugin.serialization") version libs.versions.kotlin.get()
     application
 }
 
@@ -19,6 +20,7 @@ dependencies {
     // Kotlin Core
     // ----------------------------
     implementation(libs.kotlin.stdlib)
+    implementation(libs.kotlin.reflect)
 
     // ----------------------------
     // Coroutines
@@ -37,6 +39,25 @@ dependencies {
     // Database
     // ----------------------------
     implementation(libs.sqlite.jdbc)
+
+    // ----------------------------
+    // Jackson
+    // ----------------------------
+    implementation(libs.jackson.core)
+    implementation(libs.jackson.databind)
+    implementation(libs.jackson.module.kotlin)
+    implementation(libs.jackson.dataformat.yaml)
+
+    // ----------------------------
+    // Hoplite config loader
+    // ----------------------------
+    implementation(libs.hoplite.core)
+    implementation(libs.hoplite.yaml)
+
+    // ----------------------------
+    // Kotlinx serialization
+    // ----------------------------
+    implementation(libs.kotlinx.serialization.core)
 
     // ----------------------------
     // Testing

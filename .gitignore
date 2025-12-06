@@ -185,3 +185,8 @@ gradle-app.setting
 *.hprof
 
 # End of https://www.toptal.com/developers/gitignore/api/kotlin,java,intellij,gradle
+
+
+# Custom ignores
+config/
+#logs/ # duplicate
