@@ -287,7 +287,12 @@ object Logger {
                 '\r' -> sb.append("\\r")
                 '\t' -> sb.append("\\t")
                 '\u000C' -> sb.append("\\f")
-                else -> if (ch.code < 0x20) sb.append("\\u").append(String.format("%04x", ch.code)) else sb.append(ch)
+                // Escape control characters, U+2028, and U+2029
+                else -> if (ch.code < 0x20 || ch == '\u2028' || ch == '\u2029') {
+                    sb.append("\\u").append(String.format("%04x", ch.code))
+                } else {
+                    sb.append(ch)
+                }
             }
         }
     }
