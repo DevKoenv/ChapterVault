@@ -27,7 +27,7 @@ class ChapterVaultApp {
      * Initializes all subsystems in the correct order.
      * If any step fails, the application shuts down gracefully and rethrows the exception.
      */
-    suspend fun run() {
+    fun run() {
         try {
             // 1. Load configuration
             ConfigManager.setEnvPrefix("CHAPTERVAULT")
