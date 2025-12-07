@@ -299,9 +299,10 @@ object ConfigManager {
     }
 
     /** Build the full environment variable key from path parts */
-    private fun buildEnvKey(parts: List<String>): String =
-        "${envPrefix.trimEnd('_')}_${parts.joinToString("_") { it.replace(".", "_").replace("-", "_") }}"
-
+    private fun buildEnvKey(parts: List<String>): String {
+        val keyBody = parts.joinToString("_") { it.replace(".", "_").replace("-", "_") }
+        return if (envPrefix.isEmpty()) keyBody else "${envPrefix}_$keyBody"
+    }
     /** Check if a class is a primitive type or String */
     private fun isPrimitiveOrString(k: KClass<*>?): Boolean = when (k) {
         String::class, Int::class, Long::class, Short::class, Byte::class, Float::class, Double::class, Boolean::class, Char::class -> true
