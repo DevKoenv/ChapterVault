@@ -5,6 +5,7 @@ package dev.koenv.chaptervault.core
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -42,9 +43,11 @@ object ConfigManager {
     // ------------------------ Configurable Behavior ------------------------
 
     /** Prefix applied to all environment variable lookups (default "PROJECT") */
+    @Volatile
     private var envPrefix: String = "PROJECT"
 
     /** Enable or disable environment variable overrides (true by default) */
+    @Volatile
     private var envOverridesEnabled: Boolean = true
 
     /**
@@ -73,7 +76,7 @@ object ConfigManager {
     /** YAML object mapper for reading/writing configuration files */
     private val yamlMapper = ObjectMapper(
         YAMLFactory().disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-    )
+    ).registerKotlinModule()
 
     /** Internal structure representing a single config entry */
     private data class ConfigEntry<T : Any>(
@@ -161,9 +164,9 @@ object ConfigManager {
      */
     fun <T : Any> update(clazz: KClass<T>, transform: (T) -> T) {
         val entry = registry[clazz] as? ConfigEntry<T> ?: error("Config ${clazz.simpleName} not registered")
-        val oldCfg = entry.ref.get() ?: error("Config ${clazz.simpleName} not loaded yet")
-        val newCfg = transform(oldCfg)
-        entry.ref.set(newCfg)
+        entry.ref.updateAndGet { oldCfg ->
+            oldCfg?.let(transform) ?: error("Config ${clazz.simpleName} not loaded yet")
+        }
         save(clazz)
     }
 

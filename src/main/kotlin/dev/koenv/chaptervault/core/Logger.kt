@@ -144,7 +144,7 @@ object Logger {
     fun clearLogFile() = lock.withLock {
         if (!config.file) {
             info("File logging disabled; nothing to clear")
-            return
+            return@withLock
         }
         closeWriter()
         logFile?.writeText("")
@@ -188,7 +188,11 @@ object Logger {
      * Ensure the logger is initialized. If not, it initializes with default [Config].
      */
     private fun ensureInitialized() {
-        if (!initialized) init(Config())
+        if (!initialized) {
+            lock.withLock {
+                if (!initialized) init(Config())
+            }
+        }
     }
 
     /** Create a UTF-8 [PrintWriter] for the given file with auto-flush enabled */

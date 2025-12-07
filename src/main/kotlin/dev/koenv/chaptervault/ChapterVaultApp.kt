@@ -1,9 +1,7 @@
 package dev.koenv.chaptervault
 
-import dev.koenv.chaptervault.config.*
+import dev.koenv.chaptervault.config.Config
 import dev.koenv.chaptervault.core.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -73,7 +71,7 @@ class ChapterVaultApp {
      *
      * Idempotent: can be called multiple times safely.
      */
-    suspend fun shutdown() {
+    fun shutdown() {
         if (!shuttingDown.compareAndSet(false, true)) return
 
         Logger.info("Shutting down ChapterVault…")
@@ -105,9 +103,9 @@ class ChapterVaultApp {
         fun main(args: Array<String>) = runBlocking {
             val app = ChapterVaultApp()
 
-            // Register JVM shutdown hook
+            // Register JVM shutdown hook without using runBlocking to avoid nested coroutine dispatchers
             Runtime.getRuntime().addShutdownHook(Thread {
-                runBlocking { app.shutdown() }
+                app.shutdown()
             })
 
             // Start application
