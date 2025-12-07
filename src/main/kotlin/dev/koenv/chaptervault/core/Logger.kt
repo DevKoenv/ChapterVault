@@ -226,7 +226,8 @@ object Logger {
                 }
             }
             latest.delete()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            System.err.println("Logger: Failed to archive log file '${latest.absolutePath}': ${e.message}")
         }
     }
 
