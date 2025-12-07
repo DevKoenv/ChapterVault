@@ -188,5 +188,5 @@ gradle-app.setting
 
 
 # Custom ignores
-config/
+/config/
 #logs/ # duplicate
