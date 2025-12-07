@@ -322,11 +322,11 @@ object ConfigManager {
         else -> null
     }
 
-    /** Parse a string into an enum constant */
+    /** Parse a string into an enum constant (case-sensitive match) */
     private fun parseEnum(raw: String, k: KClass<*>): Any? {
         @Suppress("UNCHECKED_CAST")
         val enumClass = k as KClass<out Enum<*>>
-        return enumClass.java.enumConstants?.firstOrNull { (it as Enum<*>).name.equals(raw, ignoreCase = true) }
+        return enumClass.java.enumConstants?.firstOrNull { (it as Enum<*>).name == raw }
     }
 
     // ------------------------ Merging / Defaults ------------------------
