@@ -176,11 +176,11 @@ object Logger {
     }
 
     /** Convenience logging methods for each level */
-    fun trace(msg: String, tag: String? = null) = log(Level.TRACE, msg, tag)
-    fun debug(msg: String, tag: String? = null) = log(Level.DEBUG, msg, tag)
-    fun info(msg: String, tag: String? = null) = log(Level.INFO, msg, tag)
-    fun warn(msg: String, tag: String? = null) = log(Level.WARN, msg, tag)
-    fun error(msg: String, tag: String? = null) = log(Level.ERROR, msg, tag)
+    fun trace(message: String, tag: String? = null) = log(Level.TRACE, message, tag)
+    fun debug(message: String, tag: String? = null) = log(Level.DEBUG, message, tag)
+    fun info(message: String, tag: String? = null) = log(Level.INFO, message, tag)
+    fun warn(message: String, tag: String? = null) = log(Level.WARN, message, tag)
+    fun error(message: String, tag: String? = null) = log(Level.ERROR, message, tag)
 
     // ------------------------ Internal Helpers ------------------------
 
@@ -226,7 +226,8 @@ object Logger {
                 }
             }
             latest.delete()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            System.err.println("Logger: Failed to archive log file '${latest.absolutePath}': ${e.message}")
         }
     }
 
