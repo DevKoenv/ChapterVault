@@ -1,5 +1,3 @@
-@file:Suppress("UNCHECKED_CAST")
-
 package dev.koenv.chaptervault.core
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -114,6 +112,7 @@ object ConfigManager {
      *
      * @param clazz Config class type
      */
+    @Suppress("UNCHECKED_CAST")
     fun <T : Any> load(clazz: KClass<T>) {
         val entry = registry[clazz] as? ConfigEntry<T> ?: error("Config ${clazz.simpleName} not registered")
         loadEntry(entry)
@@ -146,6 +145,7 @@ object ConfigManager {
      * @return Loaded configuration instance
      * @throws IllegalStateException if config not loaded yet
      */
+    @Suppress("UNCHECKED_CAST")
     fun <T : Any> get(clazz: KClass<T>): T {
         val entry = registry[clazz] as? ConfigEntry<T> ?: error("Config ${clazz.simpleName} not registered")
         return entry.ref.get() ?: error("Config ${clazz.simpleName} not loaded yet")
@@ -162,6 +162,7 @@ object ConfigManager {
      * @param clazz Config class type
      * @param transform Lambda to produce a new config instance
      */
+    @Suppress("UNCHECKED_CAST")
     fun <T : Any> update(clazz: KClass<T>, transform: (T) -> T) {
         val entry = registry[clazz] as? ConfigEntry<T> ?: error("Config ${clazz.simpleName} not registered")
         entry.ref.updateAndGet { oldCfg ->
@@ -181,6 +182,7 @@ object ConfigManager {
      * @param clazz Config class type
      * @throws IllegalStateException if config not loaded yet
      */
+    @Suppress("UNCHECKED_CAST")
     fun <T : Any> save(clazz: KClass<T>) {
         val entry = registry[clazz] as? ConfigEntry<T> ?: error("Config ${clazz.simpleName} not registered")
         val cfg = entry.ref.get() ?: error("Config ${clazz.simpleName} not loaded yet")
@@ -252,6 +254,7 @@ object ConfigManager {
     }
 
     /** Recursive helper for env overrides, handling nested data classes and primitives */
+    @Suppress("UNCHECKED_CAST")
     private fun <T : Any> applyEnvOverridesRecursive(instance: T, clazz: KClass<T>, pathParts: List<String>): T {
         val ctor = clazz.primaryConstructor ?: return instance
         val args = mutableMapOf<KParameter, Any?>()
@@ -281,7 +284,7 @@ object ConfigManager {
                         )
                     } else {
                         applyEnvOverridesRecursive(
-                            currentValue as Any,
+                            currentValue,
                             paramType.classifier as KClass<Any>,
                             pathParts + listOf(name.uppercase())
                         )
@@ -294,8 +297,7 @@ object ConfigManager {
             args[param] = overrideValue ?: currentValue
         }
 
-        @Suppress("UNCHECKED_CAST")
-        return ctor.callBy(args) as T
+        return ctor.callBy(args)
     }
 
     /** Build the full environment variable key from path parts */
