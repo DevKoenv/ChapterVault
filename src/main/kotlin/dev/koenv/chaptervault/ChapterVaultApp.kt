@@ -27,7 +27,7 @@ class ChapterVaultApp {
      * Initializes all subsystems in the correct order.
      * If any step fails, the application shuts down gracefully and rethrows the exception.
      */
-    fun run() {
+    suspend fun run() {
         try {
             // 1. Load configuration
             ConfigManager.setEnvPrefix("CHAPTERVAULT")
@@ -103,7 +103,7 @@ class ChapterVaultApp {
         fun main(args: Array<String>) = runBlocking {
             val app = ChapterVaultApp()
 
-            // Register JVM shutdown hook without using runBlocking to avoid nested coroutine dispatchers
+            // Register JVM shutdown hook. Uses a regular Thread to avoid blocking issues with coroutine contexts during JVM shutdown.
             Runtime.getRuntime().addShutdownHook(Thread {
                 app.shutdown()
             })
