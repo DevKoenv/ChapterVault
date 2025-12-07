@@ -226,8 +226,9 @@ object ConfigManager {
         val merged: T = try {
             val tmpLoaded: T = yamlMapper.readValue(file, clazz.java)
             mergeWithDefaults(tmpLoaded, defaults)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Empty or malformed file -> fallback to defaults
+            System.err.println("WARNING: Failed to load config from '${file.absolutePath}': ${e.message}. Falling back to defaults.")
             defaults
         }
 
