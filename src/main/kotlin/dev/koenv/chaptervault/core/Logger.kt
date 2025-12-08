@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.core
 
+import dev.koenv.chaptervault.config.Config
 import java.io.*
 import java.nio.charset.StandardCharsets
 import java.time.LocalDateTime
@@ -35,27 +36,6 @@ object Logger {
      */
     enum class Level(val priority: Int) { TRACE(0), DEBUG(1), INFO(2), WARN(3), ERROR(4) }
 
-    /**
-     * Logger configuration data class.
-     *
-     * @property level Minimum [Level] required to log a message.
-     * @property directory Directory path for log files.
-     * @property colors Enable ANSI color codes for console output.
-     * @property timestampFormat Pattern for formatting timestamps in human-readable logs.
-     * @property json If true, output logs as compact JSON objects.
-     * @property file Enable or disable file logging.
-     * @property tagAsField When JSON logging is enabled, whether the log tag is a separate field.
-     */
-    data class Config(
-        var level: Level = Level.DEBUG,
-        var directory: String = "logs",
-        var colors: Boolean = true,
-        var timestampFormat: String = "yyyy-MM-dd HH:mm:ss",
-        var json: Boolean = false,
-        var file: Boolean = true,
-        var tagAsField: Boolean = true
-    )
-
     /** Whether the logger has been initialized */
     private var initialized = false
 
@@ -63,7 +43,7 @@ object Logger {
     private val lock = ReentrantLock()
 
     /** Current logger configuration */
-    private var config = Config()
+    private var config = Config.Logger()
 
     /** Current log file handle (if file logging is enabled) */
     private var logFile: File? = null
@@ -99,7 +79,7 @@ object Logger {
      *
      * @param newConfig Configuration to apply. Overwrites previous configuration.
      */
-    fun init(newConfig: Config) {
+    fun init(newConfig: Config.Logger) {
         var toArchive: File? = null
         lock.withLock {
             closeWriter()
@@ -190,7 +170,7 @@ object Logger {
     private fun ensureInitialized() {
         if (!initialized) {
             lock.withLock {
-                if (!initialized) init(Config())
+                if (!initialized) init(Config.Logger())
             }
         }
     }

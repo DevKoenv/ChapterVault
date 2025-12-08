@@ -1,16 +1,16 @@
 package dev.koenv.chaptervault.config
 
-import dev.koenv.chaptervault.core.Logger
+import dev.koenv.chaptervault.core.Logger.Level
 
 /**
  * Root configuration for the application.
  */
 data class Config(
     var server: Server = Server(),
-    var logger: Logger.Config = Logger.Config(),
+    var logger: Logger = Logger(),
     var database: Database = Database(),
     var network: Network = Network(),
-    var features: Features = Features()
+    var features: Features = Features(),
 ) {
     data class Server(
         var host: String = "0.0.0.0",
@@ -28,6 +28,27 @@ data class Config(
         var timeoutMs: Long = 30000,
         var retryCount: Int = 3,
         var concurrentRequests: Int = 8
+    )
+
+    /**
+     * Logger configuration data class.
+     *
+     * @property level Minimum [Level] required to log a message.
+     * @property directory Directory path for log files.
+     * @property colors Enable ANSI color codes for console output.
+     * @property timestampFormat Pattern for formatting timestamps in human-readable logs.
+     * @property json If true, output logs as compact JSON objects.
+     * @property file Enable or disable file logging.
+     * @property tagAsField When JSON logging is enabled, whether the log tag is a separate field.
+     */
+    data class Logger(
+        var level: Level = Level.INFO,
+        var directory: String = "logs",
+        var colors: Boolean = true,
+        var timestampFormat: String = "yyyy-MM-dd HH:mm:ss",
+        var json: Boolean = false,
+        var file: Boolean = false,
+        var tagAsField: Boolean = true
     )
 
     data class Features(

@@ -2,7 +2,10 @@ package dev.koenv.chaptervault
 
 import dev.koenv.chaptervault.config.Config
 import dev.koenv.chaptervault.core.*
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -28,42 +31,38 @@ class ChapterVaultApp {
      * If any step fails, the application shuts down gracefully and rethrows the exception.
      */
     suspend fun run() {
-        try {
-            // 1. Load configuration
-            ConfigManager.setEnvPrefix("CHAPTERVAULT")
-            ConfigManager.enableEnvOverrides(true)
-            ConfigManager.registerConfig<Config>("config/config.yaml")
-            ConfigManager.loadAll()
-            val config = ConfigManager.get<Config>()
+        // 1. Load configuration
+        ConfigManager.setEnvPrefix("CHAPTERVAULT")
+        ConfigManager.enableEnvOverrides(true)
+        ConfigManager.registerConfig<Config>("config/config.yaml")
+        ConfigManager.loadAll()
+        val config = ConfigManager.get<Config>()
 
-            // 2. Initialize logger according to loaded config
-            Logger.init(config.logger)
+        // 2. Initialize logger according to loaded config
+        Logger.init(config.logger)
 
-            Logger.info("Logger configured.")
+        Logger.info("Logger configured.")
 
-            // 3. Initialize event bus
-            // EventBus.init()
-            Logger.info("Event bus initialized.")
+        // 3. Initialize event bus
+        // EventBus.init()
+        Logger.info("Event bus initialized.")
 
-            // 4. Load plugins
-            // PluginManager.loadAll()
-            Logger.info("Plugins loaded successfully.")
+        // 4. Load plugins
+        // PluginManager.loadAll()
+        Logger.info("Plugins loaded successfully.")
 
-            // 5. Start downloader subsystem
-            // Downloader.init(config.downloads)
-            Logger.info("Downloader subsystem started.")
+        // 5. Start downloader subsystem
+        // Downloader.init(config.downloads)
+        Logger.info("Downloader subsystem started.")
 
-            // 6. Start OPDS server
-            // OpdsServer.start(config.opds)
-            Logger.info("OPDS server started.")
+        // 6. Start OPDS server
+        // OpdsServer.start(config.opds)
+        Logger.info("OPDS server started.")
 
-            Logger.info("ChapterVault fully started.")
-        } catch (ex: Exception) {
-            Logger.error("Startup failed. Performing graceful shutdown.")
-            Logger.logException(ex)
-            shutdown()
-            throw ex // Ensures JVM exits with non-zero status
-        }
+        Logger.info("ChapterVault fully started.")
+
+        // Keep application running until shutdown
+        awaitCancellation()
     }
 
     /**
@@ -74,7 +73,7 @@ class ChapterVaultApp {
     fun shutdown() {
         if (!shuttingDown.compareAndSet(false, true)) return
 
-        Logger.info("Shutting down ChapterVault…")
+        Logger.info("Shutting down ChapterVault...")
 
         // 1. Stop OPDS server
         // OpdsServer.stop()
@@ -96,20 +95,30 @@ class ChapterVaultApp {
     companion object {
         /**
          * JVM entry point.
-         *
-         * Registers a shutdown hook to ensure graceful termination on SIGTERM/SIGINT.
          */
         @JvmStatic
         fun main(args: Array<String>) = runBlocking {
             val app = ChapterVaultApp()
 
-            // Register JVM shutdown hook. Uses a regular Thread to avoid blocking issues with coroutine contexts during JVM shutdown.
             Runtime.getRuntime().addShutdownHook(Thread {
                 app.shutdown()
             })
 
-            // Start application
-            app.run()
+            try {
+                // Start application
+                runBlocking {
+                    app.run()
+                }
+            } catch (ex: Exception) {
+                // Log fatal error and rethrow
+                Logger.error("Fatal error during startup: ${ex.message}")
+                throw ex
+            } finally {
+                // Ensure shutdown on exit
+                withContext(NonCancellable) {
+                    app.shutdown()
+                }
+            }
         }
     }
 }
