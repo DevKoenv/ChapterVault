@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "dev.koenv"
-version = "1.0-SNAPSHOT"
+version = "RCv1.0.0"
 
 repositories {
     mavenCentral()
@@ -47,12 +47,6 @@ dependencies {
     implementation(libs.jackson.databind)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.jackson.dataformat.yaml)
-
-    // ----------------------------
-    // Hoplite config loader
-    // ----------------------------
-    implementation(libs.hoplite.core)
-    implementation(libs.hoplite.yaml)
 
     // ----------------------------
     // Kotlinx serialization
