@@ -137,7 +137,11 @@ object Logger {
             return@withLock
         }
         closeWriter()
-        logFile?.writeText("")
+        try {
+            logFile?.writeText("")
+        } catch (_: Exception) {
+            // Ignore truncation errors
+        }
         writer = logFile?.let { createWriter(it) }
         info("Log file cleared")
     }

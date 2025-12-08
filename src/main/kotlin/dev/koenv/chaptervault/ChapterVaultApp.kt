@@ -101,7 +101,9 @@ class ChapterVaultApp {
             val app = ChapterVaultApp()
 
             Runtime.getRuntime().addShutdownHook(Thread {
-                app.shutdown()
+                runBlocking {
+                    app.shutdown()
+                }
             })
 
             try {
