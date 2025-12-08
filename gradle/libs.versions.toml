@@ -4,7 +4,6 @@ coroutines = "1.7.3"
 ktor = "2.3.5"
 sqlite = "3.42.0.0"
 jackson = "2.15.3"
-hoplite = "2.9.0"
 kotlinx-serialization = "1.6.0"
 junit = "5.10.0"
 
@@ -31,10 +30,6 @@ jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
 jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
-
-# Hoplite config loader
-hoplite-core = { module = "com.sksamuel.hoplite:hoplite-core", version.ref = "hoplite" }
-hoplite-yaml = { module = "com.sksamuel.hoplite:hoplite-yaml", version.ref = "hoplite" }
 
 # Kotlinx serialization
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
