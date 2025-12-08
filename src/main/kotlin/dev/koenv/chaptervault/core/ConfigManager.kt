@@ -378,7 +378,7 @@ object ConfigManager {
 
     /** Emit a warning for invalid environment variable values */
     private fun warnInvalidEnv(envKey: String, raw: String, expectedType: String) {
-        System.err.println("WARNING: Invalid environment value for '$envKey'. Expected $expectedType, got '$raw'. This env override will be ignored.")
+        System.err.println("WARNING: Invalid environment value for '$envKey'. Expected $expectedType. This env override will be ignored.")
     }
 
     // ------------------------ Merging / Defaults ------------------------
