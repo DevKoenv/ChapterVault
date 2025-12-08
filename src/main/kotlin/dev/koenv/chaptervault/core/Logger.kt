@@ -97,13 +97,17 @@ object Logger {
                 val latest = File(dir, "latest.log")
                 if (latest.exists()) toArchive = latest
                 logFile = latest
-                writer = createWriter(latest)
             }
-
             initialized = true
         }
 
-        toArchive?.let { archiveLatest(it) }
+        toArchive?.let {
+            archiveLatest(it)
+            // Recreate writer after archival
+            lock.withLock {
+                writer = logFile?.let { createWriter(it) }
+            }
+        }
         info("Logger initialized with level ${config.level} (directory='${config.directory}', file=${config.file})")
     }
 
