@@ -359,7 +359,12 @@ object ConfigManager {
         Byte::class -> raw.toByteOrNull()
         Float::class -> raw.toFloatOrNull()
         Double::class -> raw.toDoubleOrNull()
-        Boolean::class -> raw.equals("true", ignoreCase = true) || raw == "1"
+        Boolean::class -> when {
+            raw.equals("true", ignoreCase = true) || raw == "1" -> true
+            raw.equals("false", ignoreCase = true) || raw == "0" -> false
+            else -> null
+        }
+
         Char::class -> raw.firstOrNull()
         else -> null
     }
