@@ -47,7 +47,7 @@ data class Config(
         var colors: Boolean = true,
         var timestampFormat: String = "yyyy-MM-dd HH:mm:ss",
         var json: Boolean = false,
-        var file: Boolean = false,
+        var file: Boolean = true,
         var tagAsField: Boolean = true
     )
 
