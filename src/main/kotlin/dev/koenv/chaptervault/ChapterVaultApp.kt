@@ -1,7 +1,9 @@
 package dev.koenv.chaptervault
 
 import dev.koenv.chaptervault.config.Config
-import dev.koenv.chaptervault.core.*
+import dev.koenv.chaptervault.core.ConfigManager
+import dev.koenv.chaptervault.core.Logger
+import dev.koenv.chaptervault.core.eventbus.EventBus
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
@@ -40,24 +42,11 @@ class ChapterVaultApp {
 
         // 2. Initialize logger according to loaded config
         Logger.init(config.logger)
-
         Logger.info("Logger configured.")
 
         // 3. Initialize event bus
-        // EventBus.init()
+        EventBus.init()
         Logger.info("Event bus initialized.")
-
-        // 4. Load plugins
-        // PluginManager.loadAll()
-        Logger.info("Plugins loaded successfully.")
-
-        // 5. Start downloader subsystem
-        // Downloader.init(config.downloads)
-        Logger.info("Downloader subsystem started.")
-
-        // 6. Start OPDS server
-        // OpdsServer.start(config.opds)
-        Logger.info("OPDS server started.")
 
         Logger.info("ChapterVault fully started.")
 
@@ -70,26 +59,18 @@ class ChapterVaultApp {
      *
      * Idempotent: can be called multiple times safely.
      */
-    fun shutdown() {
+    suspend fun shutdown() {
         if (!shuttingDown.compareAndSet(false, true)) return
 
         Logger.info("Shutting down ChapterVault...")
 
-        // 1. Stop OPDS server
-        // OpdsServer.stop()
+        // 1. Shutdown event bus
+        EventBus.shutdown()
 
-        // 2. Stop downloader subsystem
-        // Downloader.shutdown()
-
-        // 3. Unload plugins
-        // PluginManager.unloadAll()
-
-        // 4. Shutdown event bus
-        // EventBus.shutdown()
-
-        // 5. Flush and close logger
+        // 2. Flush and close logger
         Logger.info("Shutdown complete.")
         Logger.shutdown()
+
     }
 
     companion object {
@@ -108,9 +89,7 @@ class ChapterVaultApp {
 
             try {
                 // Start application
-                runBlocking {
-                    app.run()
-                }
+                app.run()
             } catch (ex: Exception) {
                 // Log fatal error and rethrow
                 Logger.error("Fatal error during startup: ${ex.message}")
