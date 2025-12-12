@@ -88,7 +88,7 @@ object EventBus {
     /**
      * Blocking variant that waits for all handlers on the calling thread.
      *
-     * WARNING: Do NOT call from inside an existing coroutine (runBlocking will throw).
+     * WARNING: Calling this from within a coroutine can lead to thread pool exhaustion and deadlocks.
      * Use emit from coroutines instead.
      */
     fun postBlocking(event: Any) {
