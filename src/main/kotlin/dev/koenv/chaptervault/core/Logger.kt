@@ -13,6 +13,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import java.util.zip.GZIPOutputStream
 import kotlin.concurrent.withLock
@@ -43,7 +44,7 @@ object Logger {
     enum class Level(val priority: Int) { TRACE(0), DEBUG(1), INFO(2), WARN(3), ERROR(4) }
 
     /** Whether the logger has been initialized */
-    private var initialized = false
+    private var initialized = AtomicBoolean(false)
 
     /** Lock for thread-safe access to internal state and file writes */
     private val lock = ReentrantLock()
@@ -98,7 +99,7 @@ object Logger {
                 if (latest.exists()) toArchive = latest
                 logFile = latest
             }
-            initialized = true
+            initialized.set(true)
         }
 
         toArchive?.let {
@@ -123,7 +124,7 @@ object Logger {
         }
         closeWriter()
         logFile = null
-        initialized = false
+        initialized.set(false)
     }
 
     /**
@@ -182,10 +183,8 @@ object Logger {
      * Ensure the logger is initialized. If not, it initializes with default [Config].
      */
     private fun ensureInitialized() {
-        if (!initialized) {
-            lock.withLock {
-                if (!initialized) init(Config.Logger())
-            }
+        if (!initialized.get()) {
+            throw IllegalStateException("Logger not initialized. Call Logger.init() before use.")
         }
     }
 
