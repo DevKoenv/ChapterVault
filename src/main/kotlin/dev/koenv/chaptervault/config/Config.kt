@@ -1,7 +1,5 @@
 package dev.koenv.chaptervault.config
 
-import dev.koenv.chaptervault.core.Logger.Level
-
 /**
  * Root configuration for the application.
  */
@@ -37,18 +35,14 @@ data class Config(
      * @property directory Directory path for log files.
      * @property colors Enable ANSI color codes for console output.
      * @property timestampFormat Pattern for formatting timestamps in human-readable logs.
-     * @property json If true, output logs as compact JSON objects.
      * @property file Enable or disable file logging.
-     * @property tagAsField When JSON logging is enabled, whether the log tag is a separate field.
      */
     data class Logger(
         var level: Level = Level.INFO,
         var directory: String = "logs",
         var colors: Boolean = true,
         var timestampFormat: String = "yyyy-MM-dd HH:mm:ss",
-        var json: Boolean = false,
-        var file: Boolean = true,
-        var tagAsField: Boolean = true
+        var file: Boolean = true
     )
 
     data class Features(

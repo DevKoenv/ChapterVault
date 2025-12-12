@@ -28,7 +28,7 @@ dependencies {
     implementation(libs.coroutines.core)
 
     // ----------------------------
-    // Ktor HTTP client
+    // Ktor Client
     // ----------------------------
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
@@ -52,6 +52,12 @@ dependencies {
     // Kotlinx serialization
     // ----------------------------
     implementation(libs.kotlinx.serialization.core)
+
+    // ----------------------------
+    // Logging
+    // ----------------------------
+    implementation(libs.slf4j.api)
+    implementation(libs.logback.classic)
 
     // ----------------------------
     // Testing
