@@ -5,9 +5,11 @@
     <property name="APP_NAME" value="ChapterVault"/>
     <property name="TIMESTAMP_FORMAT" value="yyyy-MM-dd HH:mm:ss"/>
 
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
+
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <withJansi>true</withJansi>
-        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+        <encoder>
             <pattern>%highlight([%d{${TIMESTAMP_FORMAT}}] [%level] [%X{moduleShort:-${APP_NAME}}] %msg%n)</pattern>
         </encoder>
     </appender>
