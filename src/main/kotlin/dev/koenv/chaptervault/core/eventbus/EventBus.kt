@@ -1,3 +1,4 @@
+// kotlin
 package dev.koenv.chaptervault.core.eventbus
 
 import dev.koenv.chaptervault.core.eventbus.events.UnhandledExceptionEvent
@@ -5,6 +6,7 @@ import kotlin.reflect.KClass
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -16,14 +18,25 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - supports listeners registered for supertypes/interfaces
  * - isolates listener exceptions and continues delivering
  * - emits UnhandledExceptionEvent
+ *
+ * After shutdown, you can call init() again to reuse.
  */
 object EventBus {
     private val listeners = ConcurrentHashMap<KClass<*>, CopyOnWriteArrayList<suspend (Any) -> Unit>>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Volatile
+    private var scope = createScope()
     private val initialized = AtomicBoolean(false)
 
+    private fun createScope() = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * Initialize or reinitialize the internal coroutine scope so the bus can be reused after shutdown.
+     */
     fun init() {
-        initialized.set(true)
+        if (initialized.compareAndSet(false, true)) {
+            scope = createScope()
+        }
     }
 
     /**
@@ -32,8 +45,15 @@ object EventBus {
      */
     suspend fun shutdown() {
         if (initialized.compareAndSet(true, false)) {
-            scope.coroutineContext[Job]?.cancelAndJoin()
+            val s = scope
+            s.coroutineContext[Job]?.cancelAndJoin()
             listeners.clear()
+        }
+    }
+
+    private fun ensureInitialized() {
+        if (!initialized.get()) {
+            throw IllegalStateException("EventBus not initialized. Call EventBus.init() before use.")
         }
     }
 
@@ -50,6 +70,7 @@ object EventBus {
         clazz: KClass<T>,
         handler: suspend (T) -> Unit
     ): ListenerHandle {
+        ensureInitialized()
         val wrapper: suspend (Any) -> Unit = { event -> handler(event as T) }
         listeners.computeIfAbsent(clazz) { CopyOnWriteArrayList() }.add(wrapper)
         return ListenerHandle { listeners[clazz]?.remove(wrapper) }
@@ -71,19 +92,26 @@ object EventBus {
     /**
      * Unsubscribe by handle.
      */
-    fun unsubscribe(handle: ListenerHandle) = handle.unregister()
+    fun unsubscribe(handle: ListenerHandle) {
+        ensureInitialized()
+        handle.unregister()
+    }
 
     /**
      * Fire-and-forget: handlers are launched on internal scope and not awaited.
      */
     fun post(event: Any) {
+        ensureInitialized()
         scope.launch { dispatch(event, wait = false) }
     }
 
     /**
      * Suspend until all handlers complete.
      */
-    suspend fun emit(event: Any) = dispatch(event, wait = true)
+    suspend fun emit(event: Any) {
+        ensureInitialized()
+        return dispatch(event, wait = true)
+    }
 
     /**
      * Blocking variant that waits for all handlers on the calling thread.
@@ -92,28 +120,29 @@ object EventBus {
      * Use emit from coroutines instead.
      */
     fun postBlocking(event: Any) {
+        ensureInitialized()
         runBlocking { dispatch(event, wait = true, forceBlocking = true) }
     }
 
     private suspend fun dispatch(event: Any, wait: Boolean, forceBlocking: Boolean = false) {
-        // collect listeners whose registered class isInstance(event, allows supertypes & interfaces
+        // collect listeners whose registered class isInstance(event), allows supertypes & interfaces
         val snapshotKeys = listeners.keys().toList()
         val matched = snapshotKeys.flatMap { key ->
             if (key.java.isInstance(event)) listeners[key]?.toList().orEmpty() else emptyList()
         }
         if (matched.isEmpty()) return
 
-        val errors = mutableListOf<Throwable>()
+        val errors = ConcurrentLinkedQueue<Throwable>()
 
         if (wait || forceBlocking) {
             if (forceBlocking) {
                 // Run handlers sequentially on current thread to avoid spawning coroutines
                 matched.forEach { handler ->
                     try {
-                        // handler is `suspend`; run in runBlocking context (we are already in runBlocking for postBlocking)
-                        runBlocking { handler(event) }
+                        // handler is `suspend`; already in coroutine context, just call directly
+                        handler(event)
                     } catch (t: Throwable) {
-                        errors += t
+                        errors.add(t)
                     }
                 }
             } else {
@@ -124,7 +153,7 @@ object EventBus {
                             try {
                                 handler(event)
                             } catch (t: Throwable) {
-                                errors += t
+                                errors.add(t)
                             }
                         }
                     }
@@ -137,13 +166,13 @@ object EventBus {
                     try {
                         handler(event)
                     } catch (t: Throwable) {
-                        errors += t
+                        errors.add(t)
                     }
                 }
             }
         }
 
-        if (errors.isNotEmpty() && event !is UnhandledExceptionEvent) {
+        if (errors.isEmpty().not() && event !is UnhandledExceptionEvent) {
             // post errors as an event (fire-and-forget) but avoid recursion.
             post(UnhandledExceptionEvent(event, errors.toList()))
         }

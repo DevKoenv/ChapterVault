@@ -1,7 +1,7 @@
 package dev.koenv.chaptervault.core.eventbus.events
 
 /**
- * Emitted when one or more listeners threw during handling an event.
+ * Emitted when one or more listeners threw an exception during event handling.
  * Note: EventBus avoids re-emitting these recursively.
  */
 data class UnhandledExceptionEvent(
