@@ -1,0 +1,16 @@
+# gradle/libs.versions.toml
+
+[versions]
+# =====================================
+# Kotlin
+# =====================================
+kotlin = "2.3.0"
+
+
+[libraries]
+
+[plugins]
+# =====================================
+# Kotlin
+# =====================================
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
