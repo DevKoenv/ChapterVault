@@ -3,7 +3,6 @@ package dev.koenv.chaptervault.connectors.impl
 import dev.koenv.chaptervault.core.connector.Connector
 import dev.koenv.chaptervault.core.connector.ConnectorConfig
 import dev.koenv.chaptervault.core.connector.ConnectorFeatures
-import dev.koenv.chaptervault.core.connector.defaultCanHandle
 import dev.koenv.chaptervault.core.domain.ChapterMetadata
 import dev.koenv.chaptervault.core.domain.SeriesMetadata
 import dev.koenv.chaptervault.core.domain.SeriesSearchResult
@@ -42,11 +41,13 @@ class MockConnector : Connector {
         "https://mock-comics.example.com/*",
         "mock-comics.example.com/*"
     )
-    
+
     /**
      * Uses default URL pattern matching from baseUrls
+     *
+     * Currently commented out to use the default implementation
      */
-    override fun canHandle(url: String): Boolean = defaultCanHandle(url)
+    // override fun canHandle(url: String): Boolean {}
     
     override suspend fun searchSeries(query: String): List<SeriesSearchResult> {
         // Simulate network delay
