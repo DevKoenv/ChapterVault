@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.app
 import dev.koenv.chaptervault.api.configureApi
 import dev.koenv.chaptervault.opds.configureOpds
 import dev.koenv.chaptervault.connectors.impl.MockConnector
+import dev.koenv.chaptervault.connectors.impl.SampleConnector
 import dev.koenv.chaptervault.connectors.registry.ConnectorRegistryImpl
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import dev.koenv.chaptervault.storage.impl.FileStorageSink
@@ -29,13 +30,12 @@ fun main() {
     // Initialize connector registry
     val connectorRegistry = ConnectorRegistryImpl()
     
-    // Register mock connector (config is now part of connector)
-    val mockConnector = MockConnector()
-    connectorRegistry.register(mockConnector)
-    logger.info { "Registered connector: ${mockConnector.config.name} v${mockConnector.config.version}" }
-    logger.info { "  - Base URLs: ${mockConnector.baseUrls.joinToString()}" }
-    logger.info { "  - Features: search=${mockConnector.config.features.supportsSearch}, auth=${mockConnector.config.features.requiresAuth}" }
-    
+    // Register connector
+    connectorRegistry.register(MockConnector())
+    connectorRegistry.register(SampleConnector())
+
+    logger.info { "Registered ${connectorRegistry.getAllConnectors().count()} connectors" }
+
     // Initialize orchestrator
     val orchestrator = Orchestrator(
         connectorRegistry = connectorRegistry,
