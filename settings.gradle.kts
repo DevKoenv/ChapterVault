@@ -17,20 +17,18 @@ dependencyResolutionManagement {
 
 include("core")
 include("connectors")
-include("download")
 include("orchestration")
 include("storage")
+// include("database") // TODO: Fix Exposed 1.0.0 compilation issues
 include("opds")
 include("api")
-include("runner")
 include("app")
 
 project(":core").projectDir = file("modules/core")
 project(":connectors").projectDir = file("modules/connectors")
-project(":download").projectDir = file("modules/download")
 project(":orchestration").projectDir = file("modules/orchestration")
 project(":storage").projectDir = file("modules/storage")
+// project(":database").projectDir = file("modules/database")
 project(":opds").projectDir = file("modules/opds")
 project(":api").projectDir = file("modules/api")
-project(":runner").projectDir = file("modules/runner")
 project(":app").projectDir = file("modules/app")
