@@ -1,6 +1,9 @@
 package dev.koenv.chaptervault.database.repository
 
 import dev.koenv.chaptervault.core.domain.ChapterMetadata
+import dev.koenv.chaptervault.core.repository.CachedChapter
+import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
+import dev.koenv.chaptervault.core.repository.DownloadStatus
 import dev.koenv.chaptervault.database.entity.*
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -8,53 +11,42 @@ import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
-import java.util.UUID as JavaUUID
+import java.util.UUID
 
 /**
- * Repository for chapter metadata and download tracking
+ * Exposed-based implementation of ChapterRepositoryPort.
+ * Uses H2/SQLite/PostgreSQL via Exposed ORM.
  */
-class ChapterRepository(private val database: Database) {
+class ChapterRepository(private val database: Database) : ChapterRepositoryPort {
 
-    fun initialize() {
+    override fun initialize() {
         transaction(database) {
             SchemaUtils.create(ChapterTable)
         }
     }
 
-    /**
-     * Find chapter by source URL
-     */
-    fun findByUrl(url: String): CachedChapter? {
+    override fun findByUrl(url: String): CachedChapter? {
         return transaction(database) {
             val entity = ChapterEntity.find { ChapterTable.sourceUrl eq url }.firstOrNull()
             entity?.toCachedChapter()
         }
     }
 
-    /**
-     * Find chapter by internal ID
-     */
-    fun findById(id: JavaUUID): CachedChapter? {
+    override fun findById(id: UUID): CachedChapter? {
         return transaction(database) {
             val entity = ChapterEntity.findById(id)
             entity?.toCachedChapter()
         }
     }
 
-    /**
-     * Find all chapters for a series
-     */
-    fun findBySeriesId(seriesId: JavaUUID): List<CachedChapter> {
+    override fun findBySeriesId(seriesId: UUID): List<CachedChapter> {
         return transaction(database) {
             ChapterEntity.find { ChapterTable.seriesId eq seriesId }
                 .map { it.toCachedChapter() }
         }
     }
 
-    /**
-     * Find downloaded chapters for a series
-     */
-    fun findDownloaded(seriesId: JavaUUID): List<CachedChapter> {
+    override fun findDownloaded(seriesId: UUID): List<CachedChapter> {
         return transaction(database) {
             ChapterEntity.find {
                 (ChapterTable.seriesId eq seriesId) and
@@ -63,10 +55,7 @@ class ChapterRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Find chapters not yet downloaded for a series
-     */
-    fun findNotDownloaded(seriesId: JavaUUID): List<CachedChapter> {
+    override fun findNotDownloaded(seriesId: UUID): List<CachedChapter> {
         return transaction(database) {
             ChapterEntity.find {
                 (ChapterTable.seriesId eq seriesId) and
@@ -75,10 +64,7 @@ class ChapterRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Save or update chapter metadata
-     */
-    fun save(metadata: ChapterMetadata, seriesId: JavaUUID): CachedChapter {
+    override fun save(metadata: ChapterMetadata, seriesId: UUID): CachedChapter {
         return transaction(database) {
             val now = Instant.now()
             val series = SeriesEntity.findById(seriesId)
@@ -104,10 +90,7 @@ class ChapterRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Save multiple chapters at once
-     */
-    fun saveAll(chapters: List<ChapterMetadata>, seriesId: JavaUUID): List<CachedChapter> {
+    override fun saveAll(chapters: List<ChapterMetadata>, seriesId: UUID): List<CachedChapter> {
         return transaction(database) {
             chapters.map { metadata ->
                 val now = Instant.now()
@@ -135,10 +118,7 @@ class ChapterRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Mark chapter as currently downloading
-     */
-    fun markDownloading(chapterId: JavaUUID) {
+    override fun markDownloading(chapterId: UUID) {
         transaction(database) {
             val entity = ChapterEntity.findById(chapterId)
                 ?: throw IllegalArgumentException("Chapter not found: $chapterId")
@@ -147,10 +127,7 @@ class ChapterRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Mark chapter as successfully downloaded
-     */
-    fun markDownloaded(chapterId: JavaUUID, filePath: String, fileSize: Long, storageFormat: String) {
+    override fun markDownloaded(chapterId: UUID, filePath: String, fileSize: Long, storageFormat: String) {
         transaction(database) {
             val entity = ChapterEntity.findById(chapterId)
                 ?: throw IllegalArgumentException("Chapter not found: $chapterId")
@@ -163,10 +140,7 @@ class ChapterRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Mark chapter download as failed
-     */
-    fun markFailed(chapterId: JavaUUID) {
+    override fun markFailed(chapterId: UUID) {
         transaction(database) {
             val entity = ChapterEntity.findById(chapterId)
                 ?: throw IllegalArgumentException("Chapter not found: $chapterId")
@@ -175,10 +149,7 @@ class ChapterRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Reset chapter to not downloaded (for re-download)
-     */
-    fun resetDownloadStatus(chapterId: JavaUUID) {
+    override fun resetDownloadStatus(chapterId: UUID) {
         transaction(database) {
             val entity = ChapterEntity.findById(chapterId)
                 ?: throw IllegalArgumentException("Chapter not found: $chapterId")
@@ -191,37 +162,25 @@ class ChapterRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Delete chapter by ID
-     */
-    fun delete(chapterId: JavaUUID) {
+    override fun delete(chapterId: UUID) {
         transaction(database) {
             ChapterEntity.findById(chapterId)?.delete()
         }
     }
 
-    /**
-     * Delete all chapters for a series
-     */
-    fun deleteBySeriesId(seriesId: JavaUUID) {
+    override fun deleteBySeriesId(seriesId: UUID) {
         transaction(database) {
             ChapterEntity.find { ChapterTable.seriesId eq seriesId }.forEach { it.delete() }
         }
     }
 
-    /**
-     * Count chapters for a series
-     */
-    fun countBySeriesId(seriesId: JavaUUID): Long {
+    override fun countBySeriesId(seriesId: UUID): Long {
         return transaction(database) {
             ChapterEntity.find { ChapterTable.seriesId eq seriesId }.count()
         }
     }
 
-    /**
-     * Count downloaded chapters for a series
-     */
-    fun countDownloaded(seriesId: JavaUUID): Long {
+    override fun countDownloaded(seriesId: UUID): Long {
         return transaction(database) {
             ChapterEntity.find {
                 (ChapterTable.seriesId eq seriesId) and
@@ -249,23 +208,3 @@ class ChapterRepository(private val database: Database) {
         )
     }
 }
-
-/**
- * Cached chapter model with internal UUID
- */
-data class CachedChapter(
-    val id: JavaUUID,
-    val seriesId: JavaUUID,
-    val sourceUrl: String,
-    val title: String,
-    val chapterNumber: String,
-    val publishDate: String?,
-    val pageCount: Int?,
-    val downloadStatus: DownloadStatus,
-    val downloadedAt: Instant?,
-    val filePath: String?,
-    val fileSize: Long?,
-    val storageFormat: String?,
-    val createdAt: Instant,
-    val updatedAt: Instant
-)

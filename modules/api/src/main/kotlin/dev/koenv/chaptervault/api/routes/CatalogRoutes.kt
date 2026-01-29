@@ -5,11 +5,11 @@ import dev.koenv.chaptervault.api.models.Pagination
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.catalog.*
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
-import dev.koenv.chaptervault.database.entity.DownloadStatus
-import dev.koenv.chaptervault.database.repository.CachedChapter
-import dev.koenv.chaptervault.database.repository.CachedSeries
-import dev.koenv.chaptervault.database.repository.ChapterRepository
-import dev.koenv.chaptervault.database.repository.SeriesRepository
+import dev.koenv.chaptervault.core.repository.CachedChapter
+import dev.koenv.chaptervault.core.repository.CachedSeries
+import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
+import dev.koenv.chaptervault.core.repository.DownloadStatus
+import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import io.ktor.http.*
 import io.ktor.server.response.*
@@ -22,8 +22,8 @@ import java.util.UUID
 fun Route.catalogRoutes(
     orchestrator: Orchestrator,
     connectorRegistry: ConnectorRegistry,
-    seriesRepository: SeriesRepository,
-    chapterRepository: ChapterRepository
+    seriesRepository: SeriesRepositoryPort,
+    chapterRepository: ChapterRepositoryPort
 ) {
     route("/api/v1/catalog") {
 
@@ -227,7 +227,7 @@ fun Route.catalogRoutes(
     }
 }
 
-private fun CachedSeries.toDownloadSummary(chapterRepository: ChapterRepository): DownloadSummaryDto {
+private fun CachedSeries.toDownloadSummary(chapterRepository: ChapterRepositoryPort): DownloadSummaryDto {
     val totalChapters = chapterRepository.countBySeriesId(id).toInt()
     val downloadedChapters = chapterRepository.countDownloaded(id).toInt()
     return DownloadSummaryDto(

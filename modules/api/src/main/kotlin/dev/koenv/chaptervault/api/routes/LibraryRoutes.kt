@@ -4,11 +4,11 @@ import dev.koenv.chaptervault.api.models.ErrorTypes
 import dev.koenv.chaptervault.api.models.Pagination
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.library.*
-import dev.koenv.chaptervault.database.entity.DownloadStatus
-import dev.koenv.chaptervault.database.repository.CachedChapter
-import dev.koenv.chaptervault.database.repository.CachedSeries
-import dev.koenv.chaptervault.database.repository.ChapterRepository
-import dev.koenv.chaptervault.database.repository.SeriesRepository
+import dev.koenv.chaptervault.core.repository.CachedChapter
+import dev.koenv.chaptervault.core.repository.CachedSeries
+import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
+import dev.koenv.chaptervault.core.repository.DownloadStatus
+import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -18,8 +18,8 @@ import java.util.UUID
  * Library routes - view downloaded content only.
  */
 fun Route.libraryRoutes(
-    seriesRepository: SeriesRepository,
-    chapterRepository: ChapterRepository
+    seriesRepository: SeriesRepositoryPort,
+    chapterRepository: ChapterRepositoryPort
 ) {
     route("/api/v1/library") {
 
@@ -148,7 +148,7 @@ fun Route.libraryRoutes(
     }
 }
 
-private fun CachedSeries.toLibraryDto(chapterRepository: ChapterRepository): LibrarySeriesDto {
+private fun CachedSeries.toLibraryDto(chapterRepository: ChapterRepositoryPort): LibrarySeriesDto {
     val downloadedCount = chapterRepository.countDownloaded(id).toInt()
     val totalCount = chapterRepository.countBySeriesId(id).toInt()
 

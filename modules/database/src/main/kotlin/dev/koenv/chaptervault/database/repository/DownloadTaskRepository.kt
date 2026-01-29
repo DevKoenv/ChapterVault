@@ -1,5 +1,9 @@
 package dev.koenv.chaptervault.database.repository
 
+import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
+import dev.koenv.chaptervault.core.repository.PersistedTask
+import dev.koenv.chaptervault.core.repository.TaskStatus
+import dev.koenv.chaptervault.core.repository.TaskType
 import dev.koenv.chaptervault.database.entity.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.or
@@ -7,53 +11,41 @@ import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
-import java.util.UUID as JavaUUID
+import java.util.UUID
 
 /**
- * Repository for download task persistence
- * Enables recovery of in-progress downloads after restarts
+ * Exposed-based implementation of DownloadTaskRepositoryPort.
+ * Uses H2/SQLite/PostgreSQL via Exposed ORM.
  */
-class DownloadTaskRepository(private val database: Database) {
+class DownloadTaskRepository(private val database: Database) : DownloadTaskRepositoryPort {
 
-    fun initialize() {
+    override fun initialize() {
         transaction(database) {
             SchemaUtils.create(DownloadTaskTable)
         }
     }
 
-    /**
-     * Find task by ID
-     */
-    fun findById(taskId: JavaUUID): PersistedTask? {
+    override fun findById(taskId: UUID): PersistedTask? {
         return transaction(database) {
             DownloadTaskEntity.findById(taskId)?.toPersistedTask()
         }
     }
 
-    /**
-     * Find all pending tasks
-     */
-    fun findPending(): List<PersistedTask> {
+    override fun findPending(): List<PersistedTask> {
         return transaction(database) {
             DownloadTaskEntity.find { DownloadTaskTable.status eq TaskStatus.PENDING.name }
                 .map { it.toPersistedTask() }
         }
     }
 
-    /**
-     * Find all running tasks
-     */
-    fun findRunning(): List<PersistedTask> {
+    override fun findRunning(): List<PersistedTask> {
         return transaction(database) {
             DownloadTaskEntity.find { DownloadTaskTable.status eq TaskStatus.RUNNING.name }
                 .map { it.toPersistedTask() }
         }
     }
 
-    /**
-     * Find all tasks (optionally filtered by status)
-     */
-    fun findAll(status: TaskStatus? = null): List<PersistedTask> {
+    override fun findAll(status: TaskStatus?): List<PersistedTask> {
         return transaction(database) {
             val query = if (status != null) {
                 DownloadTaskEntity.find { DownloadTaskTable.status eq status.name }
@@ -64,14 +56,11 @@ class DownloadTaskRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Create a new task
-     */
-    fun create(
+    override fun create(
         taskType: TaskType,
         targetUrl: String,
-        seriesId: JavaUUID? = null,
-        chapterId: JavaUUID? = null
+        seriesId: UUID?,
+        chapterId: UUID?
     ): PersistedTask {
         return transaction(database) {
             val now = Instant.now()
@@ -89,15 +78,12 @@ class DownloadTaskRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Update task status and progress
-     */
-    fun updateProgress(
-        taskId: JavaUUID,
+    override fun updateProgress(
+        taskId: UUID,
         status: TaskStatus,
-        message: String? = null,
-        current: Int? = null,
-        total: Int? = null
+        message: String?,
+        current: Int?,
+        total: Int?
     ) {
         transaction(database) {
             val entity = DownloadTaskEntity.findById(taskId)
@@ -114,10 +100,7 @@ class DownloadTaskRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Mark task as started
-     */
-    fun markStarted(taskId: JavaUUID, totalProgress: Int = 0) {
+    override fun markStarted(taskId: UUID, totalProgress: Int) {
         transaction(database) {
             val entity = DownloadTaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
@@ -127,10 +110,7 @@ class DownloadTaskRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Mark task as completed
-     */
-    fun markCompleted(taskId: JavaUUID) {
+    override fun markCompleted(taskId: UUID) {
         transaction(database) {
             val entity = DownloadTaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
@@ -140,10 +120,7 @@ class DownloadTaskRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Mark task as failed
-     */
-    fun markFailed(taskId: JavaUUID, errorMessage: String?) {
+    override fun markFailed(taskId: UUID, errorMessage: String?) {
         transaction(database) {
             val entity = DownloadTaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
@@ -153,10 +130,7 @@ class DownloadTaskRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Mark task as cancelled
-     */
-    fun markCancelled(taskId: JavaUUID) {
+    override fun markCancelled(taskId: UUID) {
         transaction(database) {
             val entity = DownloadTaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
@@ -165,19 +139,13 @@ class DownloadTaskRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Delete a task
-     */
-    fun delete(taskId: JavaUUID) {
+    override fun delete(taskId: UUID) {
         transaction(database) {
             DownloadTaskEntity.findById(taskId)?.delete()
         }
     }
 
-    /**
-     * Cleanup old completed/failed/cancelled tasks
-     */
-    fun cleanupOldTasks(olderThan: Instant) {
+    override fun cleanupOldTasks(olderThan: Instant) {
         transaction(database) {
             DownloadTaskEntity.find {
                 (DownloadTaskTable.status eq TaskStatus.COMPLETED.name) or
@@ -191,10 +159,7 @@ class DownloadTaskRepository(private val database: Database) {
         }
     }
 
-    /**
-     * Reset running tasks to pending (for recovery after crash)
-     */
-    fun resetRunningTasks() {
+    override fun resetRunningTasks() {
         transaction(database) {
             DownloadTaskEntity.find { DownloadTaskTable.status eq TaskStatus.RUNNING.name }
                 .forEach {
@@ -221,26 +186,4 @@ class DownloadTaskRepository(private val database: Database) {
             completedAt = completedAt
         )
     }
-}
-
-/**
- * Persisted task model
- */
-data class PersistedTask(
-    val id: JavaUUID,
-    val taskType: TaskType,
-    val targetUrl: String,
-    val seriesId: JavaUUID?,
-    val chapterId: JavaUUID?,
-    val status: TaskStatus,
-    val message: String?,
-    val currentProgress: Int,
-    val totalProgress: Int,
-    val errorMessage: String?,
-    val createdAt: Instant,
-    val startedAt: Instant?,
-    val completedAt: Instant?
-) {
-    val percentage: Int
-        get() = if (totalProgress > 0) (currentProgress * 100) / totalProgress else 0
 }

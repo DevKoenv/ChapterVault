@@ -23,23 +23,3 @@ object DownloadTaskTable : UUIDTable("download_tasks") {
     val startedAt = timestamp("started_at").nullable()
     val completedAt = timestamp("completed_at").nullable()
 }
-
-/**
- * Task types for download operations
- */
-enum class TaskType {
-    DOWNLOAD_CHAPTER,
-    DOWNLOAD_SERIES,
-    REFRESH_METADATA
-}
-
-/**
- * Task status for tracking progress
- */
-enum class TaskStatus {
-    PENDING,
-    RUNNING,
-    COMPLETED,
-    FAILED,
-    CANCELLED
-}

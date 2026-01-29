@@ -2,6 +2,8 @@ package dev.koenv.chaptervault.database.repository
 
 import dev.koenv.chaptervault.core.domain.SeriesMetadata
 import dev.koenv.chaptervault.core.domain.SeriesStatus
+import dev.koenv.chaptervault.core.repository.CachedSeries
+import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.database.entity.*
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -11,15 +13,15 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import java.time.Instant
-import java.util.UUID as JavaUUID
+import java.util.UUID
 
 /**
- * Repository for series metadata caching
- * Stores static information that doesn't change frequently
+ * Exposed-based implementation of SeriesRepositoryPort.
+ * Uses H2/SQLite/PostgreSQL via Exposed ORM.
  */
-class SeriesRepository(private val database: Database) {
+class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
 
-    fun initialize() {
+    override fun initialize() {
         transaction(database) {
             SchemaUtils.create(SeriesTable, SeriesTagTable, SeriesTagsTable)
         }
@@ -28,7 +30,7 @@ class SeriesRepository(private val database: Database) {
     /**
      * Find series by source URL or return null
      */
-    fun findByUrl(url: String): CachedSeries? {
+    override fun findByUrl(url: String): CachedSeries? {
         return transaction(database) {
             val entity = SeriesEntity.find { SeriesTable.sourceUrl eq url }.firstOrNull()
             entity?.toCachedSeries()
@@ -38,7 +40,7 @@ class SeriesRepository(private val database: Database) {
     /**
      * Find series by internal ID
      */
-    fun findById(id: JavaUUID): CachedSeries? {
+    override fun findById(id: UUID): CachedSeries? {
         return transaction(database) {
             val entity = SeriesEntity.findById(id)
             entity?.toCachedSeries()
@@ -48,7 +50,7 @@ class SeriesRepository(private val database: Database) {
     /**
      * Save or update series metadata
      */
-    fun save(metadata: SeriesMetadata, language: String? = null): CachedSeries {
+    override fun save(metadata: SeriesMetadata, language: String?): CachedSeries {
         return transaction(database) {
             val now = Instant.now()
 
@@ -101,7 +103,7 @@ class SeriesRepository(private val database: Database) {
     /**
      * Get all cached series
      */
-    fun findAll(): List<CachedSeries> {
+    override fun findAll(): List<CachedSeries> {
         return transaction(database) {
             SeriesEntity.all().map { it.toCachedSeries() }
         }
@@ -110,7 +112,7 @@ class SeriesRepository(private val database: Database) {
     /**
      * Delete series by ID
      */
-    fun delete(id: JavaUUID) {
+    override fun delete(id: UUID) {
         transaction(database) {
             val entity = SeriesEntity.findById(id) ?: return@transaction
 
@@ -138,20 +140,3 @@ class SeriesRepository(private val database: Database) {
         )
     }
 }
-
-/**
- * Cached series model with internal UUID
- */
-data class CachedSeries(
-    val id: JavaUUID,
-    val sourceUrl: String,
-    val title: String,
-    val description: String?,
-    val author: String?,
-    val coverUrl: String?,
-    val status: SeriesStatus,
-    val language: String?,
-    val tags: List<String>,
-    val createdAt: Instant,
-    val updatedAt: Instant
-)

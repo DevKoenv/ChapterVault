@@ -6,9 +6,9 @@ import dev.koenv.chaptervault.api.routes.catalogRoutes
 import dev.koenv.chaptervault.api.routes.downloadRoutes
 import dev.koenv.chaptervault.api.routes.libraryRoutes
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
-import dev.koenv.chaptervault.database.repository.ChapterRepository
-import dev.koenv.chaptervault.database.repository.DownloadTaskRepository
-import dev.koenv.chaptervault.database.repository.SeriesRepository
+import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
+import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
+import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -32,9 +32,9 @@ import java.io.File
 data class ApiConfiguration(
     val orchestrator: Orchestrator,
     val connectorRegistry: ConnectorRegistry,
-    val seriesRepository: SeriesRepository,
-    val chapterRepository: ChapterRepository,
-    val downloadTaskRepository: DownloadTaskRepository,
+    val seriesRepository: SeriesRepositoryPort,
+    val chapterRepository: ChapterRepositoryPort,
+    val downloadTaskRepository: DownloadTaskRepositoryPort,
     val storageDir: File
 )
 

@@ -20,6 +20,11 @@ ktor = "3.4.0"
 playwright = "1.49.0"
 
 # =====================================
+# HTML Parsing
+# =====================================
+jsoup = "1.18.3"
+
+# =====================================
 # Database
 # =====================================
 exposed = "1.0.0"
@@ -66,6 +71,11 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 # Playwright
 # =====================================
 playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
+
+# =====================================
+# HTML Parsing
+# =====================================
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 
 # =====================================
 # Database - Exposed
