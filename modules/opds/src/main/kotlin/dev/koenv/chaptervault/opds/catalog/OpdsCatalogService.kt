@@ -1,10 +1,10 @@
 package dev.koenv.chaptervault.opds.catalog
 
-import dev.koenv.chaptervault.database.entity.DownloadStatus
-import dev.koenv.chaptervault.database.repository.CachedChapter
-import dev.koenv.chaptervault.database.repository.CachedSeries
-import dev.koenv.chaptervault.database.repository.ChapterRepository
-import dev.koenv.chaptervault.database.repository.SeriesRepository
+import dev.koenv.chaptervault.core.repository.CachedChapter
+import dev.koenv.chaptervault.core.repository.CachedSeries
+import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
+import dev.koenv.chaptervault.core.repository.DownloadStatus
+import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.opds.builder.opdsFeed
 import dev.koenv.chaptervault.opds.model.*
 import dev.koenv.chaptervault.opds.renderer.FeedRenderer
@@ -20,8 +20,8 @@ import java.util.UUID
  * Supports multiple OPDS versions through the renderer abstraction.
  */
 class OpdsCatalogService(
-    private val seriesRepository: SeriesRepository,
-    private val chapterRepository: ChapterRepository,
+    private val seriesRepository: SeriesRepositoryPort,
+    private val chapterRepository: ChapterRepositoryPort,
     private val storageBasePath: File,
     private val baseUrl: String = "http://localhost:8080/opds",
     private val version: OpdsVersion = OpdsVersion.V1_2,

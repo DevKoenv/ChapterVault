@@ -1,7 +1,7 @@
 package dev.koenv.chaptervault.opds
 
-import dev.koenv.chaptervault.database.repository.ChapterRepository
-import dev.koenv.chaptervault.database.repository.SeriesRepository
+import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
+import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.opds.catalog.OpdsCatalogService
 import dev.koenv.chaptervault.opds.model.OpdsVersion
 import dev.koenv.chaptervault.opds.routes.opdsRoutes
@@ -10,11 +10,18 @@ import io.ktor.server.routing.*
 import java.io.File
 
 /**
- * OPDS module configuration
+ * OPDS module configuration.
+ *
+ * Configure via environment variables:
+ * - CHAPTERVAULT_BASE_URL: Base URL for the server (e.g., "https://comics.example.com")
+ *   The OPDS endpoint will be at {CHAPTERVAULT_BASE_URL}/opds
+ *
+ * Note: OPDS entry IDs use full URLs as per the Atom/OPDS specification.
+ * This is intentional and ensures globally unique identifiers.
  */
 data class OpdsConfiguration(
-    val seriesRepository: SeriesRepository,
-    val chapterRepository: ChapterRepository,
+    val seriesRepository: SeriesRepositoryPort,
+    val chapterRepository: ChapterRepositoryPort,
     val storageBasePath: File,
     val baseUrl: String = "http://localhost:8080/opds",
     val version: OpdsVersion = OpdsVersion.V1_2,
@@ -55,8 +62,8 @@ fun Application.configureOpds(config: OpdsConfiguration) {
  * Alternative: Configure OPDS with inline parameters (for simpler setup)
  */
 fun Application.configureOpds(
-    seriesRepository: SeriesRepository,
-    chapterRepository: ChapterRepository,
+    seriesRepository: SeriesRepositoryPort,
+    chapterRepository: ChapterRepositoryPort,
     storageBasePath: File,
     baseUrl: String = "http://localhost:8080/opds"
 ) {

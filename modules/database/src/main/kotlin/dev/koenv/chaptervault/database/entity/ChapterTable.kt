@@ -24,14 +24,3 @@ object ChapterTable : UUIDTable("chapters") {
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
 }
-
-/**
- * Download status for chapters
- */
-enum class DownloadStatus {
-    NOT_DOWNLOADED,
-    DOWNLOADING,
-    DOWNLOADED,
-    FAILED,
-    PARTIAL
-}

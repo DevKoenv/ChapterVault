@@ -6,10 +6,10 @@ import dev.koenv.chaptervault.core.domain.ChapterMetadata
 import dev.koenv.chaptervault.core.domain.SeriesMetadata
 import dev.koenv.chaptervault.core.domain.SeriesSearchResult
 import dev.koenv.chaptervault.core.storage.StorageSink
-import dev.koenv.chaptervault.database.entity.TaskStatus as DbTaskStatus
-import dev.koenv.chaptervault.database.repository.DownloadTaskRepository
-import dev.koenv.chaptervault.database.repository.SeriesRepository
-import dev.koenv.chaptervault.database.repository.ChapterRepository
+import dev.koenv.chaptervault.core.repository.TaskStatus as DbTaskStatus
+import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
+import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
+import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
 import dev.koenv.chaptervault.orchestration.ratelimit.RateLimiter
 import dev.koenv.chaptervault.orchestration.task.*
 import kotlinx.coroutines.*
@@ -36,9 +36,9 @@ class Orchestrator(
     private val connectorRegistry: ConnectorRegistry,
     private val storageSink: StorageSink,
     private val rateLimiter: RateLimiter = RateLimiter(),
-    private val seriesRepository: SeriesRepository? = null,
-    private val chapterRepository: ChapterRepository? = null,
-    private val downloadTaskRepository: DownloadTaskRepository? = null
+    private val seriesRepository: SeriesRepositoryPort? = null,
+    private val chapterRepository: ChapterRepositoryPort? = null,
+    private val downloadTaskRepository: DownloadTaskRepositoryPort? = null
 ) {
 
     private val logger = LoggerFactory.getLogger(Orchestrator::class.java)
@@ -208,12 +208,23 @@ class Orchestrator(
                 }
                 logger.info("[Task {}] Fetched metadata for: {}", taskId, seriesMetadata.title)
 
+                // Save series to database
+                val cachedSeries = seriesRepository?.save(seriesMetadata)
+                val seriesId = cachedSeries?.id
+                logger.info("[Task {}] Saved series to database with ID: {}", taskId, seriesId)
+
                 // Fetch chapter list
                 logger.debug("[Task {}] Fetching chapter list...", taskId)
                 val chapters = withRateLimit(connector) {
                     connector.fetchChapterList(seriesUrl)
                 }
                 logger.info("[Task {}] Found {} chapters", taskId, chapters.size)
+
+                // Save chapters to database
+                val cachedChapters = if (seriesId != null) {
+                    chapterRepository?.saveAll(chapters, seriesId)
+                } else null
+                logger.info("[Task {}] Saved {} chapters to database", taskId, cachedChapters?.size ?: 0)
 
                 val message = "Downloading ${chapters.size} chapters"
                 updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, message, 0, chapters.size))
@@ -231,6 +242,12 @@ class Orchestrator(
                     updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, chapterMessage, index, chapters.size))
                     updatePersistedTask(persistedTaskId, DbTaskStatus.RUNNING, chapterMessage, index, chapters.size)
 
+                    // Find the cached chapter to update later
+                    val cachedChapter = cachedChapters?.find { it.sourceUrl == chapterMetadata.url }
+
+                    // Mark chapter as downloading
+                    cachedChapter?.let { chapterRepository?.markDownloading(it.id) }
+
                     storageSink.beginChapter(chapterMetadata)
 
                     withRateLimit(connector) {
@@ -238,6 +255,15 @@ class Orchestrator(
                     }
 
                     storageSink.endChapter()
+
+                    // Update chapter with file info
+                    val filePath = storageSink.getLastWrittenPath()
+                    val fileSize = storageSink.getLastWrittenSize()
+                    if (cachedChapter != null && filePath != null && fileSize != null) {
+                        chapterRepository?.markDownloaded(cachedChapter.id, filePath, fileSize, "CBZ")
+                        logger.debug("[Task {}] Updated chapter {} with file: {}", taskId, cachedChapter.id, filePath)
+                    }
+
                     logger.debug("[Task {}] Completed chapter {}/{}", taskId, index + 1, chapters.size)
                 }
 
@@ -251,6 +277,112 @@ class Orchestrator(
 
             } catch (e: Exception) {
                 val errorMessage = "Download failed: ${e.message}"
+                logger.error("[Task {}] {}", taskId, errorMessage, e)
+                updateProgress(TaskProgress(taskId, TaskStatus.FAILED, error = e.message))
+                updatePersistedTaskFailed(persistedTaskId, e.message)
+            }
+        }
+
+        return taskId
+    }
+
+    /**
+     * Download specific chapters by their database IDs.
+     * @param seriesId The database ID of the series
+     * @param chapterIds The database IDs of chapters to download
+     * @param persistedTaskId Optional ID of a persisted task to update progress on
+     */
+    suspend fun downloadChapters(seriesId: UUID, chapterIds: List<UUID>, persistedTaskId: UUID? = null): String {
+        val taskId = persistedTaskId?.toString() ?: Uuid.random().toString()
+        logger.info("[Task {}] Starting download of {} specific chapters for series {}", taskId, chapterIds.size, seriesId)
+
+        updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, "Starting chapter download"))
+        updatePersistedTask(persistedTaskId, DbTaskStatus.RUNNING, "Starting chapter download", 0, chapterIds.size)
+
+        scope.launch {
+            try {
+                // Get series from database
+                val cachedSeries = seriesRepository?.findById(seriesId)
+                    ?: throw IllegalArgumentException("Series not found in database: $seriesId")
+
+                // Find connector for the series URL
+                logger.debug("[Task {}] Finding connector for series URL: {}", taskId, cachedSeries.sourceUrl)
+                val connector = findConnectorOrThrow(cachedSeries.sourceUrl)
+                logger.info("[Task {}] Using connector: {}", taskId, connector.config.name)
+
+                // Fetch series metadata for storage
+                val seriesMetadata = withRateLimit(connector) {
+                    connector.fetchSeriesMetadata(cachedSeries.sourceUrl)
+                }
+
+                // Get chapters from database
+                val chaptersToDownload = chapterIds.mapNotNull { chapterId ->
+                    chapterRepository?.findById(chapterId)
+                }
+
+                if (chaptersToDownload.isEmpty()) {
+                    throw IllegalArgumentException("No valid chapters found to download")
+                }
+
+                logger.info("[Task {}] Found {} chapters to download", taskId, chaptersToDownload.size)
+
+                val message = "Downloading ${chaptersToDownload.size} chapters"
+                updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, message, 0, chaptersToDownload.size))
+                updatePersistedTask(persistedTaskId, DbTaskStatus.RUNNING, message, 0, chaptersToDownload.size)
+
+                // Begin series storage
+                storageSink.beginSeries(seriesMetadata)
+
+                // Download each chapter
+                chaptersToDownload.forEachIndexed { index, cachedChapter ->
+                    val chapterMessage = "Downloading chapter ${index + 1}/${chaptersToDownload.size}: ${cachedChapter.title}"
+                    logger.info("[Task {}] {}", taskId, chapterMessage)
+
+                    updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, chapterMessage, index, chaptersToDownload.size))
+                    updatePersistedTask(persistedTaskId, DbTaskStatus.RUNNING, chapterMessage, index, chaptersToDownload.size)
+
+                    // Mark chapter as downloading
+                    chapterRepository?.markDownloading(cachedChapter.id)
+
+                    // Create ChapterMetadata for storage
+                    val chapterMetadata = dev.koenv.chaptervault.core.domain.ChapterMetadata(
+                        url = cachedChapter.sourceUrl,
+                        seriesUrl = cachedSeries.sourceUrl,
+                        title = cachedChapter.title,
+                        chapterNumber = cachedChapter.chapterNumber,
+                        publishDate = cachedChapter.publishDate,
+                        pageCount = cachedChapter.pageCount
+                    )
+
+                    storageSink.beginChapter(chapterMetadata)
+
+                    withRateLimit(connector) {
+                        connector.downloadChapter(cachedChapter.sourceUrl, storageSink)
+                    }
+
+                    storageSink.endChapter()
+
+                    // Update chapter with file info
+                    val filePath = storageSink.getLastWrittenPath()
+                    val fileSize = storageSink.getLastWrittenSize()
+                    if (filePath != null && fileSize != null) {
+                        chapterRepository?.markDownloaded(cachedChapter.id, filePath, fileSize, "CBZ")
+                        logger.debug("[Task {}] Updated chapter {} with file: {}", taskId, cachedChapter.id, filePath)
+                    }
+
+                    logger.debug("[Task {}] Completed chapter {}/{}", taskId, index + 1, chaptersToDownload.size)
+                }
+
+                // End series
+                storageSink.endSeries()
+
+                val completedMessage = "Downloaded ${chaptersToDownload.size} chapters successfully"
+                logger.info("[Task {}] {}", taskId, completedMessage)
+                updateProgress(TaskProgress(taskId, TaskStatus.COMPLETED, completedMessage, chaptersToDownload.size, chaptersToDownload.size))
+                updatePersistedTaskCompleted(persistedTaskId)
+
+            } catch (e: Exception) {
+                val errorMessage = "Chapter download failed: ${e.message}"
                 logger.error("[Task {}] {}", taskId, errorMessage, e)
                 updateProgress(TaskProgress(taskId, TaskStatus.FAILED, error = e.message))
                 updatePersistedTaskFailed(persistedTaskId, e.message)
