@@ -1,6 +1,6 @@
 package dev.koenv.chaptervault.database.entity
 
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.v1.core.Table
 
 /**
  * Many-to-many relationship table between Series and Tags

@@ -13,6 +13,7 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":database"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.slf4j.api)
 }

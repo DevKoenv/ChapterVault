@@ -1,13 +1,14 @@
 package dev.koenv.chaptervault.database.entity
 
-import org.jetbrains.exposed.dao.id.UUIDTable
-import org.jetbrains.exposed.sql.javatime.timestamp
+import org.jetbrains.exposed.v1.core.dao.id.java.UUIDTable
+import org.jetbrains.exposed.v1.javatime.timestamp
+
 
 /**
  * Table for storing cached series metadata
  * Caches static information that doesn't change frequently
  */
-object SeriesTable : UUIDTable("series") {
+object SeriesTable : UUIDTable(name = "series") {
     val sourceUrl = varchar("source_url", 512).uniqueIndex()
     val title = varchar("title", 256)
     val description = text("description").nullable()

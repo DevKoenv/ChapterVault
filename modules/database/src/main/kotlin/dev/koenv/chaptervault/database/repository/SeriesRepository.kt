@@ -3,9 +3,13 @@ package dev.koenv.chaptervault.database.repository
 import dev.koenv.chaptervault.core.domain.SeriesMetadata
 import dev.koenv.chaptervault.core.domain.SeriesStatus
 import dev.koenv.chaptervault.database.entity.*
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.SchemaUtils
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
 import java.time.Instant
 import java.util.UUID as JavaUUID
 
@@ -14,13 +18,13 @@ import java.util.UUID as JavaUUID
  * Stores static information that doesn't change frequently
  */
 class SeriesRepository(private val database: Database) {
-    
+
     fun initialize() {
         transaction(database) {
             SchemaUtils.create(SeriesTable, SeriesTagTable, SeriesTagsTable)
         }
     }
-    
+
     /**
      * Find series by source URL or return null
      */
@@ -30,7 +34,7 @@ class SeriesRepository(private val database: Database) {
             entity?.toCachedSeries()
         }
     }
-    
+
     /**
      * Find series by internal ID
      */
@@ -40,20 +44,21 @@ class SeriesRepository(private val database: Database) {
             entity?.toCachedSeries()
         }
     }
-    
+
     /**
      * Save or update series metadata
      */
     fun save(metadata: SeriesMetadata, language: String? = null): CachedSeries {
         return transaction(database) {
             val now = Instant.now()
-            
+
             val entity = SeriesEntity.find { SeriesTable.sourceUrl eq metadata.url }.firstOrNull()
                 ?: SeriesEntity.new {
                     sourceUrl = metadata.url
                     createdAt = now
+                    updatedAt = now
                 }
-            
+
             entity.apply {
                 title = metadata.title
                 description = metadata.description
@@ -63,29 +68,36 @@ class SeriesRepository(private val database: Database) {
                 this.language = language
                 updatedAt = now
             }
-            
-            // Handle tags
+
+            // Handle tags using the junction table directly
             val existingTags = entity.tags.toList()
-            val tagNames = metadata.tags.toSet()
-            
+            val existingTagNames = existingTags.map { it.name }.toSet()
+            val newTagNames = metadata.tags.toSet()
+
             // Remove tags that are no longer present
-            existingTags.filter { it.name !in tagNames }.forEach { tag ->
-                entity.tags = entity.tags.minus(tag)
-            }
-            
-            // Add new tags
-            tagNames.forEach { tagName ->
-                val tag = SeriesTagEntity.find { SeriesTagTable.name eq tagName }.firstOrNull()
-                    ?: SeriesTagEntity.new { name = tagName }
-                if (tag !in entity.tags) {
-                    entity.tags = entity.tags.plus(tag)
+            val tagsToRemove = existingTags.filter { it.name !in newTagNames }
+            tagsToRemove.forEach { tag ->
+                SeriesTagsTable.deleteWhere {
+                    (SeriesTagsTable.series eq entity.id) and (SeriesTagsTable.tag eq tag.id)
                 }
             }
-            
+
+            // Add new tags
+            val tagsToAdd = newTagNames.filter { it !in existingTagNames }
+            tagsToAdd.forEach { tagName ->
+                val tag = SeriesTagEntity.find { SeriesTagTable.name eq tagName }.firstOrNull()
+                    ?: SeriesTagEntity.new { name = tagName }
+
+                SeriesTagsTable.insert {
+                    it[series] = entity.id
+                    it[SeriesTagsTable.tag] = tag.id
+                }
+            }
+
             entity.toCachedSeries()
         }
     }
-    
+
     /**
      * Get all cached series
      */
@@ -94,7 +106,22 @@ class SeriesRepository(private val database: Database) {
             SeriesEntity.all().map { it.toCachedSeries() }
         }
     }
-    
+
+    /**
+     * Delete series by ID
+     */
+    fun delete(id: JavaUUID) {
+        transaction(database) {
+            val entity = SeriesEntity.findById(id) ?: return@transaction
+
+            // Delete tag associations first
+            SeriesTagsTable.deleteWhere { SeriesTagsTable.series eq entity.id }
+
+            // Delete series
+            entity.delete()
+        }
+    }
+
     private fun SeriesEntity.toCachedSeries(): CachedSeries {
         return CachedSeries(
             id = id.value,

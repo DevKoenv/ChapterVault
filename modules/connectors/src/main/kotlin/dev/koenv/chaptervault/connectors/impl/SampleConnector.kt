@@ -21,11 +21,13 @@ import kotlin.time.Duration.Companion.seconds
  */
 class SampleConnector : Connector {
 
+    private val logger = org.slf4j.LoggerFactory.getLogger(SampleConnector::class.java)
+
     override val config = ConnectorConfig(
         name = "SampleConnector",
         version = "1.0.0",
         rateLimitConfig = RateLimitConfig(
-            minDelay = 10.seconds
+            minDelay = 1.seconds
         ),
         features = ConnectorFeatures(
             supportsSearch = true,
@@ -38,7 +40,7 @@ class SampleConnector : Connector {
 
     override val baseUrls = listOf(
         "https://example.net/*",
-        "sample-comics.example.net/*"
+        "https://sample-comics.example.net/*"
     )
 
     /**
@@ -82,9 +84,10 @@ class SampleConnector : Connector {
     }
 
     override suspend fun searchSeries(query: String): List<SeriesSearchResult> {
+        logger.info("Searching for: {}", query)
         delay(100) // simulate network delay
 
-        return seriesList
+        val results = seriesList
             .filter { it.title.contains(query, ignoreCase = true) }
             .map {
                 SeriesSearchResult(
@@ -94,31 +97,42 @@ class SampleConnector : Connector {
                     coverUrl = it.coverUrl
                 )
             }
+        logger.info("Search found {} results for '{}'", results.size, query)
+        return results
     }
 
     override suspend fun fetchSeriesMetadata(seriesUrl: String): SeriesMetadata {
+        logger.info("Fetching series metadata for: {}", seriesUrl)
         delay(100) // simulate network delay
 
-        return seriesList.find { it.url == seriesUrl }
+        val series = seriesList.find { it.url == seriesUrl }
             ?: throw IllegalArgumentException("Series not found: $seriesUrl")
+        logger.info("Found series: {}", series.title)
+        return series
     }
 
     override suspend fun fetchChapterList(seriesUrl: String): List<ChapterMetadata> {
+        logger.info("Fetching chapter list for: {}", seriesUrl)
         delay(100)
 
-        return chapterMap[seriesUrl]
+        val chapters = chapterMap[seriesUrl]
             ?: throw IllegalArgumentException("No chapters found for series: $seriesUrl")
+        logger.info("Found {} chapters for series", chapters.size)
+        return chapters
     }
 
     override suspend fun downloadChapter(chapterUrl: String, storage: StorageSink) {
+        logger.info("Downloading chapter: {}", chapterUrl)
         delay(200) // simulate network delay for discovering pages
 
         val pageCount = 3
         for (pageIndex in 0 until pageCount) {
+            logger.debug("Downloading page {}/{}", pageIndex + 1, pageCount)
             delay(150)
             val imageBytes = generateMockImage(pageIndex)
             storage.writePage(pageIndex, imageBytes, "image/png")
         }
+        logger.info("Chapter download complete: {}", chapterUrl)
     }
 
     private fun generateMockImage(pageIndex: Int): ByteArray {
