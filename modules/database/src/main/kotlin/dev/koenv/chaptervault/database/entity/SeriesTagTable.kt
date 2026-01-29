@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.database.entity
 
-import org.jetbrains.exposed.dao.id.IntIdTable
+import org.jetbrains.exposed.v1.core.dao.id.IntIdTable
+
 
 /**
  * Table for storing series tags

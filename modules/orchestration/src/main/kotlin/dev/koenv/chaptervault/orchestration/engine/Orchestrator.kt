@@ -6,50 +6,69 @@ import dev.koenv.chaptervault.core.domain.ChapterMetadata
 import dev.koenv.chaptervault.core.domain.SeriesMetadata
 import dev.koenv.chaptervault.core.domain.SeriesSearchResult
 import dev.koenv.chaptervault.core.storage.StorageSink
+import dev.koenv.chaptervault.database.entity.TaskStatus as DbTaskStatus
+import dev.koenv.chaptervault.database.repository.DownloadTaskRepository
+import dev.koenv.chaptervault.database.repository.SeriesRepository
+import dev.koenv.chaptervault.database.repository.ChapterRepository
 import dev.koenv.chaptervault.orchestration.ratelimit.RateLimiter
 import dev.koenv.chaptervault.orchestration.task.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
+import java.util.UUID
 import kotlin.uuid.Uuid
 
 /**
  * Orchestrator manages task execution, rate limiting, and retries.
- * 
+ *
  * Key responsibilities:
  * - Accept high-level tasks (browse, download)
  * - Find appropriate connector
  * - Enforce rate limits
  * - Manage retries and errors
  * - Report progress
- * 
+ * - Cache metadata in database (when repositories provided)
+ *
  * Orchestrator NEVER fetches or parses data directly.
  */
 class Orchestrator(
     private val connectorRegistry: ConnectorRegistry,
     private val storageSink: StorageSink,
-    private val rateLimiter: RateLimiter = RateLimiter()
+    private val rateLimiter: RateLimiter = RateLimiter(),
+    private val seriesRepository: SeriesRepository? = null,
+    private val chapterRepository: ChapterRepository? = null,
+    private val downloadTaskRepository: DownloadTaskRepository? = null
 ) {
-    
+
     private val logger = LoggerFactory.getLogger(Orchestrator::class.java)
     private val progressMap = mutableMapOf<String, TaskProgress>()
     private val progressMutex = Mutex()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     /**
-     * Search for series
+     * Search for series across all connectors or a specific connector.
+     * @param query The search query
+     * @param connectorName Optional connector name to search only that connector
      */
-    suspend fun searchSeries(query: String): List<SeriesSearchResult> {
+    suspend fun searchSeries(query: String, connectorName: String? = null): List<SeriesSearchResult> {
         val taskId = Uuid.random().toString()
-        logger.info("Starting search for: {}", query)
+        logger.info("Starting search for: {} (connector: {})", query, connectorName ?: "all")
         updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, "Searching for '$query'"))
-        
+
         return try {
             val results = mutableListOf<SeriesSearchResult>()
-            
-            // Try all connectors that support search
-            connectorRegistry.getAllConnectors().forEach { connector ->
+
+            // Determine which connectors to search
+            val connectorsToSearch = if (connectorName != null) {
+                val connector = connectorRegistry.findByName(connectorName)
+                if (connector != null) listOf(connector) else emptyList()
+            } else {
+                connectorRegistry.getAllConnectors()
+            }
+
+            // Try selected connectors that support search
+            connectorsToSearch.forEach { connector ->
                 try {
                     val connectorResults = withRateLimit(connector) {
                         connector.searchSeries(query)
@@ -60,7 +79,7 @@ class Orchestrator(
                     // Continue with other connectors if one fails
                 }
             }
-            
+
             logger.info("Search completed: found {} results for '{}'", results.size, query)
             updateProgress(TaskProgress(taskId, TaskStatus.COMPLETED, "Found ${results.size} results"))
             results
@@ -126,9 +145,9 @@ class Orchestrator(
         scope.launch {
             try {
                 val connector = findConnectorOrThrow(chapterUrl)
-                
+
                 // Fetch chapter metadata first
-                val seriesUrl = extractSeriesUrl(chapterUrl)
+                val seriesUrl = extractSeriesUrl(connector, chapterUrl)
                 val chapters = withRateLimit(connector) {
                     connector.fetchChapterList(seriesUrl)
                 }
@@ -166,71 +185,106 @@ class Orchestrator(
     
     /**
      * Download entire series (all chapters)
+     * @param seriesUrl The URL of the series to download
+     * @param persistedTaskId Optional ID of a persisted task to update progress on
      */
-    suspend fun downloadSeries(seriesUrl: String): String {
-        val taskId = Uuid.random().toString()
+    suspend fun downloadSeries(seriesUrl: String, persistedTaskId: UUID? = null): String {
+        val taskId = persistedTaskId?.toString() ?: Uuid.random().toString()
+        logger.info("[Task {}] Starting series download for URL: {}", taskId, seriesUrl)
+
         updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, "Starting series download"))
-        
+        updatePersistedTask(persistedTaskId, DbTaskStatus.RUNNING, "Starting series download", 0, 0)
+
         scope.launch {
             try {
+                logger.debug("[Task {}] Finding connector for URL: {}", taskId, seriesUrl)
                 val connector = findConnectorOrThrow(seriesUrl)
-                
+                logger.info("[Task {}] Using connector: {}", taskId, connector.config.name)
+
                 // Fetch series metadata
+                logger.debug("[Task {}] Fetching series metadata...", taskId)
                 val seriesMetadata = withRateLimit(connector) {
                     connector.fetchSeriesMetadata(seriesUrl)
                 }
-                
+                logger.info("[Task {}] Fetched metadata for: {}", taskId, seriesMetadata.title)
+
                 // Fetch chapter list
+                logger.debug("[Task {}] Fetching chapter list...", taskId)
                 val chapters = withRateLimit(connector) {
                     connector.fetchChapterList(seriesUrl)
                 }
-                
-                updateProgress(TaskProgress(
-                    taskId, 
-                    TaskStatus.RUNNING, 
-                    "Downloading ${chapters.size} chapters", 
-                    0, 
-                    chapters.size
-                ))
-                
+                logger.info("[Task {}] Found {} chapters", taskId, chapters.size)
+
+                val message = "Downloading ${chapters.size} chapters"
+                updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, message, 0, chapters.size))
+                updatePersistedTask(persistedTaskId, DbTaskStatus.RUNNING, message, 0, chapters.size)
+
                 // Begin series
+                logger.debug("[Task {}] Beginning series storage...", taskId)
                 storageSink.beginSeries(seriesMetadata)
-                
+
                 // Download each chapter
                 chapters.forEachIndexed { index, chapterMetadata ->
-                    updateProgress(TaskProgress(
-                        taskId,
-                        TaskStatus.RUNNING,
-                        "Downloading chapter ${index + 1}/${chapters.size}",
-                        index + 1,
-                        chapters.size
-                    ))
-                    
+                    val chapterMessage = "Downloading chapter ${index + 1}/${chapters.size}: ${chapterMetadata.title}"
+                    logger.info("[Task {}] {}", taskId, chapterMessage)
+
+                    updateProgress(TaskProgress(taskId, TaskStatus.RUNNING, chapterMessage, index, chapters.size))
+                    updatePersistedTask(persistedTaskId, DbTaskStatus.RUNNING, chapterMessage, index, chapters.size)
+
                     storageSink.beginChapter(chapterMetadata)
-                    
+
                     withRateLimit(connector) {
                         connector.downloadChapter(chapterMetadata.url, storageSink)
                     }
-                    
+
                     storageSink.endChapter()
+                    logger.debug("[Task {}] Completed chapter {}/{}", taskId, index + 1, chapters.size)
                 }
-                
+
                 // End series
                 storageSink.endSeries()
-                
-                updateProgress(TaskProgress(
-                    taskId,
-                    TaskStatus.COMPLETED,
-                    "Series downloaded successfully",
-                    chapters.size,
-                    chapters.size
-                ))
+
+                val completedMessage = "Series downloaded successfully: ${seriesMetadata.title}"
+                logger.info("[Task {}] {}", taskId, completedMessage)
+                updateProgress(TaskProgress(taskId, TaskStatus.COMPLETED, completedMessage, chapters.size, chapters.size))
+                updatePersistedTaskCompleted(persistedTaskId)
+
             } catch (e: Exception) {
+                val errorMessage = "Download failed: ${e.message}"
+                logger.error("[Task {}] {}", taskId, errorMessage, e)
                 updateProgress(TaskProgress(taskId, TaskStatus.FAILED, error = e.message))
+                updatePersistedTaskFailed(persistedTaskId, e.message)
             }
         }
-        
+
         return taskId
+    }
+
+    private fun updatePersistedTask(taskId: UUID?, status: DbTaskStatus, message: String?, current: Int?, total: Int?) {
+        if (taskId == null || downloadTaskRepository == null) return
+        try {
+            downloadTaskRepository.updateProgress(taskId, status, message, current, total)
+        } catch (e: Exception) {
+            logger.warn("Failed to update persisted task {}: {}", taskId, e.message)
+        }
+    }
+
+    private fun updatePersistedTaskCompleted(taskId: UUID?) {
+        if (taskId == null || downloadTaskRepository == null) return
+        try {
+            downloadTaskRepository.markCompleted(taskId)
+        } catch (e: Exception) {
+            logger.warn("Failed to mark task {} as completed: {}", taskId, e.message)
+        }
+    }
+
+    private fun updatePersistedTaskFailed(taskId: UUID?, errorMessage: String?) {
+        if (taskId == null || downloadTaskRepository == null) return
+        try {
+            downloadTaskRepository.markFailed(taskId, errorMessage)
+        } catch (e: Exception) {
+            logger.warn("Failed to mark task {} as failed: {}", taskId, e.message)
+        }
     }
     
     /**
@@ -263,17 +317,14 @@ class Orchestrator(
     }
     
     private suspend fun <T> withRateLimit(connector: Connector, block: suspend () -> T): T {
-        rateLimiter.acquire(connector, connector.config.rateLimitConfig)
-        return block()
+        return rateLimiter.withRateLimit(connector, block)
     }
     
     /**
-     * Extract series URL from chapter URL
-     * In a real implementation, this would be connector-specific
+     * Extract series URL from chapter URL using the connector's implementation.
      */
-    private fun extractSeriesUrl(chapterUrl: String): String {
-        // Simple heuristic: remove last path segment
-        return chapterUrl.substringBeforeLast("/")
+    private fun extractSeriesUrl(connector: Connector, chapterUrl: String): String {
+        return connector.extractSeriesUrl(chapterUrl)
     }
     
     fun shutdown() {

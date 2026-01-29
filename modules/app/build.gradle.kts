@@ -17,6 +17,7 @@ dependencies {
     implementation(project(":storage"))
     implementation(project(":api"))
     implementation(project(":opds"))
+    implementation(project(":database"))
     
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.ktor.server.netty)

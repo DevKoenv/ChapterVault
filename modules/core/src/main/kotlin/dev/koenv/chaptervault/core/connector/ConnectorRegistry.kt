@@ -12,12 +12,17 @@ interface ConnectorRegistry {
      * Rate limit config is now part of connector.config, not passed separately.
      */
     fun register(connector: Connector)
-    
+
     /**
      * Find a connector that can handle the given URL
      */
     fun findConnector(url: String): Connector?
-    
+
+    /**
+     * Find a connector by name (case-insensitive)
+     */
+    fun findByName(name: String): Connector?
+
     /**
      * Get all registered connectors
      */

@@ -9,10 +9,11 @@ plugins {
 dependencies {
     implementation(project(":core"))
     implementation(project(":storage"))
-    
+    implementation(project(":database"))
+
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
-    
+
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.content.negotiation)
 }
