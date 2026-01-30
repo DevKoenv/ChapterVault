@@ -7,9 +7,11 @@ import dev.koenv.chaptervault.core.domain.ChapterMetadata
 import dev.koenv.chaptervault.core.domain.SeriesMetadata
 import dev.koenv.chaptervault.core.domain.SeriesSearchResult
 import dev.koenv.chaptervault.core.domain.SeriesStatus
+import dev.koenv.chaptervault.core.execution.Executor
 import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
 import dev.koenv.chaptervault.core.storage.StorageSink
 import kotlinx.coroutines.delay
+import org.slf4j.LoggerFactory
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -17,11 +19,16 @@ import javax.imageio.ImageIO
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Mock connector using a shared in-memory list to simulate an API.
+ * Sample connector using a shared in-memory list to simulate an API.
+ *
+ * Note: This connector doesn't use execution plans - it uses mock data directly.
+ * The executor is provided for interface compliance but is not used.
  */
-class SampleConnector : Connector {
+class SampleConnector(
+    override val executor: Executor
+) : Connector {
 
-    private val logger = org.slf4j.LoggerFactory.getLogger(SampleConnector::class.java)
+    private val logger = LoggerFactory.getLogger(SampleConnector::class.java)
 
     override val config = ConnectorConfig(
         name = "SampleConnector",
@@ -39,8 +46,8 @@ class SampleConnector : Connector {
     )
 
     override val baseUrls = listOf(
-        "https://example.net/*",
-        "https://sample-comics.example.net/*"
+        "example.net",
+        "sample-comics.example.net"
     )
 
     /**

@@ -1,0 +1,140 @@
+# ChapterVault Configuration File
+# Copy this file to chaptervault.yaml and modify as needed.
+#
+# Configuration locations (in order of precedence):
+# 1. CHAPTERVAULT_CONFIG environment variable
+# 2. ./config/chaptervault.yaml
+# 3. ~/.chaptervault/config.yaml
+# 4. /etc/chaptervault/config.yaml (Linux only)
+#
+# Environment variables can override any setting (see comments below)
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+server:
+  host: "0.0.0.0"           # CHAPTERVAULT_HOST
+  port: 8080                # CHAPTERVAULT_PORT
+  base_url: null            # CHAPTERVAULT_BASE_URL - Set for external access (e.g., https://comics.example.com)
+
+# =============================================================================
+# Storage Configuration
+# =============================================================================
+storage:
+  path: null                # CHAPTERVAULT_STORAGE_PATH - Default: ~/ChapterVault/downloads
+  format: "cbz"             # CHAPTERVAULT_STORAGE_FORMAT - cbz or folder
+  min_free_space_mb: 500    # Minimum free disk space required
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+database:
+  type: "h2"                # CHAPTERVAULT_DB_TYPE - h2, sqlite, postgresql
+  path: null                # CHAPTERVAULT_DB_PATH - For file-based DBs, default: ~/ChapterVault/data
+
+  # PostgreSQL settings (only used when type: postgresql)
+  # host: "localhost"       # CHAPTERVAULT_DB_HOST
+  # port: 5432              # CHAPTERVAULT_DB_PORT
+  # name: "chaptervault"    # CHAPTERVAULT_DB_NAME
+  # username: "postgres"    # CHAPTERVAULT_DB_USERNAME
+  # password: "secret"      # CHAPTERVAULT_DB_PASSWORD
+
+# =============================================================================
+# Browser Pool Configuration
+# =============================================================================
+# The browser pool manages shared Playwright browser instances for connectors
+# that require JavaScript rendering.
+browser:
+  enabled: true                     # CHAPTERVAULT_BROWSER_ENABLED
+  max_browsers: 2                   # CHAPTERVAULT_BROWSER_MAX - Max browser instances
+  max_contexts_per_browser: 3       # Max isolated contexts per browser
+  browser_idle_timeout_seconds: 300 # Close idle browsers after 5 minutes
+  context_idle_timeout_seconds: 60  # Close idle contexts after 1 minute
+  headless: true                    # CHAPTERVAULT_BROWSER_HEADLESS - Run without GUI
+  browser_type: "chromium"          # chromium, firefox, webkit
+  user_agent: null                  # Custom user agent (null = default Chrome UA)
+  viewport_width: 1920
+  viewport_height: 1080
+  locale: "en-US"
+  timezone: null                    # e.g., "America/New_York"
+
+  # Resource types to block for faster loading (when images aren't needed)
+  # Options: image, media, font, stylesheet, script
+  block_resources: [ ]
+
+  # Extra browser launch arguments
+  extra_args: [ ]
+  # extra_args:
+  #   - "--disable-web-security"
+  #   - "--disable-features=IsolateOrigins,site-per-process"
+
+# =============================================================================
+# HTTP Client Configuration
+# =============================================================================
+http:
+  connect_timeout_seconds: 30
+  read_timeout_seconds: 60
+  max_retries: 3
+  retry_delay_millis: 1000
+  user_agent: "ChapterVault/1.0"
+  follow_redirects: true
+  max_redirects: 5
+
+  # Proxy configuration (optional)
+  # proxy:
+  #   host: "proxy.example.com"
+  #   port: 8080
+  #   username: null
+  #   password: null
+  #   type: "http"          # http, socks4, socks5
+
+# =============================================================================
+# Connector-Specific Configuration
+# =============================================================================
+# Each connector can have its own section with authentication and settings.
+# The section name should match the connector name (case-insensitive).
+
+connectors:
+  # Example: ExampleAuthenticatedConnector
+  ExampleAuthenticatedConnector:
+    enabled: true
+    priority: 20              # Override default priority
+
+    auth:
+      username: "your_username"
+      password: "your_password"
+      # Or use API key/token authentication:
+      # api_key: "your_api_key"
+      # token: "your_bearer_token"
+
+      # Pre-set cookies (for session-based auth)
+      # cookies:
+      #   session_id: "abc123"
+      #   auth_token: "xyz789"
+
+      # Custom headers for all requests
+      # headers:
+      #   X-Custom-Header: "value"
+
+    rate_limit:
+      min_delay_millis: 500
+      max_concurrent: 3
+      max_requests_per_minute: 100
+
+    # Custom connector-specific settings
+    # Access via: config.getString("quality"), config.getBoolean("downloadCovers"), etc.
+    quality: "high"
+    download_covers: true
+    preferred_language: "en"
+
+  # Example: Premium site with API key
+  # PremiumManga:
+  #   enabled: true
+  #   auth:
+  #     api_key: "your_api_key_here"
+  #   rate_limit:
+  #     max_requests_per_minute: 60
+
+  # Disable a connector
+  # SomeConnector:
+  #   enabled: false

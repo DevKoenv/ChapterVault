@@ -2,6 +2,7 @@ package dev.koenv.chaptervault.app
 
 import dev.koenv.chaptervault.api.ApiConfiguration
 import dev.koenv.chaptervault.api.configureApi
+import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.opds.OpdsConfiguration
 import dev.koenv.chaptervault.opds.configureOpds
 import dev.koenv.chaptervault.connectors.impl.MockConnector
@@ -12,6 +13,8 @@ import dev.koenv.chaptervault.database.repository.SeriesRepository
 import dev.koenv.chaptervault.database.repository.ChapterRepository
 import dev.koenv.chaptervault.database.repository.DownloadTaskRepository
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
+import dev.koenv.chaptervault.orchestration.execution.LocalExecutor
+import dev.koenv.chaptervault.orchestration.fetch.FetchClientImpl
 import dev.koenv.chaptervault.storage.impl.FileStorageSink
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.engine.*
@@ -25,7 +28,8 @@ private val logger = KotlinLogging.logger {}
  * Bootstraps all modules and starts the API server.
  */
 fun main() {
-    logger.info { "ChapterVault starting..." }
+    logger.info { "${BuildConfig.APP_NAME} v${BuildConfig.VERSION} starting..." }
+    logger.info { "Environment: ${if (BuildConfig.isDevelopment) "development" else "production"}" }
 
     // Initialize database
     val dataDir = File(
@@ -53,14 +57,31 @@ fun main() {
     logger.info { "Storage directory configured: ${storageDir.absolutePath}" }
     val storageSink = FileStorageSink(storageDir)
 
+    // Initialize HTTP client and executor for connectors
+    val fetchClient = FetchClientImpl()
+    val executor = LocalExecutor(fetchClient)
+    logger.info { "Executor initialized" }
+
     // Initialize connector registry
     val connectorRegistry = ConnectorRegistryImpl()
 
     // Register connectors
-    connectorRegistry.register(MockConnector())
-    connectorRegistry.register(SampleConnector())
+    // In development mode, register mock connectors for testing
+    if (BuildConfig.isDevelopment) {
+        logger.info { "Development mode: registering mock connectors" }
+        connectorRegistry.register(MockConnector(executor))
+        connectorRegistry.register(SampleConnector(executor))
+    }
+
+    // TODO: Register production connectors here
+    // See docs/LEGAL_SOURCES.md for a list of sources that can be legally integrated
+    // Example:
+    // connectorRegistry.register(MyLegalConnector(executor))
 
     logger.info { "Registered ${connectorRegistry.getAllConnectors().count()} connectors" }
+    if (connectorRegistry.getAllConnectors().none()) {
+        logger.warn { "No connectors registered! Set CHAPTERVAULT_ENV=development to enable mock connectors, or add production connectors." }
+    }
 
     // Initialize orchestrator with database integration
     val orchestrator = Orchestrator(

@@ -288,3 +288,33 @@ gradle-app.setting
 *.hprof
 
 # End of https://www.toptal.com/developers/gitignore/api/gradle,kotlin,jetbrains,eclipse,visualstudiocode,netbeans,macos,windows
+
+### ChapterVault Specific ###
+# Downloaded content (don't commit test downloads)
+downloads/
+
+# Local data/database files
+data/
+*.h2.db
+*.h2.db.lock.db
+*.sqlite
+*.sqlite-journal
+
+# Local configuration with secrets
+config/local.yml
+config/secrets.yml
+*.local.yml
+
+# Playwright browser binaries
+.playwright/
+
+# Test output
+test-output/
+test-downloads/
+
+# Coverage reports
+coverage/
+jacoco/
+
+# IDE run configurations with local paths
+.idea/runConfigurations/local*.xml

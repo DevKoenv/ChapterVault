@@ -1,212 +1,273 @@
-# ChapterVault - Media Ingestion and Download System
+# ChapterVault
 
-A modular Kotlin-based system for downloading and managing comics, manga, and ebooks with OPDS catalog support.
+[![Build](https://github.com/DevKoenv/ChapterVault/actions/workflows/build.yml/badge.svg)](https://github.com/DevKoenv/ChapterVault/actions/workflows/build.yml)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.0-blue.svg)](https://kotlinlang.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Architecture Overview
+A modular, self-hosted manga/comic library server with OPDS support. Download, organize, and serve your comic collection to any OPDS-compatible reader.
 
-ChapterVault follows a clean, modular architecture with strict separation of concerns:
+## Features
 
-### Core Principles
-
-1. **Connectors fetch data directly** - Each connector handles HTTP, browser automation, tokens, and binary data fetching
-2. **No downloader module** - Downloading happens inside connectors, no separate fetch-plan abstractions
-3. **Orchestration schedules work** - Orchestrator manages tasks, retries, and rate limiting but never fetches data
-4. **Clear separation: Browsing vs Downloading** - Browsing fetches metadata only; downloading fetches pages and binary data
-5. **Storage receives bytes** - Storage gets already-fetched bytes and writes files (CBZ, PDF, EPUB)
-
-## Module Structure
-
-```
-ChapterVault/
-├── core/              # Domain models and interfaces
-├── connectors/        # Site connectors (handles all fetching logic)
-├── orchestration/     # Task scheduling and rate limiting
-├── storage/           # File writing and format generation
-├── api/               # REST API for browsing and triggering downloads
-├── opds/              # OPDS v1.2 catalog for reading comics
-└── app/               # Application bootstrap
-```
-
-### Module Details
-
-#### Core Module
-- **Domain Models**: Series, Chapter, Page, SeriesMetadata, ChapterMetadata
-- **Interfaces**: Connector, StorageSink, ConnectorRegistry
-- **Rate Limiting**: RateLimitConfig primitives
-
-#### Connectors Module
-- Implements Connector interface
-- Handles HTTP requests and browser automation (Playwright)
-- Manages CSRF/VRF tokens and cookies
-- **Methods**:
-  - `canHandle(url)` - Check if connector supports a URL
-  - `searchSeries(query)` - Search for series (optional)
-  - `fetchSeriesMetadata(url)` - Get series details
-  - `fetchChapterList(url)` - List chapters (metadata only)
-  - `downloadChapter(url, storage)` - Download chapter pages
-
-#### Storage Module
-- Implements StorageSink interface
-- Receives bytes from connectors
-- Writes files to disk
-- Builds CBZ archives
-- **Methods**:
-  - `beginSeries(metadata)` - Start series
-  - `beginChapter(metadata)` - Start chapter
-  - `writePage(index, bytes, mimeType)` - Write page
-  - `endChapter()` - Finalize chapter (creates CBZ)
-  - `endSeries()` - Finalize series
-
-#### Orchestration Module
-- Task scheduling and execution
-- Rate limit enforcement per connector
-- Retry logic
-- Progress tracking
-- **Operations**:
-  - `searchSeries(query)` - Search across connectors
-  - `fetchSeriesMetadata(url)` - Get series details
-  - `fetchChapterList(url)` - Get chapter list
-  - `downloadChapter(url)` - Download single chapter
-  - `downloadSeries(url)` - Download all chapters
-  - `getProgress(taskId)` - Check task status
-
-#### API Module
-- REST API built with Ktor
-- **Endpoints**:
-  - `POST /series/search` - Search for series
-  - `GET /series/metadata?url=...` - Get series metadata
-  - `GET /series/chapters?url=...` - Get chapter list
-  - `POST /download/chapter` - Trigger chapter download
-  - `POST /download/series` - Trigger series download
-  - `GET /download/progress/{taskId}` - Check download progress
-  - `GET /download/progress` - Get all tasks
-
-#### OPDS Module
-- OPDS v1.2 catalog implementation
-- Serves downloaded content for comic readers
-- **Endpoints**:
-  - `GET /opds` - Root catalog
-  - `GET /opds/series/{id}` - Series chapters
-  - `GET /opds/download/{seriesId}/{chapterId}` - Download CBZ
-
-#### App Module
-- Application entry point
-- Dependency wiring
-- Server initialization
+- **Multi-Source Support** - Extensible connector system for different content sources
+- **OPDS v1.2 Catalog** - Compatible with Panels, Chunky, Kavita, and other readers
+- **REST API** - Full API for browsing, searching, and managing downloads
+- **CBZ Output** - Industry-standard comic archive format with ComicInfo.xml metadata
+- **Rate Limiting** - Per-connector configurable rate limits to respect source servers
+- **Declarative Extraction** - Clean DSL for defining what data to extract from sources
+- **Browser Automation** - Playwright integration for JavaScript-heavy sites
+- **Multiple Databases** - H2 (default), SQLite, or PostgreSQL
 
 ## Quick Start
 
-### Build
+### Prerequisites
+
+- Java 21 or higher
+- Gradle 8.x (wrapper included)
+
+### Build & Run
 
 ```bash
+# Clone the repository
+git clone https://github.com/DevKoenv/ChapterVault.git
+cd ChapterVault
+
+# Build the project
 ./gradlew build
-```
 
-### Run
-
-```bash
+# Run the server
 ./gradlew :app:run
 ```
 
-The server starts on port 8080 (or use `PORT=8081 ./gradlew :app:run`).
+The server starts at `http://localhost:8080`.
 
-### API Examples
+### Docker
 
-**Search for series:**
+Build and run with Docker:
+
 ```bash
-curl -X POST http://localhost:8080/series/search \
+# Clone the repository
+git clone https://github.com/DevKoenv/ChapterVault.git
+cd ChapterVault
+
+# Build and run with docker-compose
+docker-compose up -d
+```
+
+Or build manually:
+
+```bash
+docker build -t chaptervault .
+docker run -d \
+  -p 8080:8080 \
+  -v /path/to/downloads:/downloads \
+  -v /path/to/data:/data \
+  chaptervault
+```
+
+## Configuration
+
+Configuration via environment variables:
+
+| Variable                    | Default                    | Description                                    |
+|-----------------------------|----------------------------|------------------------------------------------|
+| `PORT`                      | `8080`                     | Server port                                    |
+| `HOST`                      | `0.0.0.0`                  | Server bind address                            |
+| `CHAPTERVAULT_DATA_PATH`    | `~/ChapterVault/data`      | Database location                              |
+| `CHAPTERVAULT_STORAGE_PATH` | `~/ChapterVault/downloads` | Downloaded files                               |
+| `CHAPTERVAULT_DB_TYPE`      | `h2`                       | Database type: `h2`, `sqlite`, `postgresql`    |
+| `CHAPTERVAULT_ENV`          | `production`               | Set to `development` to enable mock connectors |
+
+See [docs/configuration.md](docs/configuration.md) for full configuration options.
+
+> **Note:** In production mode, no connectors are registered by default. Set `CHAPTERVAULT_ENV=development` to enable mock connectors for testing, or implement your own connectors. See [docs/LEGAL_SOURCES.md](docs/LEGAL_SOURCES.md) for information on legal content sources.
+
+## API Usage
+
+### Search for Series
+
+```bash
+curl "http://localhost:8080/api/v1/catalog/series?q=adventure"
+```
+
+### Get Series Details
+
+```bash
+curl "http://localhost:8080/api/v1/catalog/series/{seriesId}"
+```
+
+### Download a Series
+
+```bash
+# Download by source URL (for series not yet in library)
+curl -X POST "http://localhost:8080/api/v1/downloads" \
   -H "Content-Type: application/json" \
-  -d '{"query":"adventure"}'
-```
+  -d '{"sourceUrl": "https://example.com/series/123"}'
 
-**Get series metadata:**
-```bash
-curl "http://localhost:8080/series/metadata?url=https://mock-comics.example.com/series/test-comic-1"
-```
-
-**List chapters:**
-```bash
-curl "http://localhost:8080/series/chapters?url=https://mock-comics.example.com/series/test-comic-1"
-```
-
-**Download a chapter:**
-```bash
-curl -X POST http://localhost:8080/download/chapter \
+# Or download by series ID (for series already in library)
+curl -X POST "http://localhost:8080/api/v1/downloads" \
   -H "Content-Type: application/json" \
-  -d '{"url":"https://mock-comics.example.com/series/test-comic-1/chapter-1"}'
+  -d '{"seriesId": "uuid-here"}'
 ```
 
-**Check download progress:**
+> **Note:** When searching for series via `/api/v1/catalog/series`, external results (not yet in your library) will have `id: null`. Use `sourceUrl` to download these. Once downloaded, the series will have an `id` assigned.
+
+### Check Download Progress
+
 ```bash
-curl "http://localhost:8080/download/progress/{taskId}"
+curl "http://localhost:8080/api/v1/downloads/{downloadId}"
 ```
 
-### OPDS Catalog
+## OPDS Catalog
 
-Access the OPDS catalog at:
+Access your library with any OPDS-compatible reader:
+
 ```
 http://localhost:8080/opds
 ```
 
-Compatible with any OPDS-supporting comic reader (Chunky, Panels, etc.).
+**Compatible Readers:**
 
-## Mock Connector
+- [Panels](https://panels.app/) (iOS/macOS)
+- [Chunky](http://chunkyreader.com/) (iOS)
+- [Librera](https://librera.mobi/) (Android)
+- [Moon+ Reader](https://www.moondownload.com/) (Android)
+- [Kavita](https://www.kavitareader.com/) (Web)
 
-The system includes a MockConnector for testing that:
-- Responds to URLs starting with `https://mock-comics.example.com/`
-- Generates mock series with 5 chapters each
-- Creates simple PNG images for each page
-- Demonstrates the full architecture
+## Architecture
 
-## Storage
+```
+ChapterVault/
+├── modules/
+│   ├── core/           # Domain models, ports, execution primitives
+│   ├── connectors/     # Connector implementations
+│   ├── orchestration/  # Task scheduling, rate limiting, execution
+│   ├── storage/        # File storage (CBZ writer)
+│   ├── database/       # Repository implementations
+│   ├── api/            # REST API (Ktor)
+│   ├── opds/           # OPDS catalog (Ktor)
+│   └── app/            # Application entry point
+├── config/             # Configuration files
+└── docs/               # Documentation
+```
 
-Downloaded content is stored in:
+### Key Design Decisions
+
+1. **Declarative Extraction** - Connectors declare WHAT to extract, not HOW:
+   ```kotlin
+   extractData(url = searchUrl) {
+       nestedList("results", ".manga-card") {
+           href("url", "a")
+           text("title", ".title")
+       }
+   }
+   ```
+
+2. **Port/Adapter Pattern** - Clean interfaces with pluggable implementations
+
+3. **Execution Plans** - Instructions describe operations; executor handles implementation
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the full roadmap.
+
+## Creating Connectors
+
+Connectors handle fetching data from sources. Here's a minimal example:
+
+```kotlin
+class MyConnector(override val executor: Executor) : Connector {
+    override val baseUrls = listOf("manga.example.com")
+
+    override val config = ConnectorConfig(
+        name = "MyConnector",
+        version = "1.0.0",
+        // ... rate limits, features
+    )
+
+    override suspend fun searchSeries(query: String): List<SeriesSearchResult> {
+        val plan = executionPlan {
+            extractData(url = "https://manga.example.com/search?q=$query") {
+                nestedList("results", ".manga-item") {
+                    href("url", "a")
+                    text("title", ".title")
+                    src("cover", "img")
+                }
+            }
+        }
+
+        val results = executor.executeAll(plan.instructions, getExecutionContext())
+        // Convert extracted data to SeriesSearchResult...
+    }
+
+    // Implement other methods...
+}
+```
+
+See [docs/connectors.md](docs/connectors.md) for the full connector development guide.
+
+## Storage Format
+
+Downloaded chapters are stored as CBZ files:
+
 ```
 ~/ChapterVault/downloads/
-  SeriesName/
-    Chapter 1 - Title.cbz
-    Chapter 2 - Title.cbz
-    ...
+└── Series Name/
+    ├── Chapter 001 - Title.cbz
+    ├── Chapter 002 - Title.cbz
+    └── ...
 ```
 
-CBZ files are ZIP archives containing numbered images that can be opened with any comic reader.
+Each CBZ contains:
+
+```
+chapter.cbz/
+├── ComicInfo.xml      # Metadata (ComicRack format)
+├── 001.jpg            # Pages
+├── 002.jpg
+└── ...
+```
 
 ## Technology Stack
 
-- **Kotlin** - Primary language
-- **Coroutines** - Async/await support
-- **Ktor** - HTTP server and client
-- **Playwright** - Browser automation (for future real connectors)
-- **Gradle** - Build system
+| Component          | Technology                         |
+|--------------------|------------------------------------|
+| Language           | Kotlin 2.3                         |
+| Async              | Kotlin Coroutines                  |
+| HTTP Server        | Ktor 3.4                           |
+| HTTP Client        | Ktor Client                        |
+| Browser Automation | Playwright                         |
+| Database           | Exposed ORM (H2/SQLite/PostgreSQL) |
+| HTML Parsing       | Jsoup                              |
+| Build              | Gradle (Kotlin DSL)                |
 
-## Future Enhancements
+## Contributing
 
-### Real Connectors
-Add connectors for actual comic/manga sites with:
-- CSRF/VRF token handling
-- Browser automation for JS-heavy sites
-- Cookie management
-- Custom rate limiting per site
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### Storage Formats
-- PDF generation
-- EPUB for text-based content
-- Custom folder structures
+### Development Setup
 
-### OPDS Extensions
-- Page streaming (v1)
-- Search within OPDS
-- Thumbnail generation
+```bash
+# Clone and build
+git clone https://github.com/DevKoenv/ChapterVault.git
+cd ChapterVault
+./gradlew build
 
-## Design Philosophy
+# Run tests
+./gradlew test
 
-1. **Single Responsibility** - Each module has one clear purpose
-2. **Interface Segregation** - Clean contracts between modules
-3. **Dependency Inversion** - Depend on abstractions, not implementations
-4. **Local-First** - Designed for single-node deployment
-5. **Extensible** - Easy to add new connectors and storage formats
-6. **Maintainable** - Clear separation makes reasoning about code easy
+# Run with hot reload (development)
+./gradlew :app:run --continuous
+```
 
 ## License
 
-MIT License - See LICENSE file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Ktor](https://ktor.io/) - Kotlin async web framework
+- [Exposed](https://github.com/JetBrains/Exposed) - Kotlin SQL framework
+- [Playwright](https://playwright.dev/) - Browser automation
+- [Jsoup](https://jsoup.org/) - HTML parsing
+
+## Disclaimer
+
+This software is provided for personal use only. Users are responsible for ensuring they have the right to download and store any content. The developers do not endorse piracy or copyright infringement.

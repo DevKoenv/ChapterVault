@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions
+    url: https://github.com/DevKoenv/ChapterVault/discussions
+    about: Ask questions, share ideas, or discuss features
+  - name: Documentation
+    url: https://github.com/DevKoenv/ChapterVault/tree/master/docs
+    about: Read the documentation before opening an issue

@@ -7,6 +7,7 @@ import dev.koenv.chaptervault.core.domain.ChapterMetadata
 import dev.koenv.chaptervault.core.domain.SeriesMetadata
 import dev.koenv.chaptervault.core.domain.SeriesSearchResult
 import dev.koenv.chaptervault.core.domain.SeriesStatus
+import dev.koenv.chaptervault.core.execution.Executor
 import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
 import dev.koenv.chaptervault.core.storage.StorageSink
 import kotlinx.coroutines.delay
@@ -19,8 +20,13 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * Mock connector for testing and demonstration.
  * Simulates a comic site with generated content.
+ *
+ * Note: This connector doesn't use execution plans - it generates mock data directly.
+ * The executor is provided for interface compliance but is not used.
  */
-class MockConnector : Connector {
+class MockConnector(
+    override val executor: Executor
+) : Connector {
     
     override val config = ConnectorConfig(
         name = "MockConnector",
@@ -38,8 +44,7 @@ class MockConnector : Connector {
     )
     
     override val baseUrls = listOf(
-        "https://mock-comics.example.com/*",
-        "mock-comics.example.com/*"
+        "mock-comics.example.com"
     )
 
     /**
