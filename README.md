@@ -15,7 +15,7 @@ A modular, self-hosted manga/comic library server with OPDS support. Download, o
 - **Rate Limiting** - Per-connector configurable rate limits to respect source servers
 - **Declarative Extraction** - Clean DSL for defining what data to extract from sources
 - **Browser Automation** - Playwright integration for JavaScript-heavy sites
-- **Multiple Databases** - H2 (default), SQLite, or PostgreSQL
+- **Multiple Databases** - SQLite (default), H2, or PostgreSQL
 
 ## Quick Start
 
@@ -74,7 +74,7 @@ Configuration via environment variables:
 | `HOST`                      | `0.0.0.0`                  | Server bind address                            |
 | `CHAPTERVAULT_DATA_PATH`    | `~/ChapterVault/data`      | Database location                              |
 | `CHAPTERVAULT_STORAGE_PATH` | `~/ChapterVault/downloads` | Downloaded files                               |
-| `CHAPTERVAULT_DB_TYPE`      | `h2`                       | Database type: `h2`, `sqlite`, `postgresql`    |
+| `CHAPTERVAULT_DB_TYPE`      | `sqlite`                   | Database type: `sqlite`, `h2`, `postgresql`    |
 | `CHAPTERVAULT_ENV`          | `production`               | Set to `development` to enable mock connectors |
 
 See [docs/configuration.md](docs/configuration.md) for full configuration options.

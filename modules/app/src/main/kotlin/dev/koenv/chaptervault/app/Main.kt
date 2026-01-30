@@ -2,16 +2,17 @@ package dev.koenv.chaptervault.app
 
 import dev.koenv.chaptervault.api.ApiConfiguration
 import dev.koenv.chaptervault.api.configureApi
-import dev.koenv.chaptervault.core.BuildConfig
-import dev.koenv.chaptervault.opds.OpdsConfiguration
-import dev.koenv.chaptervault.opds.configureOpds
 import dev.koenv.chaptervault.connectors.impl.MockConnector
 import dev.koenv.chaptervault.connectors.impl.SampleConnector
 import dev.koenv.chaptervault.connectors.registry.ConnectorRegistryImpl
+import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.database.DatabaseConfig
-import dev.koenv.chaptervault.database.repository.SeriesRepository
 import dev.koenv.chaptervault.database.repository.ChapterRepository
 import dev.koenv.chaptervault.database.repository.DownloadTaskRepository
+import dev.koenv.chaptervault.database.repository.SeriesRepository
+import dev.koenv.chaptervault.opds.OpdsConfiguration
+import dev.koenv.chaptervault.opds.configureOpds
+import dev.koenv.chaptervault.orchestration.config.ConfigurationServiceImpl
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import dev.koenv.chaptervault.orchestration.execution.LocalExecutor
 import dev.koenv.chaptervault.orchestration.fetch.FetchClientImpl
@@ -31,15 +32,28 @@ fun main() {
     logger.info { "${BuildConfig.APP_NAME} v${BuildConfig.VERSION} starting..." }
     logger.info { "Environment: ${if (BuildConfig.isDevelopment) "development" else "production"}" }
 
-    // Initialize database
+    // Initialize configuration service
+    val configService = ConfigurationServiceImpl.create()
+    val appConfig = configService.getAppConfig()
+
+    if (configService.configExists()) {
+        logger.info { "Configuration loaded from: ${configService.getConfigPath()}" }
+    } else {
+        logger.info { "No configuration file found, using defaults" }
+    }
+
+    // Resolve data directory
     val dataDir = File(
-        System.getenv("CHAPTERVAULT_DATA_PATH")
+        appConfig.database.path
+            ?: System.getenv("CHAPTERVAULT_DATA_PATH")
             ?: "${System.getProperty("user.home")}/ChapterVault/data"
     )
     dataDir.mkdirs()
-    logger.info { "Database directory: ${dataDir.absolutePath}" }
+    logger.info { "Data directory: ${dataDir.absolutePath}" }
 
-    val database = DatabaseConfig.initialize(dataDir)
+    // Initialize database using configuration
+    logger.info { "Database type: ${appConfig.database.type}" }
+    val database = DatabaseConfig.initialize(dataDir, appConfig.database)
     logger.info { "Database initialized" }
 
     // Initialize repositories
@@ -48,19 +62,21 @@ fun main() {
     val downloadTaskRepository = DownloadTaskRepository(database).also { it.initialize() }
     logger.info { "Repositories initialized" }
 
-    // Initialize storage
+    // Resolve storage directory
     val storageDir = File(
-        System.getenv("CHAPTERVAULT_STORAGE_PATH")
+        appConfig.storage.path
+            ?: System.getenv("CHAPTERVAULT_STORAGE_PATH")
             ?: "${System.getProperty("user.home")}/ChapterVault/downloads"
     )
     storageDir.mkdirs()
-    logger.info { "Storage directory configured: ${storageDir.absolutePath}" }
+    logger.info { "Storage directory: ${storageDir.absolutePath}" }
     val storageSink = FileStorageSink(storageDir)
 
     // Initialize HTTP client and executor for connectors
-    val fetchClient = FetchClientImpl()
+    val httpConfig = configService.getHttpConfig()
+    val fetchClient = FetchClientImpl(httpConfig)
     val executor = LocalExecutor(fetchClient)
-    logger.info { "Executor initialized" }
+    logger.info { "Executor initialized (User-Agent: ${httpConfig.userAgent})" }
 
     // Initialize connector registry
     val connectorRegistry = ConnectorRegistryImpl()
@@ -92,7 +108,7 @@ fun main() {
         downloadTaskRepository = downloadTaskRepository
     )
     logger.info { "Orchestrator initialized" }
-    
+
     // Create API configuration
     val apiConfig = ApiConfiguration(
         orchestrator = orchestrator,
@@ -103,10 +119,11 @@ fun main() {
         storageDir = storageDir
     )
 
-    // Start API server
-    val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
-    val host = System.getenv("HOST") ?: "0.0.0.0"
-    val baseUrl = System.getenv("CHAPTERVAULT_BASE_URL") ?: "http://localhost:$port"
+    // Server configuration
+    val serverConfig = appConfig.server
+    val port = serverConfig.port
+    val host = serverConfig.host
+    val baseUrl = serverConfig.baseUrl ?: "http://localhost:$port"
 
     // Create OPDS configuration
     val opdsConfig = OpdsConfiguration(
@@ -120,17 +137,17 @@ fun main() {
         configureApi(apiConfig)
         configureOpds(opdsConfig)
     }
-    
-    logger.info { "Starting server on port $port" }
-    logger.info { "ChapterVault ready - API available at http://localhost:$port" }
-    
+
+    logger.info { "Starting server on $host:$port" }
+    logger.info { "${BuildConfig.APP_NAME} ready - API available at http://$host:$port" }
+
     // Add shutdown hook
     Runtime.getRuntime().addShutdownHook(Thread {
-        logger.info { "ChapterVault shutting down..." }
+        logger.info { "${BuildConfig.APP_NAME} shutting down..." }
         orchestrator.shutdown()
         server.stop(1000, 2000)
-        logger.info { "ChapterVault stopped" }
+        logger.info { "${BuildConfig.APP_NAME} stopped" }
     })
-    
+
     server.start(wait = true)
 }

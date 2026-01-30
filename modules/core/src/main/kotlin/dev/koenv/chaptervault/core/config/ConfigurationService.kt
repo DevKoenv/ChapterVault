@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.core.config
 
+import dev.koenv.chaptervault.core.BuildConfig
 import java.io.File
 
 /**
@@ -85,7 +86,7 @@ data class StorageAppConfig(
  * Database configuration from config file.
  */
 data class DatabaseAppConfig(
-    val type: String = "h2",  // h2, sqlite, postgresql
+    val type: String = "sqlite",  // sqlite, h2, h2_memory, postgresql
     val path: String? = null,  // For file-based DBs
     val host: String? = null,  // For PostgreSQL
     val port: Int? = null,
@@ -122,7 +123,7 @@ data class HttpClientConfig(
     val readTimeoutSeconds: Long = 60,
     val maxRetries: Int = 3,
     val retryDelayMillis: Long = 1000,
-    val userAgent: String = "ChapterVault/1.0",
+    val userAgent: String = "ChapterVault/${BuildConfig.VERSION}",
     val followRedirects: Boolean = true,
     val maxRedirects: Int = 5,
     val proxy: ProxyConfig? = null

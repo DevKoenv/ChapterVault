@@ -25,35 +25,47 @@ ChapterVault can be configured through environment variables or YAML configurati
 
 ### Database Configuration
 
-| Variable                   | Default          | Description                                 |
-|----------------------------|------------------|---------------------------------------------|
-| `CHAPTERVAULT_DB_TYPE`     | `h2`             | Database type: `h2`, `sqlite`, `postgresql` |
-| `CHAPTERVAULT_DB_URL`      | (auto-generated) | JDBC connection URL                         |
-| `CHAPTERVAULT_DB_USER`     | (none)           | Database username (PostgreSQL)              |
-| `CHAPTERVAULT_DB_PASSWORD` | (none)           | Database password (PostgreSQL)              |
+| Variable                   | Default          | Description                                              |
+|----------------------------|------------------|----------------------------------------------------------|
+| `CHAPTERVAULT_DB_TYPE`     | `sqlite`         | Database type: `sqlite`, `h2`, `h2_memory`, `postgresql` |
+| `CHAPTERVAULT_DB_PATH`     | (auto-generated) | Path to database file (for file-based DBs)               |
+| `CHAPTERVAULT_DB_HOST`     | `localhost`      | Database host (PostgreSQL)                               |
+| `CHAPTERVAULT_DB_PORT`     | `5432`           | Database port (PostgreSQL)                               |
+| `CHAPTERVAULT_DB_NAME`     | `chaptervault`   | Database name (PostgreSQL)                               |
+| `CHAPTERVAULT_DB_USERNAME` | (none)           | Database username (PostgreSQL)                           |
+| `CHAPTERVAULT_DB_PASSWORD` | (none)           | Database password (PostgreSQL)                           |
 
 #### Database Examples
 
-**H2 (Default - File-based)**
-
-```bash
-CHAPTERVAULT_DB_TYPE=h2
-# URL auto-generated: jdbc:h2:file:$DATA_PATH/chaptervault
-```
-
-**SQLite**
+**SQLite (Default - Recommended)**
 
 ```bash
 CHAPTERVAULT_DB_TYPE=sqlite
-CHAPTERVAULT_DB_URL=jdbc:sqlite:/path/to/chaptervault.sqlite
+# Path auto-generated: $DATA_PATH/chaptervault.db
+```
+
+**H2 (File-based)**
+
+```bash
+CHAPTERVAULT_DB_TYPE=h2
+# Path auto-generated: $DATA_PATH/chaptervault
+```
+
+**H2 In-Memory (For Testing)**
+
+```bash
+CHAPTERVAULT_DB_TYPE=h2_memory
+# Data is lost on restart
 ```
 
 **PostgreSQL**
 
 ```bash
 CHAPTERVAULT_DB_TYPE=postgresql
-CHAPTERVAULT_DB_URL=jdbc:postgresql://localhost:5432/chaptervault
-CHAPTERVAULT_DB_USER=chaptervault
+CHAPTERVAULT_DB_HOST=localhost
+CHAPTERVAULT_DB_PORT=5432
+CHAPTERVAULT_DB_NAME=chaptervault
+CHAPTERVAULT_DB_USERNAME=chaptervault
 CHAPTERVAULT_DB_PASSWORD=yourpassword
 ```
 
