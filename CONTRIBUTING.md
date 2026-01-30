@@ -95,7 +95,7 @@ type(scope): description
 **Examples:**
 
 ```
-feat(connector): add MangaDex connector
+feat(connector): add Webtoon connector
 
 fix(download): handle 429 rate limit responses
 

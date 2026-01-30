@@ -8,7 +8,7 @@ import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
  */
 data class ConnectorConfig(
     /**
-     * Display name of the connector (e.g., "MangaDex", "ComicVine")
+     * Display name of the connector (e.g., "Webtoon", "MangaPlus")
      */
     val name: String,
 
