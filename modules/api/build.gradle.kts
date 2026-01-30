@@ -21,6 +21,5 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.server.status.pages)
     implementation(libs.ktor.server.swagger)
-//    implementation(libs.ktor.server.openapi)
     implementation(libs.ktor.server.openapi.routing)
 }

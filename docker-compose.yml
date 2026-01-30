@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  chaptervault:
+    build: .
+    container_name: chaptervault
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - chaptervault-data:/data
+      - chaptervault-downloads:/downloads
+      # Optional: mount local config
+      # - ./config:/app/config:ro
+    environment:
+      - CHAPTERVAULT_DATA_PATH=/data
+      - CHAPTERVAULT_STORAGE_PATH=/downloads
+      - PORT=8080
+      - HOST=0.0.0.0
+      # Database configuration (default: H2)
+      - CHAPTERVAULT_DB_TYPE=h2
+      # For PostgreSQL:
+      # - CHAPTERVAULT_DB_TYPE=postgresql
+      # - CHAPTERVAULT_DB_URL=jdbc:postgresql://db:5432/chaptervault
+      # - CHAPTERVAULT_DB_USER=chaptervault
+      # - CHAPTERVAULT_DB_PASSWORD=changeme
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: PostgreSQL database
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: chaptervault-db
+  #   restart: unless-stopped
+  #   volumes:
+  #     - chaptervault-postgres:/var/lib/postgresql/data
+  #   environment:
+  #     - POSTGRES_USER=chaptervault
+  #     - POSTGRES_PASSWORD=changeme
+  #     - POSTGRES_DB=chaptervault
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U chaptervault"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  chaptervault-data:
+  chaptervault-downloads:
+  # chaptervault-postgres:
+
+networks:
+  default:
+    name: chaptervault-network

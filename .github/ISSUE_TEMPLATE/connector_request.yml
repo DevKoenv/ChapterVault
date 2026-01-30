@@ -1,0 +1,96 @@
+name: Connector Request
+description: Request support for a new content source
+title: "[Connector]: "
+labels: ["connector", "enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new connector! Please provide details about the source you'd like supported.
+
+        **Note:** We only support legal content sources. Requests for sources that primarily host pirated content will be closed.
+
+  - type: input
+    id: source-name
+    attributes:
+      label: Source Name
+      description: The name of the content source
+      placeholder: "e.g., MangaDex"
+    validations:
+      required: true
+
+  - type: input
+    id: source-url
+    attributes:
+      label: Source URL
+      description: The main URL of the source
+      placeholder: "https://example.com"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: content-type
+    attributes:
+      label: Content Type
+      description: What type of content does this source provide?
+      options:
+        - Manga
+        - Comics
+        - Webtoons
+        - Light Novels
+        - Mixed
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: features
+    attributes:
+      label: Source Features
+      description: What features does this source have?
+      options:
+        - label: Search functionality
+        - label: Series listing/browsing
+        - label: Chapter reader
+        - label: Requires authentication
+        - label: Has API (official or unofficial)
+        - label: Heavy JavaScript (needs browser automation)
+        - label: Cloudflare protection
+
+  - type: textarea
+    id: technical-notes
+    attributes:
+      label: Technical Notes
+      description: Any technical details that might help with implementation
+      placeholder: |
+        - API documentation: ...
+        - Known rate limits: ...
+        - Special authentication requirements: ...
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why This Source?
+      description: Why would this source be valuable to add?
+      placeholder: This source is popular because...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to help?
+      options:
+        - label: I would be willing to implement this connector
+        - label: I can help test this connector
+        - label: I can provide sample URLs for testing
+
+  - type: checkboxes
+    id: legal
+    attributes:
+      label: Legal Confirmation
+      description: Please confirm the following
+      options:
+        - label: I confirm this source hosts legal/licensed content or user-uploaded content with proper DMCA procedures
+    validations:
+      required: true

@@ -25,6 +25,11 @@ playwright = "1.49.0"
 jsoup = "1.18.3"
 
 # =====================================
+# Configuration
+# =====================================
+snakeyaml = "2.3"
+
+# =====================================
 # Database
 # =====================================
 exposed = "1.0.0"
@@ -76,6 +81,11 @@ playwright = { module = "com.microsoft.playwright:playwright", version.ref = "pl
 # HTML Parsing
 # =====================================
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+
+# =====================================
+# Configuration
+# =====================================
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 
 # =====================================
 # Database - Exposed

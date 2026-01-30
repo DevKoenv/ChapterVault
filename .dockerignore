@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.iml
+*.iws
+*.ipr
+
+# Build outputs
+**/build
+**/out
+.gradle
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+
+# GitHub
+.github
+
+# Local configuration
+config/local.yml
+config/secrets.yml
+*.local.yml
+
+# Test files
+**/src/test
+test-output/
+test-downloads/
+
+# Docker files (avoid recursion)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Downloads and data (use volumes instead)
+downloads/
+data/
+*.h2.db
+*.sqlite
+
+# Playwright browsers (installed at runtime if needed)
+.playwright/
+
+# Claude Code
+.claude/

@@ -5,6 +5,7 @@ import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.routes.catalogRoutes
 import dev.koenv.chaptervault.api.routes.downloadRoutes
 import dev.koenv.chaptervault.api.routes.libraryRoutes
+import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
 import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
@@ -27,6 +28,7 @@ import io.ktor.server.routing.openapi.OpenApiDocSource
 import io.ktor.server.routing.routing
 import io.ktor.server.routing.routingRoot
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import java.io.File
 
 data class ApiConfiguration(
@@ -78,33 +80,47 @@ fun Application.configureApi(config: ApiConfiguration) {
 
     routing {
         get("/") {
-            call.respondText("ChapterVault API v1 is running", ContentType.Text.Plain)
-        }
-
-        get("/health") {
-            val diskSpace = config.storageDir.usableSpace / (1024 * 1024)
-            call.respond(
-                HttpStatusCode.OK,
-                mapOf(
-                    "status" to "healthy",
-                    "version" to "1.0.0",
-                    "storage" to mapOf(
-                        "path" to config.storageDir.absolutePath,
-                        "freeSpaceMB" to diskSpace
-                    )
-                )
+            call.respondText(
+                "${BuildConfig.APP_NAME} API is running version ${BuildConfig.VERSION}",
+                ContentType.Text.Plain
             )
         }
 
+        get("/health") {
+            val usableBytes = config.storageDir.usableSpace
+
+            val freeMiB = usableBytes / (1024 * 1024) // binary MB
+            val freeMB = usableBytes / 1_000_000 // decimal MB
+
+            val response = buildJsonObject {
+                put("status", "healthy")
+                put("version", BuildConfig.VERSION)
+                put("environment", if (BuildConfig.isDevelopment) "development" else "production")
+
+                putJsonObject("storage") {
+                    put("path", config.storageDir.absolutePath)
+                    put("freeMiB", freeMiB)
+                    put("freeMB", freeMB)
+                }
+            }
+
+            call.respond(HttpStatusCode.OK, response)
+        }
+
         swaggerUI("/swagger") {
-            info = OpenApiInfo("ChapterVault API", "1.0.0")
+            info = OpenApiInfo("${BuildConfig.APP_NAME} API", BuildConfig.VERSION)
             source = OpenApiDocSource.Routing(ContentType.Application.Json) {
                 routingRoot.descendants()
             }
         }
 
         catalogRoutes(config.orchestrator, config.connectorRegistry, config.seriesRepository, config.chapterRepository)
-        downloadRoutes(config.orchestrator, config.seriesRepository, config.chapterRepository, config.downloadTaskRepository)
+        downloadRoutes(
+            config.orchestrator,
+            config.seriesRepository,
+            config.chapterRepository,
+            config.downloadTaskRepository
+        )
         libraryRoutes(config.seriesRepository, config.chapterRepository)
     }
 }
