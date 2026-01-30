@@ -1,7 +1,7 @@
 name: Connector Request
 description: Request support for a new content source
 title: "[Connector]: "
-labels: ["connector", "enhancement", "triage"]
+labels: [ "connector", "enhancement", "triage" ]
 body:
   - type: markdown
     attributes:

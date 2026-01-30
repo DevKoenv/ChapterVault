@@ -29,7 +29,12 @@ storage:
 # Database Configuration
 # =============================================================================
 database:
-  type: "h2"                # CHAPTERVAULT_DB_TYPE - h2, sqlite, postgresql
+  # Supported types:
+  #   - sqlite (default) - Single file, portable, recommended for most users
+  #   - h2 - Java-native, file-based
+  #   - h2_memory - In-memory H2, data lost on restart (for testing)
+  #   - postgresql - For production/multi-instance deployments
+  type: "sqlite"            # CHAPTERVAULT_DB_TYPE
   path: null                # CHAPTERVAULT_DB_PATH - For file-based DBs, default: ~/ChapterVault/data
 
   # PostgreSQL settings (only used when type: postgresql)
@@ -76,7 +81,7 @@ http:
   read_timeout_seconds: 60
   max_retries: 3
   retry_delay_millis: 1000
-  user_agent: "ChapterVault/1.0"
+  user_agent: "ChapterVault/0.1"
   follow_redirects: true
   max_redirects: 5
 

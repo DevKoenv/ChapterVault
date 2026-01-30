@@ -14,7 +14,11 @@ dependencies {
     implementation(libs.exposed.core)
     implementation(libs.exposed.dao)
     implementation(libs.exposed.java.time)
+
+    // Database drivers
     implementation(libs.h2.database)
+    implementation(libs.sqlite.jdbc)
+    implementation(libs.postgresql.jdbc)
 
     implementation(libs.kotlinx.coroutines.core)
 }

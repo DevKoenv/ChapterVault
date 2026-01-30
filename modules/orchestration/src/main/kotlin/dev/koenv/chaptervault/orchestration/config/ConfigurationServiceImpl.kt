@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.orchestration.config
 
+import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.core.config.*
 import org.slf4j.LoggerFactory
 import org.yaml.snakeyaml.Yaml
@@ -151,7 +152,7 @@ class ConfigurationServiceImpl(
 
     private fun parseDatabase(raw: Map<String, Any>): DatabaseAppConfig {
         return DatabaseAppConfig(
-            type = raw["type"]?.toString() ?: "h2",
+            type = raw["type"]?.toString() ?: "sqlite",
             path = raw["path"]?.toString(),
             host = raw["host"]?.toString(),
             port = (raw["port"] as? Number)?.toInt(),
@@ -215,7 +216,7 @@ class ConfigurationServiceImpl(
                 ?: 1000,
             userAgent = raw["userAgent"]?.toString()
                 ?: raw["user_agent"]?.toString()
-                ?: "ChapterVault/1.0",
+                ?: "ChapterVault/${BuildConfig.VERSION}",
             followRedirects = raw["followRedirects"]?.toString()?.toBooleanStrictOrNull()
                 ?: raw["follow_redirects"]?.toString()?.toBooleanStrictOrNull()
                 ?: true,
