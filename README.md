@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/DevKoenv/ChapterVault/actions/workflows/build.yml/badge.svg)](https://github.com/DevKoenv/ChapterVault/actions/workflows/build.yml)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.0-blue.svg)](https://kotlinlang.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%20License%202.0-green)](LICENSE)
 
 A modular, self-hosted manga/comic library server with OPDS support. Download, organize, and serve your comic collection to any OPDS-compatible reader.
 
