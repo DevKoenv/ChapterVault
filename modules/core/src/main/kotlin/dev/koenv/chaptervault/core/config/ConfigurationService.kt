@@ -56,6 +56,7 @@ interface ConfigurationService {
  * Root application configuration.
  */
 data class AppConfig(
+    val dataPath: String = "${System.getProperty("user.home")}/ChapterVault/data",
     val server: ServerConfig = ServerConfig(),
     val storage: StorageAppConfig = StorageAppConfig(),
     val database: DatabaseAppConfig = DatabaseAppConfig(),
@@ -77,7 +78,7 @@ data class ServerConfig(
  * Storage configuration from config file.
  */
 data class StorageAppConfig(
-    val path: String? = null,  // Default: ~/ChapterVault/downloads
+    val path: String = "${System.getProperty("user.home")}/ChapterVault/downloads",
     val format: String = "cbz",  // cbz or folder
     val minFreeSpaceMb: Long = 500
 )
@@ -87,10 +88,10 @@ data class StorageAppConfig(
  */
 data class DatabaseAppConfig(
     val type: String = "sqlite",  // sqlite, h2, h2_memory, postgresql
-    val path: String? = null,  // For file-based DBs
-    val host: String? = null,  // For PostgreSQL
-    val port: Int? = null,
-    val name: String? = null,
+    val path: String? = null,  // For file-based DBs (derived from dataPath if not set)
+    val host: String = "localhost",  // For PostgreSQL
+    val port: Int = 5432,  // For PostgreSQL
+    val name: String = "chaptervault",  // For PostgreSQL
     val username: String? = null,
     val password: String? = null
 )

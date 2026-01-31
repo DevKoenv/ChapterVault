@@ -42,12 +42,8 @@ fun main() {
         logger.info { "No configuration file found, using defaults" }
     }
 
-    // Resolve data directory
-    val dataDir = File(
-        appConfig.database.path
-            ?: System.getenv("CHAPTERVAULT_DATA_PATH")
-            ?: "${System.getProperty("user.home")}/ChapterVault/data"
-    )
+    // Resolve data directory (defaults are in ConfigurationService)
+    val dataDir = File(appConfig.dataPath)
     dataDir.mkdirs()
     logger.info { "Data directory: ${dataDir.absolutePath}" }
 
@@ -62,15 +58,11 @@ fun main() {
     val downloadTaskRepository = DownloadTaskRepository(database).also { it.initialize() }
     logger.info { "Repositories initialized" }
 
-    // Resolve storage directory
-    val storageDir = File(
-        appConfig.storage.path
-            ?: System.getenv("CHAPTERVAULT_STORAGE_PATH")
-            ?: "${System.getProperty("user.home")}/ChapterVault/downloads"
-    )
+    // Resolve storage directory (defaults are in ConfigurationService)
+    val storageDir = File(appConfig.storage.path)
     storageDir.mkdirs()
     logger.info { "Storage directory: ${storageDir.absolutePath}" }
-    val storageSink = FileStorageSink(storageDir)
+    val storageSink = FileStorageSink(storageDir, appConfig.storage.minFreeSpaceMb)
 
     // Initialize HTTP client and executor for connectors
     val httpConfig = configService.getHttpConfig()

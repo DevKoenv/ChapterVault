@@ -23,7 +23,7 @@ class OpdsCatalogService(
     private val seriesRepository: SeriesRepositoryPort,
     private val chapterRepository: ChapterRepositoryPort,
     private val storageBasePath: File,
-    private val baseUrl: String = "http://localhost:8080/opds",
+    private val baseUrl: String,  // Required - derived from server config
     private val version: OpdsVersion = OpdsVersion.V1_2,
     private val enablePse: Boolean = true  // Page Streaming Extension
 ) {

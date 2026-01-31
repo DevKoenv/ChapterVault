@@ -18,10 +18,13 @@ private val logger = KotlinLogging.logger {}
  * - Atomic writes using temp files
  * - Cleanup on failure
  * - Disk space validation
+ *
+ * @param baseDir Base directory for storing files
+ * @param minFreeSpaceMB Minimum free space to maintain (from ConfigurationService)
  */
 class FileStorageSink(
     private val baseDir: File,
-    private val minFreeSpaceMB: Long = 100
+    private val minFreeSpaceMB: Long
 ) : StorageSink {
 
     private var currentSeriesMetadata: SeriesMetadata? = null

@@ -16,10 +16,13 @@ private val logger = KotlinLogging.logger {}
  * - Simple folder structure
  * - Cleanup on failure
  * - Disk space validation
+ *
+ * @param baseDir Base directory for storing files
+ * @param minFreeSpaceMB Minimum free space to maintain (from ConfigurationService)
  */
 class FolderStorageSink(
     private val baseDir: File,
-    private val minFreeSpaceMB: Long = 100
+    private val minFreeSpaceMB: Long
 ) : StorageSink {
 
     private var currentSeriesMetadata: SeriesMetadata? = null

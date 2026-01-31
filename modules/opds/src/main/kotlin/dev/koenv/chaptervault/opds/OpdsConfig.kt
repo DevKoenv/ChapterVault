@@ -23,7 +23,7 @@ data class OpdsConfiguration(
     val seriesRepository: SeriesRepositoryPort,
     val chapterRepository: ChapterRepositoryPort,
     val storageBasePath: File,
-    val baseUrl: String = "http://localhost:8080/opds",
+    val baseUrl: String,  // Required - derived from server config
     val version: OpdsVersion = OpdsVersion.V1_2,
     val enablePse: Boolean = true
 )
@@ -65,7 +65,7 @@ fun Application.configureOpds(
     seriesRepository: SeriesRepositoryPort,
     chapterRepository: ChapterRepositoryPort,
     storageBasePath: File,
-    baseUrl: String = "http://localhost:8080/opds"
+    baseUrl: String  // Required - derived from server config
 ) {
     configureOpds(OpdsConfiguration(
         seriesRepository = seriesRepository,
