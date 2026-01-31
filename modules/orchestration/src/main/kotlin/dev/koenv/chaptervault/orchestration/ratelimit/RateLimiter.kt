@@ -59,6 +59,11 @@ class RateLimiter {
      * Legacy API: Acquire permission to make a request.
      * Prefer using withRateLimit() instead.
      */
+    @Deprecated(
+        "Use withRateLimit() which wraps the entire operation",
+        ReplaceWith("withRateLimit(connector) { /* your request code */ }"),
+        DeprecationLevel.WARNING
+    )
     suspend fun acquire(connector: Connector, config: RateLimitConfig) {
         val state = getOrCreateState(connector)
 
@@ -128,7 +133,8 @@ class RateLimiter {
 
                 // Remove expired timestamps from the sliding window
                 while (state.requestTimestamps.isNotEmpty() &&
-                    state.requestTimestamps.first() < windowStart) {
+                    state.requestTimestamps.first() < windowStart
+                ) {
                     state.requestTimestamps.removeFirst()
                 }
 
