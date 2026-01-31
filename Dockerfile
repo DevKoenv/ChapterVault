@@ -1,5 +1,4 @@
 # ChapterVault Dockerfile
-# Multi-stage build for smaller final image
 
 # ============================================
 # Stage 1: Build
@@ -44,7 +43,7 @@ FROM eclipse-temurin:21-jre
 LABEL org.opencontainers.image.title="ChapterVault"
 LABEL org.opencontainers.image.description="Self-hosted manga/comic library server with OPDS support"
 LABEL org.opencontainers.image.source="https://github.com/DevKoenv/ChapterVault"
-LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Create non-root user
 RUN groupadd -r chaptervault && useradd -r -g chaptervault chaptervault
