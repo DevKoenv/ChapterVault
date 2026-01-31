@@ -65,6 +65,7 @@ browser:
 
   # Resource types to block for faster loading (when images aren't needed)
   # Options: image, media, font, stylesheet, script
+  # Default: ["image", "media", "font"] - set to [] to load all resources
   block_resources: [ ]
 
   # Extra browser launch arguments

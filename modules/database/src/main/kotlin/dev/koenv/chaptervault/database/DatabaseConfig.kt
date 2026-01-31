@@ -51,7 +51,7 @@ object DatabaseConfig {
     /**
      * Build JDBC URL from config.
      */
-    private fun buildUrl(config: DatabaseAppConfig, dataDir: File, dbType: DatabaseType): String? {
+    private fun buildUrl(config: DatabaseAppConfig, dataDir: File, dbType: DatabaseType): String {
         // If explicit path is provided, use it
         val dbPath = config.path?.let { File(it) }
 
@@ -66,10 +66,8 @@ object DatabaseConfig {
                 "jdbc:sqlite:${file.absolutePath}"
             }
             DatabaseType.POSTGRESQL -> {
-                val host = config.host ?: "localhost"
-                val port = config.port ?: 5432
-                val name = config.name ?: "chaptervault"
-                "jdbc:postgresql://$host:$port/$name"
+                // host, port, name have defaults in DatabaseAppConfig
+                "jdbc:postgresql://${config.host}:${config.port}/${config.name}"
             }
         }
     }
@@ -85,25 +83,6 @@ object DatabaseConfig {
             "postgresql", "postgres" -> DatabaseType.POSTGRESQL
             else -> DatabaseType.SQLITE // Default to SQLite
         }
-    }
-
-    /**
-     * Initialize database connection based on environment variables or defaults.
-     * @deprecated Use initialize(dataDir, config) with ConfigurationService instead.
-     */
-    @Deprecated("Use initialize(dataDir, config) with ConfigurationService")
-    fun initialize(dataDir: File): Database {
-        val dbType = System.getenv("CHAPTERVAULT_DB_TYPE")?.let { parseDbType(it) }
-            ?: DatabaseType.SQLITE
-
-        val options = DatabaseOptions(
-            type = dbType,
-            url = System.getenv("CHAPTERVAULT_DB_URL"),
-            user = System.getenv("CHAPTERVAULT_DB_USER"),
-            password = System.getenv("CHAPTERVAULT_DB_PASSWORD")
-        )
-
-        return initialize(dataDir, options)
     }
 
     /**
@@ -167,7 +146,7 @@ object DatabaseConfig {
      */
     private fun initializePostgres(options: DatabaseOptions): Database {
         val url = options.url
-            ?: throw IllegalArgumentException("CHAPTERVAULT_DB_URL is required for PostgreSQL")
+            ?: throw IllegalArgumentException("Database URL is required for PostgreSQL")
 
         return Database.connect(
             url = url,

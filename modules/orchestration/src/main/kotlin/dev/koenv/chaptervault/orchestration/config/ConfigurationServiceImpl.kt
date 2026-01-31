@@ -115,6 +115,10 @@ class ConfigurationServiceImpl(
      */
     @Suppress("UNCHECKED_CAST")
     private fun parseConfig(raw: Map<String, Any>): AppConfig {
+        val defaults = AppConfig()
+        val dataPath = raw["dataPath"]?.toString()
+            ?: raw["data_path"]?.toString()
+            ?: defaults.dataPath
         val server = (raw["server"] as? Map<String, Any>)?.let { parseServer(it) } ?: ServerConfig()
         val storage = (raw["storage"] as? Map<String, Any>)?.let { parseStorage(it) } ?: StorageAppConfig()
         val database = (raw["database"] as? Map<String, Any>)?.let { parseDatabase(it) } ?: DatabaseAppConfig()
@@ -123,6 +127,7 @@ class ConfigurationServiceImpl(
         val connectors = (raw["connectors"] as? Map<String, Any>)?.let { parseConnectors(it) } ?: emptyMap()
 
         return AppConfig(
+            dataPath = dataPath,
             server = server,
             storage = storage,
             database = database,
@@ -133,30 +138,33 @@ class ConfigurationServiceImpl(
     }
 
     private fun parseServer(raw: Map<String, Any>): ServerConfig {
+        val defaults = ServerConfig()
         return ServerConfig(
-            host = raw["host"]?.toString() ?: "0.0.0.0",
-            port = (raw["port"] as? Number)?.toInt() ?: 8080,
+            host = raw["host"]?.toString() ?: defaults.host,
+            port = (raw["port"] as? Number)?.toInt() ?: defaults.port,
             baseUrl = raw["baseUrl"]?.toString() ?: raw["base_url"]?.toString()
         )
     }
 
     private fun parseStorage(raw: Map<String, Any>): StorageAppConfig {
+        val defaults = StorageAppConfig()
         return StorageAppConfig(
-            path = raw["path"]?.toString(),
-            format = raw["format"]?.toString() ?: "cbz",
+            path = raw["path"]?.toString() ?: defaults.path,
+            format = raw["format"]?.toString() ?: defaults.format,
             minFreeSpaceMb = (raw["minFreeSpaceMb"] as? Number)?.toLong()
                 ?: (raw["min_free_space_mb"] as? Number)?.toLong()
-                ?: 500
+                ?: defaults.minFreeSpaceMb
         )
     }
 
     private fun parseDatabase(raw: Map<String, Any>): DatabaseAppConfig {
+        val defaults = DatabaseAppConfig()
         return DatabaseAppConfig(
-            type = raw["type"]?.toString() ?: "sqlite",
+            type = raw["type"]?.toString() ?: defaults.type,
             path = raw["path"]?.toString(),
-            host = raw["host"]?.toString(),
-            port = (raw["port"] as? Number)?.toInt(),
-            name = raw["name"]?.toString(),
+            host = raw["host"]?.toString() ?: defaults.host,
+            port = (raw["port"] as? Number)?.toInt() ?: defaults.port,
+            name = raw["name"]?.toString() ?: defaults.name,
             username = raw["username"]?.toString(),
             password = raw["password"]?.toString()
         )
@@ -293,6 +301,11 @@ class ConfigurationServiceImpl(
     private fun applyEnvironmentOverrides(config: AppConfig): AppConfig {
         var result = config
 
+        // Data path override
+        System.getenv("CHAPTERVAULT_DATA_PATH")?.let {
+            result = result.copy(dataPath = it)
+        }
+
         // Server overrides
         System.getenv("CHAPTERVAULT_PORT")?.toIntOrNull()?.let {
             result = result.copy(server = result.server.copy(port = it))
@@ -310,6 +323,9 @@ class ConfigurationServiceImpl(
         }
         System.getenv("CHAPTERVAULT_STORAGE_FORMAT")?.let {
             result = result.copy(storage = result.storage.copy(format = it))
+        }
+        System.getenv("CHAPTERVAULT_MIN_FREE_SPACE_MB")?.toLongOrNull()?.let {
+            result = result.copy(storage = result.storage.copy(minFreeSpaceMb = it))
         }
 
         // Database overrides

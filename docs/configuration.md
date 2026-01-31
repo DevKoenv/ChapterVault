@@ -8,8 +8,8 @@ ChapterVault can be configured through environment variables or YAML configurati
 
 | Variable                | Default                 | Description                                |
 |-------------------------|-------------------------|--------------------------------------------|
-| `PORT`                  | `8080`                  | HTTP server port                           |
-| `HOST`                  | `0.0.0.0`               | HTTP server bind address                   |
+| `CHAPTERVAULT_HOST`     | `0.0.0.0`               | HTTP server bind address                   |
+| `CHAPTERVAULT_PORT`     | `8080`                  | HTTP server port                           |
 | `CHAPTERVAULT_BASE_URL` | `http://localhost:8080` | Public base URL (for OPDS links)           |
 | `CHAPTERVAULT_ENV`      | `production`            | Environment: `development` or `production` |
 
@@ -17,11 +17,11 @@ ChapterVault can be configured through environment variables or YAML configurati
 
 ### Storage Configuration
 
-| Variable                      | Default                    | Description                                    |
-|-------------------------------|----------------------------|------------------------------------------------|
-| `CHAPTERVAULT_DATA_PATH`      | `~/ChapterVault/data`      | Database and cache location                    |
-| `CHAPTERVAULT_STORAGE_PATH`   | `~/ChapterVault/downloads` | Downloaded content location                    |
-| `CHAPTERVAULT_MIN_FREE_SPACE` | `524288000`                | Minimum free disk space (bytes, default 500MB) |
+| Variable                         | Default                    | Description                            |
+|----------------------------------|----------------------------|----------------------------------------|
+| `CHAPTERVAULT_DATA_PATH`         | `~/ChapterVault/data`      | Database and cache location            |
+| `CHAPTERVAULT_STORAGE_PATH`      | `~/ChapterVault/downloads` | Downloaded content location            |
+| `CHAPTERVAULT_MIN_FREE_SPACE_MB` | `500`                      | Minimum free disk space in megabytes   |
 
 ### Database Configuration
 
@@ -71,88 +71,72 @@ CHAPTERVAULT_DB_PASSWORD=yourpassword
 
 ## YAML Configuration
 
-Create a `config/application.yml` file in your data directory:
+Create a `config/chaptervault.yaml` file in your working directory:
 
 ```yaml
 server:
     port: 8080
     host: 0.0.0.0
-    baseUrl: http://localhost:8080
+    base_url: http://localhost:8080
 
 storage:
     path: /path/to/downloads
-    minFreeSpace: 524288000  # 500MB
+    format: cbz
+    min_free_space_mb: 500
 
 database:
     type: h2
-    # url: jdbc:h2:file:/path/to/data/chaptervault
-    # user: null
-    # password: null
+    path: /path/to/data/chaptervault
+    username: null
+    password: null
 
 http:
-    userAgent: "ChapterVault/0.1"
-    timeout: 30000
-    followRedirects: true
-    maxRedirects: 5
+    user_agent: "ChapterVault/0.1"
+    connect_timeout_seconds: 30
+    read_timeout_seconds: 60
+    follow_redirects: true
+    max_redirects: 5
 
 browser:
     enabled: false
     headless: true
-    timeout: 60000
-    poolSize: 2
+    max_browsers: 2
 
 connectors:
-    # Global connector settings
-    defaultRateLimit:
-        minDelayMs: 500
-        maxConcurrent: 2
-        maxRequestsPerMinute: 60
-
-    # Per-connector overrides
-    specific:
-        ExampleConnector:
-            enabled: true
-            priority: 10
-            rateLimit:
-                minDelayMs: 1000
-                maxConcurrent: 1
+    # Per-connector configuration (no nesting under "specific:")
+    ExampleConnector:
+        enabled: true
+        priority: 10
+        rate_limit:
+            min_delay_millis: 1000
+            max_concurrent: 1
 ```
 
 ## Connector Configuration
 
-### Global Rate Limits
-
-```yaml
-connectors:
-    defaultRateLimit:
-        minDelayMs: 500         # Minimum delay between requests
-        maxConcurrent: 2        # Maximum concurrent requests
-        maxRequestsPerMinute: 60
-```
-
 ### Per-Connector Settings
 
+Each connector is configured directly under the `connectors:` key:
+
 ```yaml
 connectors:
-    specific:
-        MyConnector:
-            enabled: true         # Enable/disable connector
-            priority: 10          # Higher = preferred
-            auth:
-                username: "user"
-                password: "pass"
-                # Or API key:
-                # apiKey: "your-api-key"
-                # Or custom headers:
-                # headers:
-                #   Authorization: "Bearer token"
-            rateLimit:
-                minDelayMs: 2000
-                maxConcurrent: 1
-                maxRequestsPerMinute: 30
-            custom:
-                # Connector-specific settings
-                preferredQuality: "high"
+    MyConnector:
+        enabled: true         # Enable/disable connector
+        priority: 10          # Higher = preferred
+        auth:
+            username: "user"
+            password: "pass"
+            # Or API key:
+            # api_key: "your-api-key"
+            # Or custom headers:
+            # headers:
+            #   Authorization: "Bearer token"
+        rate_limit:
+            min_delay_millis: 2000
+            max_concurrent: 1
+            max_requests_per_minute: 30
+        # Connector-specific custom settings
+        preferred_quality: "high"
 ```
 
 ## Docker Configuration
@@ -171,8 +155,10 @@ Using environment variables with Docker:
 docker run -d \
   -p 8080:8080 \
   -e CHAPTERVAULT_DB_TYPE=postgresql \
-  -e CHAPTERVAULT_DB_URL=jdbc:postgresql://db:5432/chaptervault \
-  -e CHAPTERVAULT_DB_USER=chaptervault \
+  -e CHAPTERVAULT_DB_HOST=db \
+  -e CHAPTERVAULT_DB_PORT=5432 \
+  -e CHAPTERVAULT_DB_NAME=chaptervault \
+  -e CHAPTERVAULT_DB_USERNAME=chaptervault \
   -e CHAPTERVAULT_DB_PASSWORD=secret \
   -v /path/to/downloads:/downloads \
   -v /path/to/data:/data \
