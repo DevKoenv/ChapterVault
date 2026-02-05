@@ -48,6 +48,7 @@ class Orchestrator(
     
     /**
      * Search for series across all connectors or a specific connector.
+     * Caches search results in the database for future reference.
      * @param query The search query
      * @param connectorName Optional connector name to search only that connector
      */
@@ -77,6 +78,16 @@ class Orchestrator(
                 } catch (e: Exception) {
                     logger.warn("Connector {} failed to search: {}", connector::class.simpleName, e.message)
                     // Continue with other connectors if one fails
+                }
+            }
+
+            // Cache search results in database
+            if (results.isNotEmpty() && seriesRepository != null) {
+                try {
+                    seriesRepository.saveAllFromSearch(results)
+                    logger.debug("Cached {} search results in database", results.size)
+                } catch (e: Exception) {
+                    logger.warn("Failed to cache search results: {}", e.message)
                 }
             }
 
@@ -208,9 +219,19 @@ class Orchestrator(
                 }
                 logger.info("[Task {}] Fetched metadata for: {}", taskId, seriesMetadata.title)
 
-                // Save series to database
-                val cachedSeries = seriesRepository?.save(seriesMetadata)
+                // Save series to database and add to library
+                var cachedSeries = seriesRepository?.save(seriesMetadata)
                 val seriesId = cachedSeries?.id
+
+                // Auto-add to library on download
+                if (seriesId != null && cachedSeries != null && !cachedSeries.inLibrary) {
+                    try {
+                        cachedSeries = seriesRepository?.addToLibrary(seriesId)
+                        logger.info("[Task {}] Added series to library: {}", taskId, seriesId)
+                    } catch (e: Exception) {
+                        logger.warn("[Task {}] Failed to add series to library: {}", taskId, e.message)
+                    }
+                }
                 logger.info("[Task {}] Saved series to database with ID: {}", taskId, seriesId)
 
                 // Fetch chapter list
@@ -302,8 +323,18 @@ class Orchestrator(
         scope.launch {
             try {
                 // Get series from database
-                val cachedSeries = seriesRepository?.findById(seriesId)
+                var cachedSeries = seriesRepository?.findById(seriesId)
                     ?: throw IllegalArgumentException("Series not found in database: $seriesId")
+
+                // Auto-add to library on download
+                if (!cachedSeries.inLibrary && seriesRepository != null) {
+                    try {
+                        cachedSeries = seriesRepository.addToLibrary(seriesId)
+                        logger.info("[Task {}] Added series to library: {}", taskId, seriesId)
+                    } catch (e: Exception) {
+                        logger.warn("[Task {}] Failed to add series to library: {}", taskId, e.message)
+                    }
+                }
 
                 // Find connector for the series URL
                 logger.debug("[Task {}] Finding connector for series URL: {}", taskId, cachedSeries.sourceUrl)

@@ -6,11 +6,13 @@ import org.jetbrains.exposed.v1.dao.java.UUIDEntityClass
 import java.util.UUID
 
 /**
- * DAO entity for Series
+ * DAO entity for series metadata.
+ *
+ * @see SeriesTable
  */
 class SeriesEntity(id: EntityID<UUID>) : UUIDEntity(id = id) {
     companion object : UUIDEntityClass<SeriesEntity>(SeriesTable)
-    
+
     var sourceUrl by SeriesTable.sourceUrl
     var title by SeriesTable.title
     var description by SeriesTable.description
@@ -18,6 +20,9 @@ class SeriesEntity(id: EntityID<UUID>) : UUIDEntity(id = id) {
     var coverUrl by SeriesTable.coverUrl
     var status by SeriesTable.status
     var language by SeriesTable.language
+    var inLibrary by SeriesTable.inLibrary
+    var addedToLibraryAt by SeriesTable.addedToLibraryAt
+    var metadataFetchedAt by SeriesTable.metadataFetchedAt
     var createdAt by SeriesTable.createdAt
     var updatedAt by SeriesTable.updatedAt
     var tags by SeriesTagEntity via SeriesTagsTable

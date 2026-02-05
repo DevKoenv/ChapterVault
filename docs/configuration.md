@@ -90,6 +90,12 @@ database:
     username: null
     password: null
 
+cache:
+    cleanup:
+        enabled: true           # Enable automatic cache cleanup
+        ttl_days: 90            # Days before non-library series are cleaned up
+        run_interval_hours: 24  # How often cleanup job runs
+
 http:
     user_agent: "ChapterVault/0.1"
     connect_timeout_seconds: 30
@@ -110,6 +116,28 @@ connectors:
         rate_limit:
             min_delay_millis: 1000
             max_concurrent: 1
+```
+
+## Cache Configuration
+
+ChapterVault caches series metadata from search results. Series in your library are protected from cleanup, while cached-only series are subject to TTL-based cleanup.
+
+| Setting                  | Default | Description                                      |
+|--------------------------|---------|--------------------------------------------------|
+| `cache.cleanup.enabled`  | `true`  | Enable automatic cleanup of stale cached series  |
+| `cache.cleanup.ttl_days` | `90`    | Days before non-library series are cleaned up    |
+| `cache.cleanup.run_interval_hours` | `24` | How often the cleanup job runs          |
+
+### Manual Cache Cleanup
+
+Trigger cleanup manually via the admin API:
+
+```bash
+# Check cache status
+curl "http://localhost:8080/api/v1/admin/cache/status"
+
+# Run cleanup
+curl -X POST "http://localhost:8080/api/v1/admin/cache/cleanup"
 ```
 
 ## Connector Configuration

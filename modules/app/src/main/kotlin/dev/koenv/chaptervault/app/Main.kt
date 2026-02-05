@@ -12,6 +12,7 @@ import dev.koenv.chaptervault.database.repository.DownloadTaskRepository
 import dev.koenv.chaptervault.database.repository.SeriesRepository
 import dev.koenv.chaptervault.opds.OpdsConfiguration
 import dev.koenv.chaptervault.opds.configureOpds
+import dev.koenv.chaptervault.orchestration.cache.CacheCleanupService
 import dev.koenv.chaptervault.orchestration.config.ConfigurationServiceImpl
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import dev.koenv.chaptervault.orchestration.execution.LocalExecutor
@@ -52,10 +53,13 @@ fun main() {
     val database = DatabaseConfig.initialize(dataDir, appConfig.database)
     logger.info { "Database initialized" }
 
-    // Initialize repositories
+    // Initialize repositories (order matters for foreign key constraints)
     val seriesRepository = SeriesRepository(database).also { it.initialize() }
     val chapterRepository = ChapterRepository(database).also { it.initialize() }
     val downloadTaskRepository = DownloadTaskRepository(database).also { it.initialize() }
+
+    // Run data migrations after all schemas are created
+    seriesRepository.runMigrations(chapterRepository)
     logger.info { "Repositories initialized" }
 
     // Resolve storage directory (defaults are in ConfigurationService)
@@ -101,6 +105,11 @@ fun main() {
     )
     logger.info { "Orchestrator initialized" }
 
+    // Initialize cache cleanup service
+    val cacheCleanupService = CacheCleanupService(seriesRepository, appConfig.cache)
+    cacheCleanupService.start()
+    logger.info { "Cache cleanup service initialized (enabled: ${appConfig.cache.enabled}, TTL: ${appConfig.cache.ttlDays} days)" }
+
     // Create API configuration
     val apiConfig = ApiConfiguration(
         orchestrator = orchestrator,
@@ -108,7 +117,8 @@ fun main() {
         seriesRepository = seriesRepository,
         chapterRepository = chapterRepository,
         downloadTaskRepository = downloadTaskRepository,
-        storageDir = storageDir
+        storageDir = storageDir,
+        cacheCleanupService = cacheCleanupService
     )
 
     // Server configuration
@@ -136,6 +146,7 @@ fun main() {
     // Add shutdown hook
     Runtime.getRuntime().addShutdownHook(Thread {
         logger.info { "${BuildConfig.APP_NAME} shutting down..." }
+        cacheCleanupService.stop()
         orchestrator.shutdown()
         server.stop(1000, 2000)
         logger.info { "${BuildConfig.APP_NAME} stopped" }

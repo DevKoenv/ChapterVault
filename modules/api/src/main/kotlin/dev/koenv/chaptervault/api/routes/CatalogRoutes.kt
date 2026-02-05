@@ -1,7 +1,6 @@
 package dev.koenv.chaptervault.api.routes
 
 import dev.koenv.chaptervault.api.models.ErrorTypes
-import dev.koenv.chaptervault.api.models.Pagination
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.catalog.*
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
@@ -12,6 +11,7 @@ import dev.koenv.chaptervault.core.repository.DownloadStatus
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import io.ktor.http.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.util.UUID
@@ -50,126 +50,174 @@ fun Route.catalogRoutes(
         }
 
         /**
-         * GET /api/v1/catalog/series
-         * List/search all series (both downloaded and external).
-         * Query params: q (search), downloaded (filter), source (connector name), offset, limit
+         * POST /api/v1/catalog/lookup
+         * Lookup series by URL or search by query.
+         *
+         * Request body fields:
+         * - `url`: Direct URL to a series page (connector auto-detected)
+         * - `query` + `source`: Search term with connector ID
+         *
+         * At least one of `url` or `query` must be provided.
+         * When using `query`, the `source` parameter is required.
+         *
+         * Returns [CatalogSeriesDetailResponse] for URL lookups.
+         * Returns [CatalogLookupResponse] for search queries.
          */
-        get("/series") {
-            val query = call.request.queryParameters["q"]
-            val downloadedFilter = call.request.queryParameters["downloaded"]?.toBooleanStrictOrNull()
-            val source = call.request.queryParameters["source"]
-            val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
-
-            // Validate source parameter if provided
-            if (source != null && connectorRegistry.findByName(source) == null) {
+        post("/lookup") {
+            val request = try {
+                call.receive<CatalogLookupRequest>()
+            } catch (e: Exception) {
                 call.respond(
                     HttpStatusCode.BadRequest,
                     ProblemDetail(
                         type = ErrorTypes.VALIDATION,
-                        title = "Invalid Source",
+                        title = "Invalid Request",
                         status = 400,
-                        detail = "Unknown connector: $source",
+                        detail = "Invalid request body: ${e.message}",
                         instance = call.request.local.uri
                     )
                 )
-                return@get
+                return@post
             }
 
-            try {
-                val results = mutableListOf<CatalogSeriesDto>()
-                val seenUrls = mutableSetOf<String>()
+            val url = request.url?.trim()?.takeIf { it.isNotBlank() }
+            val query = request.query?.trim()?.takeIf { it.isNotBlank() }
 
-                // Include library series (unless searching a specific external source)
-                if (source == null) {
-                    val librarySeries = seriesRepository.findAll()
-                    librarySeries.forEach { series ->
-                        val matchesQuery = query.isNullOrBlank() ||
-                            series.title.contains(query, ignoreCase = true)
-
-                        if (matchesQuery) {
-                            val downloadSummary = series.toDownloadSummary(chapterRepository)
-                            val matchesDownloadFilter = when (downloadedFilter) {
-                                true -> downloadSummary.hasDownloads
-                                false -> !downloadSummary.hasDownloads
-                                null -> true
-                            }
-
-                            if (matchesDownloadFilter) {
-                                results.add(series.toCatalogDto(downloadSummary))
-                                seenUrls.add(series.sourceUrl)
-                            }
-                        }
-                    }
-                }
-
-                // Search external connectors if query provided and not filtered to downloaded only
-                if (!query.isNullOrBlank() && downloadedFilter != true) {
-                    val externalResults = orchestrator.searchSeries(query, source)
-                    externalResults.forEach { result ->
-                        if (result.url !in seenUrls) {
-                            // Check if already in library
-                            val cached = seriesRepository.findByUrl(result.url)
-                            if (cached != null) {
-                                val downloadSummary = cached.toDownloadSummary(chapterRepository)
-                                results.add(cached.toCatalogDto(downloadSummary))
-                            } else {
-                                // Not in library yet - create DTO with null ID
-                                results.add(
-                                    CatalogSeriesDto(
-                                        id = null,
-                                        sourceUrl = result.url,
-                                        title = result.title,
-                                        description = result.description,
-                                        author = null,
-                                        coverUrl = result.coverUrl,
-                                        tags = emptyList(),
-                                        status = "UNKNOWN",
-                                        download = DownloadSummaryDto(
-                                            totalChapters = 0,
-                                            downloadedChapters = 0,
-                                            hasDownloads = false
-                                        )
-                                    )
-                                )
-                            }
-                            seenUrls.add(result.url)
-                        }
-                    }
-                }
-
-                val total = results.size.toLong()
-                val paginatedResults = results.drop(offset).take(limit)
-
+            if (url == null && query == null) {
                 call.respond(
-                    HttpStatusCode.OK,
-                    CatalogSeriesListResponse(
-                        series = paginatedResults,
-                        pagination = Pagination(
-                            offset = offset,
-                            limit = limit,
-                            total = total,
-                            hasMore = offset + paginatedResults.size < total
-                        )
-                    )
-                )
-            } catch (e: Exception) {
-                call.respond(
-                    HttpStatusCode.InternalServerError,
+                    HttpStatusCode.BadRequest,
                     ProblemDetail(
-                        type = ErrorTypes.INTERNAL_ERROR,
-                        title = "Catalog Search Failed",
-                        status = 500,
-                        detail = e.message ?: "Unknown error",
+                        type = ErrorTypes.VALIDATION,
+                        title = "Missing Parameter",
+                        status = 400,
+                        detail = "At least one of 'url' or 'query' must be provided",
                         instance = call.request.local.uri
                     )
                 )
+                return@post
+            }
+
+            if (url != null) {
+                // URL lookup - fetch series metadata directly
+                try {
+                    var series = seriesRepository.findByUrl(url)
+
+                    if (series == null) {
+                        val metadata = orchestrator.fetchSeriesMetadata(url)
+                        series = seriesRepository.save(metadata, null)
+                    } else if (series.metadataFetchedAt == null) {
+                        val metadata = orchestrator.fetchSeriesMetadata(url)
+                        series = seriesRepository.save(metadata, series.language)
+                    }
+
+                    val chapters = chapterRepository.findBySeriesId(series.id)
+                    val downloadSummary = series.toDownloadSummary(chapterRepository)
+
+                    call.respond(
+                        HttpStatusCode.OK,
+                        CatalogSeriesDetailResponse(
+                            id = series.id.toString(),
+                            sourceUrl = series.sourceUrl,
+                            title = series.title,
+                            description = series.description,
+                            author = series.author,
+                            coverUrl = series.coverUrl,
+                            tags = series.tags,
+                            status = series.status.name,
+                            download = downloadSummary,
+                            chapters = chapters.map { it.toCatalogChapterDto() },
+                            inLibrary = series.inLibrary
+                        )
+                    )
+                } catch (e: IllegalArgumentException) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ProblemDetail(
+                            type = ErrorTypes.VALIDATION,
+                            title = "Unsupported URL",
+                            status = 400,
+                            detail = e.message ?: "No connector supports this URL",
+                            instance = call.request.local.uri
+                        )
+                    )
+                } catch (e: Exception) {
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        ProblemDetail(
+                            type = ErrorTypes.INTERNAL_ERROR,
+                            title = "Lookup Failed",
+                            status = 500,
+                            detail = e.message ?: "Unknown error",
+                            instance = call.request.local.uri
+                        )
+                    )
+                }
+            } else {
+                // Search query - requires source parameter
+                val source = request.source?.trim()?.takeIf { it.isNotBlank() }
+                if (source == null) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ProblemDetail(
+                            type = ErrorTypes.VALIDATION,
+                            title = "Source Required",
+                            status = 400,
+                            detail = "Search queries require a 'source' parameter to specify which connector to search",
+                            instance = call.request.local.uri
+                        )
+                    )
+                    return@post
+                }
+
+                if (connectorRegistry.findByName(source) == null) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ProblemDetail(
+                            type = ErrorTypes.VALIDATION,
+                            title = "Invalid Source",
+                            status = 400,
+                            detail = "Unknown connector: $source",
+                            instance = call.request.local.uri
+                        )
+                    )
+                    return@post
+                }
+
+                try {
+                    val searchResults = orchestrator.searchSeries(query!!, source)
+                    val cachedSeries = seriesRepository.saveAllFromSearch(searchResults)
+
+                    val results = cachedSeries.map { series ->
+                        val downloadSummary = series.toDownloadSummary(chapterRepository)
+                        series.toCatalogDto(downloadSummary)
+                    }
+
+                    call.respond(
+                        HttpStatusCode.OK,
+                        CatalogLookupResponse(
+                            series = results,
+                            source = source
+                        )
+                    )
+                } catch (e: Exception) {
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        ProblemDetail(
+                            type = ErrorTypes.INTERNAL_ERROR,
+                            title = "Search Failed",
+                            status = 500,
+                            detail = e.message ?: "Unknown error",
+                            instance = call.request.local.uri
+                        )
+                    )
+                }
             }
         }
 
         /**
          * GET /api/v1/catalog/series/{seriesId}
          * Get series detail with all chapters.
+         * Auto-fetches full metadata from source if not yet fetched.
          */
         get("/series/{seriesId}") {
             val seriesIdParam = call.parameters["seriesId"]
@@ -190,7 +238,7 @@ fun Route.catalogRoutes(
                 return@get
             }
 
-            val series = seriesRepository.findById(seriesId)
+            var series = seriesRepository.findById(seriesId)
             if (series == null) {
                 call.respond(
                     HttpStatusCode.NotFound,
@@ -203,6 +251,17 @@ fun Route.catalogRoutes(
                     )
                 )
                 return@get
+            }
+
+            // Auto-fetch full metadata if not yet fetched
+            if (series.metadataFetchedAt == null) {
+                try {
+                    val freshMetadata = orchestrator.fetchSeriesMetadata(series.sourceUrl)
+                    series = seriesRepository.save(freshMetadata, series.language)
+                } catch (e: Exception) {
+                    // Log but continue with cached data if fetch fails
+                    // The series still has basic search data available
+                }
             }
 
             val chapters = chapterRepository.findBySeriesId(seriesId)
@@ -220,9 +279,88 @@ fun Route.catalogRoutes(
                     tags = series.tags,
                     status = series.status.name,
                     download = downloadSummary,
-                    chapters = chapters.map { it.toCatalogChapterDto() }
+                    chapters = chapters.map { it.toCatalogChapterDto() },
+                    inLibrary = series.inLibrary
                 )
             )
+        }
+
+        /**
+         * POST /api/v1/catalog/series/{seriesId}/refresh
+         * Force refresh metadata for a series from the source.
+         */
+        post("/series/{seriesId}/refresh") {
+            val seriesIdParam = call.parameters["seriesId"]
+
+            val seriesId = try {
+                UUID.fromString(seriesIdParam)
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ProblemDetail(
+                        type = ErrorTypes.VALIDATION,
+                        title = "Invalid Series ID",
+                        status = 400,
+                        detail = "Invalid UUID format: $seriesIdParam",
+                        instance = call.request.local.uri
+                    )
+                )
+                return@post
+            }
+
+            val existingSeries = seriesRepository.findById(seriesId)
+            if (existingSeries == null) {
+                call.respond(
+                    HttpStatusCode.NotFound,
+                    ProblemDetail(
+                        type = ErrorTypes.NOT_FOUND,
+                        title = "Series Not Found",
+                        status = 404,
+                        detail = "No series found with ID: $seriesIdParam",
+                        instance = call.request.local.uri
+                    )
+                )
+                return@post
+            }
+
+            try {
+                // Fetch fresh metadata from the source
+                val freshMetadata = orchestrator.fetchSeriesMetadata(existingSeries.sourceUrl)
+
+                // Save the updated metadata (this will update metadataFetchedAt)
+                val updatedSeries = seriesRepository.save(freshMetadata, existingSeries.language)
+
+                val chapters = chapterRepository.findBySeriesId(seriesId)
+                val downloadSummary = updatedSeries.toDownloadSummary(chapterRepository)
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    CatalogSeriesDetailResponse(
+                        id = updatedSeries.id.toString(),
+                        sourceUrl = updatedSeries.sourceUrl,
+                        title = updatedSeries.title,
+                        description = updatedSeries.description,
+                        author = updatedSeries.author,
+                        coverUrl = updatedSeries.coverUrl,
+                        tags = updatedSeries.tags,
+                        status = updatedSeries.status.name,
+                        download = downloadSummary,
+                        chapters = chapters.map { it.toCatalogChapterDto() },
+                        inLibrary = updatedSeries.inLibrary
+                    )
+                )
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ProblemDetail(
+                        type = ErrorTypes.INTERNAL_ERROR,
+                        title = "Metadata Refresh Failed",
+                        status = 500,
+                        detail = e.message ?: "Unknown error",
+                        instance = call.request.local.uri
+                    )
+                )
+            }
         }
     }
 }
@@ -247,7 +385,8 @@ private fun CachedSeries.toCatalogDto(downloadSummary: DownloadSummaryDto): Cata
         coverUrl = coverUrl,
         tags = tags,
         status = status.name,
-        download = downloadSummary
+        download = downloadSummary,
+        inLibrary = inLibrary
     )
 }
 

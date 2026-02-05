@@ -62,6 +62,7 @@ data class AppConfig(
     val database: DatabaseAppConfig = DatabaseAppConfig(),
     val browser: BrowserPoolConfig = BrowserPoolConfig(),
     val http: HttpClientConfig = HttpClientConfig(),
+    val cache: CacheCleanupConfig = CacheCleanupConfig(),
     val connectors: Map<String, ConnectorSpecificConfig> = emptyMap()
 )
 
@@ -193,4 +194,17 @@ data class RateLimitOverride(
     val minDelayMillis: Long? = null,
     val maxConcurrent: Int? = null,
     val maxRequestsPerMinute: Int? = null
+)
+
+/**
+ * Cache cleanup configuration.
+ * Controls automatic cleanup of non-library series metadata.
+ */
+data class CacheCleanupConfig(
+    /** Whether to enable automatic cache cleanup */
+    val enabled: Boolean = true,
+    /** Number of days before non-library series are cleaned up */
+    val ttlDays: Int = 90,
+    /** How often the cleanup job runs (in hours) */
+    val runIntervalHours: Int = 24
 )

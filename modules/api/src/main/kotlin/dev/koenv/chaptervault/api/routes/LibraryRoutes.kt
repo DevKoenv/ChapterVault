@@ -9,37 +9,35 @@ import dev.koenv.chaptervault.core.repository.CachedSeries
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
 import dev.koenv.chaptervault.core.repository.DownloadStatus
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
+import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.util.UUID
 
 /**
- * Library routes - view downloaded content only.
+ * Library routes - view downloaded content and manage library membership.
  */
 fun Route.libraryRoutes(
     seriesRepository: SeriesRepositoryPort,
-    chapterRepository: ChapterRepositoryPort
+    chapterRepository: ChapterRepositoryPort,
+    orchestrator: Orchestrator? = null
 ) {
     route("/api/v1/library") {
 
         /**
          * GET /api/v1/library/series
-         * List series that have downloaded chapters.
+         * List all series in the user's library.
          */
         get("/series") {
             val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
             val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
 
             try {
-                // Get all series that have at least one downloaded chapter
-                val allSeries = seriesRepository.findAll()
-                val seriesWithDownloads = allSeries.filter { series ->
-                    chapterRepository.countDownloaded(series.id) > 0
-                }
+                val librarySeries = seriesRepository.findAllInLibrary()
 
-                val total = seriesWithDownloads.size.toLong()
-                val paginatedSeries = seriesWithDownloads.drop(offset).take(limit)
+                val total = librarySeries.size.toLong()
+                val paginatedSeries = librarySeries.drop(offset).take(limit)
 
                 val response = paginatedSeries.map { series ->
                     series.toLibraryDto(chapterRepository)
@@ -141,9 +139,128 @@ fun Route.libraryRoutes(
                     status = series.status.name,
                     downloadedChapterCount = downloadedChapters.size,
                     totalChapterCount = totalChapterCount,
+                    inLibrary = series.inLibrary,
+                    addedToLibraryAt = series.addedToLibraryAt?.toString(),
                     chapters = downloadedChapters.map { it.toLibraryChapterDto() }
                 )
             )
+        }
+
+        /**
+         * POST /api/v1/library/series/{seriesId}
+         * Add a series to the user's library.
+         */
+        post("/series/{seriesId}") {
+            val seriesIdParam = call.parameters["seriesId"]
+
+            val seriesId = try {
+                UUID.fromString(seriesIdParam)
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ProblemDetail(
+                        type = ErrorTypes.VALIDATION,
+                        title = "Invalid Series ID",
+                        status = 400,
+                        detail = "Invalid UUID format: $seriesIdParam",
+                        instance = call.request.local.uri
+                    )
+                )
+                return@post
+            }
+
+            try {
+                val series = seriesRepository.addToLibrary(seriesId)
+                call.respond(
+                    HttpStatusCode.OK,
+                    LibraryAddResponse(
+                        id = series.id.toString(),
+                        title = series.title,
+                        inLibrary = series.inLibrary,
+                        addedToLibraryAt = series.addedToLibraryAt?.toString()
+                    )
+                )
+            } catch (e: IllegalArgumentException) {
+                call.respond(
+                    HttpStatusCode.NotFound,
+                    ProblemDetail(
+                        type = ErrorTypes.NOT_FOUND,
+                        title = "Series Not Found",
+                        status = 404,
+                        detail = e.message ?: "Series not found",
+                        instance = call.request.local.uri
+                    )
+                )
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ProblemDetail(
+                        type = ErrorTypes.INTERNAL_ERROR,
+                        title = "Failed to Add to Library",
+                        status = 500,
+                        detail = e.message ?: "Unknown error",
+                        instance = call.request.local.uri
+                    )
+                )
+            }
+        }
+
+        /**
+         * DELETE /api/v1/library/series/{seriesId}
+         * Remove a series from the user's library.
+         */
+        delete("/series/{seriesId}") {
+            val seriesIdParam = call.parameters["seriesId"]
+
+            val seriesId = try {
+                UUID.fromString(seriesIdParam)
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ProblemDetail(
+                        type = ErrorTypes.VALIDATION,
+                        title = "Invalid Series ID",
+                        status = 400,
+                        detail = "Invalid UUID format: $seriesIdParam",
+                        instance = call.request.local.uri
+                    )
+                )
+                return@delete
+            }
+
+            try {
+                val series = seriesRepository.removeFromLibrary(seriesId)
+                call.respond(
+                    HttpStatusCode.OK,
+                    LibraryRemoveResponse(
+                        id = series.id.toString(),
+                        title = series.title,
+                        inLibrary = series.inLibrary
+                    )
+                )
+            } catch (e: IllegalArgumentException) {
+                call.respond(
+                    HttpStatusCode.NotFound,
+                    ProblemDetail(
+                        type = ErrorTypes.NOT_FOUND,
+                        title = "Series Not Found",
+                        status = 404,
+                        detail = e.message ?: "Series not found",
+                        instance = call.request.local.uri
+                    )
+                )
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ProblemDetail(
+                        type = ErrorTypes.INTERNAL_ERROR,
+                        title = "Failed to Remove from Library",
+                        status = 500,
+                        detail = e.message ?: "Unknown error",
+                        instance = call.request.local.uri
+                    )
+                )
+            }
         }
     }
 }
@@ -162,7 +279,9 @@ private fun CachedSeries.toLibraryDto(chapterRepository: ChapterRepositoryPort):
         tags = tags,
         status = status.name,
         downloadedChapterCount = downloadedCount,
-        totalChapterCount = totalCount
+        totalChapterCount = totalCount,
+        inLibrary = inLibrary,
+        addedToLibraryAt = addedToLibraryAt?.toString()
     )
 }
 

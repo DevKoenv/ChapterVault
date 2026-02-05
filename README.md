@@ -83,16 +83,34 @@ See [docs/configuration.md](docs/configuration.md) for full configuration option
 
 ## API Usage
 
+### Lookup by URL
+
+```bash
+# Fetch series metadata from a direct URL
+curl -X POST "http://localhost:8080/api/v1/catalog/lookup" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/series/my-series"}'
+```
+
 ### Search for Series
 
 ```bash
-curl "http://localhost:8080/api/v1/catalog/series?q=adventure"
+# Search a specific connector (source required for searches)
+curl -X POST "http://localhost:8080/api/v1/catalog/lookup" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "adventure", "source": "my-connector"}'
 ```
 
 ### Get Series Details
 
 ```bash
 curl "http://localhost:8080/api/v1/catalog/series/{seriesId}"
+```
+
+### List Available Connectors
+
+```bash
+curl "http://localhost:8080/api/v1/catalog/connectors"
 ```
 
 ### Download a Series
@@ -109,7 +127,7 @@ curl -X POST "http://localhost:8080/api/v1/downloads" \
   -d '{"seriesId": "uuid-here"}'
 ```
 
-> **Note:** When searching for series via `/api/v1/catalog/series`, external results (not yet in your library) will have `id: null`. Use `sourceUrl` to download these. Once downloaded, the series will have an `id` assigned.
+> **Note:** All lookup results are cached and assigned a stable ID. Series not yet in your library will have `inLibrary: false`. Downloading a series automatically adds it to your library.
 
 ### Check Download Progress
 
