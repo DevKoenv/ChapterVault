@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- (no changes yet)
+### Added
+
+- **Series Caching**: Lookup results are now cached in the database, giving all series a stable ID
+- **Library Separation**: New `inLibrary` flag distinguishes user's collection from cached metadata
+- **Unified Lookup Endpoint**: `POST /api/v1/catalog/lookup` handles both URL lookups and searches
+  - URL lookup: `{"url": "https://..."}` - auto-detects connector
+  - Search: `{"query": "term", "source": "connector-id"}` - requires source to prevent concurrent load
+- **Library Management API**: Add/remove series from library via `POST/DELETE /api/v1/library/series/{id}`
+- **Metadata Refresh**: Force refresh metadata from source via `POST /api/v1/catalog/series/{id}/refresh`
+- **Auto-fetch on Detail**: `GET /api/v1/catalog/series/{id}` auto-fetches full metadata if only search data exists
+- **Cache Cleanup**: Configurable TTL-based cleanup of non-library cached series
+- **Admin Endpoints**: Manual cache cleanup via `POST /api/v1/admin/cache/cleanup`
+- **Cache Configuration**: New `cache.cleanup` config section with `enabled`, `ttl_days`, `run_interval_hours`
+
+### Changed
+
+- `CatalogSeriesDto.id` is now always populated (non-nullable) since lookup results are cached
+- Series are automatically added to library when downloading
+- Database schema uses `createMissingTablesAndColumns` for automatic migrations
+- Search operations require a `source` parameter to search one connector at a time
+
+### Removed
+
+- `GET /api/v1/catalog/series` endpoint - use `POST /api/v1/catalog/lookup` for discovery and `GET /api/v1/library/series` for library browsing
+
+### Database
+
+- New columns on `series` table: `in_library`, `added_to_library_at`, `metadata_fetched_at`
+- Automatic migration marks existing series with downloads as library items
 
 ## [0.1.0] - 2026-01-31
 

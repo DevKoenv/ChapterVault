@@ -124,6 +124,7 @@ class ConfigurationServiceImpl(
         val database = (raw["database"] as? Map<String, Any>)?.let { parseDatabase(it) } ?: DatabaseAppConfig()
         val browser = (raw["browser"] as? Map<String, Any>)?.let { parseBrowser(it) } ?: BrowserPoolConfig()
         val http = (raw["http"] as? Map<String, Any>)?.let { parseHttp(it) } ?: HttpClientConfig()
+        val cache = (raw["cache"] as? Map<String, Any>)?.let { parseCache(it) } ?: CacheCleanupConfig()
         val connectors = (raw["connectors"] as? Map<String, Any>)?.let { parseConnectors(it) } ?: emptyMap()
 
         return AppConfig(
@@ -133,6 +134,7 @@ class ConfigurationServiceImpl(
             database = database,
             browser = browser,
             http = http,
+            cache = cache,
             connectors = connectors
         )
     }
@@ -232,6 +234,19 @@ class ConfigurationServiceImpl(
                 ?: (raw["max_redirects"] as? Number)?.toInt()
                 ?: 5,
             proxy = (raw["proxy"] as? Map<String, Any>)?.let { parseProxy(it) }
+        )
+    }
+
+    private fun parseCache(raw: Map<String, Any>): CacheCleanupConfig {
+        val cleanup = (raw["cleanup"] as? Map<String, Any>) ?: raw
+        return CacheCleanupConfig(
+            enabled = cleanup["enabled"]?.toString()?.toBooleanStrictOrNull() ?: true,
+            ttlDays = (cleanup["ttlDays"] as? Number)?.toInt()
+                ?: (cleanup["ttl_days"] as? Number)?.toInt()
+                ?: 90,
+            runIntervalHours = (cleanup["runIntervalHours"] as? Number)?.toInt()
+                ?: (cleanup["run_interval_hours"] as? Number)?.toInt()
+                ?: 24
         )
     }
 

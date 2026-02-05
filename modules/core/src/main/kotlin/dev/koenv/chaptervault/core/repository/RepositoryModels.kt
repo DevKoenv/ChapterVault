@@ -6,7 +6,16 @@ import java.util.UUID
 
 /**
  * Cached series model with internal UUID.
- * Represents a series stored in the local database.
+ *
+ * Represents a series stored in the local database. Series can be either:
+ * - **In Library** ([inLibrary] = true): User's collection, protected from cleanup
+ * - **Cached** ([inLibrary] = false): Temporary metadata, subject to TTL-based cleanup
+ *
+ * @property id Internal database UUID
+ * @property sourceUrl Original URL from the content source
+ * @property inLibrary Whether this series is in the user's library
+ * @property addedToLibraryAt When the series was added to library (null if not in library)
+ * @property metadataFetchedAt When full metadata was last fetched from source (null if only search data)
  */
 data class CachedSeries(
     val id: UUID,
@@ -18,6 +27,9 @@ data class CachedSeries(
     val status: SeriesStatus,
     val language: String?,
     val tags: List<String>,
+    val inLibrary: Boolean = false,
+    val addedToLibraryAt: Instant? = null,
+    val metadataFetchedAt: Instant? = null,
     val createdAt: Instant,
     val updatedAt: Instant
 )

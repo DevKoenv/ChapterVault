@@ -13,7 +13,7 @@ data class LibrarySeriesListResponse(
 )
 
 /**
- * Series summary for library view (downloaded content only).
+ * Series summary for library view.
  */
 @Serializable
 data class LibrarySeriesDto(
@@ -26,11 +26,13 @@ data class LibrarySeriesDto(
     val tags: List<String>,
     val status: String,
     val downloadedChapterCount: Int,
-    val totalChapterCount: Int
+    val totalChapterCount: Int,
+    val inLibrary: Boolean,
+    val addedToLibraryAt: String?
 )
 
 /**
- * Detailed series response with downloaded chapters only.
+ * Detailed series response with downloaded chapters.
  */
 @Serializable
 data class LibrarySeriesDetailResponse(
@@ -44,6 +46,8 @@ data class LibrarySeriesDetailResponse(
     val status: String,
     val downloadedChapterCount: Int,
     val totalChapterCount: Int,
+    val inLibrary: Boolean,
+    val addedToLibraryAt: String?,
     val chapters: List<LibraryChapterDto>
 )
 
@@ -61,4 +65,25 @@ data class LibraryChapterDto(
     val downloadedAt: String?,
     val filePath: String?,
     val fileSize: Long?
+)
+
+/**
+ * Response for adding a series to the library.
+ */
+@Serializable
+data class LibraryAddResponse(
+    val id: String,
+    val title: String,
+    val inLibrary: Boolean,
+    val addedToLibraryAt: String?
+)
+
+/**
+ * Response for removing a series from the library.
+ */
+@Serializable
+data class LibraryRemoveResponse(
+    val id: String,
+    val title: String,
+    val inLibrary: Boolean
 )

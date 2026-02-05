@@ -2,9 +2,11 @@ package dev.koenv.chaptervault.api
 
 import dev.koenv.chaptervault.api.models.ErrorTypes
 import dev.koenv.chaptervault.api.models.ProblemDetail
+import dev.koenv.chaptervault.api.routes.adminRoutes
 import dev.koenv.chaptervault.api.routes.catalogRoutes
 import dev.koenv.chaptervault.api.routes.downloadRoutes
 import dev.koenv.chaptervault.api.routes.libraryRoutes
+import dev.koenv.chaptervault.orchestration.cache.CacheCleanupService
 import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
@@ -37,7 +39,8 @@ data class ApiConfiguration(
     val seriesRepository: SeriesRepositoryPort,
     val chapterRepository: ChapterRepositoryPort,
     val downloadTaskRepository: DownloadTaskRepositoryPort,
-    val storageDir: File
+    val storageDir: File,
+    val cacheCleanupService: CacheCleanupService? = null
 )
 
 fun Application.configureApi(config: ApiConfiguration) {
@@ -121,6 +124,7 @@ fun Application.configureApi(config: ApiConfiguration) {
             config.chapterRepository,
             config.downloadTaskRepository
         )
-        libraryRoutes(config.seriesRepository, config.chapterRepository)
+        libraryRoutes(config.seriesRepository, config.chapterRepository, config.orchestrator)
+        adminRoutes(config.cacheCleanupService)
     }
 }

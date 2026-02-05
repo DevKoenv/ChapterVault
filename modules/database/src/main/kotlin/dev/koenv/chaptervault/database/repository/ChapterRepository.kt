@@ -21,7 +21,7 @@ class ChapterRepository(private val database: Database) : ChapterRepositoryPort 
 
     override fun initialize() {
         transaction(database) {
-            SchemaUtils.create(ChapterTable)
+            SchemaUtils.createMissingTablesAndColumns(ChapterTable)
         }
     }
 
