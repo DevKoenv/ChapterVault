@@ -34,7 +34,7 @@ fun Route.catalogRoutes(
         get("/connectors") {
             val connectors = connectorRegistry.getAllConnectors().map { connector ->
                 ConnectorDto(
-                    id = connector.config.name.lowercase().replace(" ", "-"),
+                    id = connector.config.id,
                     name = connector.config.name,
                     version = connector.config.version,
                     features = ConnectorFeaturesDto(
@@ -111,7 +111,8 @@ fun Route.catalogRoutes(
                     }
 
                     val chapters = chapterRepository.findBySeriesId(series.id)
-                    val downloadSummary = series.toDownloadSummary(chapterRepository)
+                    val totalChapters = chapterRepository.countBySeriesId(series.id).toInt()
+                    val downloadedChapters = chapterRepository.countDownloaded(series.id).toInt()
 
                     call.respond(
                         HttpStatusCode.OK,
@@ -124,9 +125,11 @@ fun Route.catalogRoutes(
                             coverUrl = series.coverUrl,
                             tags = series.tags,
                             status = series.status.name,
-                            download = downloadSummary,
-                            chapters = chapters.map { it.toCatalogChapterDto() },
-                            inLibrary = series.inLibrary
+                            totalChapters = totalChapters,
+                            downloadedChapters = downloadedChapters,
+                            inLibrary = series.inLibrary,
+                            addedToLibraryAt = series.addedToLibraryAt?.toString(),
+                            chapters = chapters.map { it.toCatalogChapterDto() }
                         )
                     )
                 } catch (e: IllegalArgumentException) {
@@ -169,7 +172,7 @@ fun Route.catalogRoutes(
                     return@post
                 }
 
-                if (connectorRegistry.findByName(source) == null) {
+                if (connectorRegistry.findById(source) == null) {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ProblemDetail(
@@ -188,8 +191,7 @@ fun Route.catalogRoutes(
                     val cachedSeries = seriesRepository.saveAllFromSearch(searchResults)
 
                     val results = cachedSeries.map { series ->
-                        val downloadSummary = series.toDownloadSummary(chapterRepository)
-                        series.toCatalogDto(downloadSummary)
+                        series.toCatalogDto(chapterRepository)
                     }
 
                     call.respond(
@@ -258,14 +260,14 @@ fun Route.catalogRoutes(
                 try {
                     val freshMetadata = orchestrator.fetchSeriesMetadata(series.sourceUrl)
                     series = seriesRepository.save(freshMetadata, series.language)
-                } catch (e: Exception) {
-                    // Log but continue with cached data if fetch fails
-                    // The series still has basic search data available
+                } catch (_: Exception) {
+                    // Fetch failed - continue with cached search data
                 }
             }
 
             val chapters = chapterRepository.findBySeriesId(seriesId)
-            val downloadSummary = series.toDownloadSummary(chapterRepository)
+            val totalChapters = chapterRepository.countBySeriesId(seriesId).toInt()
+            val downloadedChapters = chapterRepository.countDownloaded(seriesId).toInt()
 
             call.respond(
                 HttpStatusCode.OK,
@@ -278,9 +280,11 @@ fun Route.catalogRoutes(
                     coverUrl = series.coverUrl,
                     tags = series.tags,
                     status = series.status.name,
-                    download = downloadSummary,
-                    chapters = chapters.map { it.toCatalogChapterDto() },
-                    inLibrary = series.inLibrary
+                    totalChapters = totalChapters,
+                    downloadedChapters = downloadedChapters,
+                    inLibrary = series.inLibrary,
+                    addedToLibraryAt = series.addedToLibraryAt?.toString(),
+                    chapters = chapters.map { it.toCatalogChapterDto() }
                 )
             )
         }
@@ -331,7 +335,8 @@ fun Route.catalogRoutes(
                 val updatedSeries = seriesRepository.save(freshMetadata, existingSeries.language)
 
                 val chapters = chapterRepository.findBySeriesId(seriesId)
-                val downloadSummary = updatedSeries.toDownloadSummary(chapterRepository)
+                val totalChapters = chapterRepository.countBySeriesId(seriesId).toInt()
+                val downloadedChapters = chapterRepository.countDownloaded(seriesId).toInt()
 
                 call.respond(
                     HttpStatusCode.OK,
@@ -344,9 +349,11 @@ fun Route.catalogRoutes(
                         coverUrl = updatedSeries.coverUrl,
                         tags = updatedSeries.tags,
                         status = updatedSeries.status.name,
-                        download = downloadSummary,
-                        chapters = chapters.map { it.toCatalogChapterDto() },
-                        inLibrary = updatedSeries.inLibrary
+                        totalChapters = totalChapters,
+                        downloadedChapters = downloadedChapters,
+                        inLibrary = updatedSeries.inLibrary,
+                        addedToLibraryAt = updatedSeries.addedToLibraryAt?.toString(),
+                        chapters = chapters.map { it.toCatalogChapterDto() }
                     )
                 )
             } catch (e: Exception) {
@@ -365,17 +372,9 @@ fun Route.catalogRoutes(
     }
 }
 
-private fun CachedSeries.toDownloadSummary(chapterRepository: ChapterRepositoryPort): DownloadSummaryDto {
+private fun CachedSeries.toCatalogDto(chapterRepository: ChapterRepositoryPort): CatalogSeriesDto {
     val totalChapters = chapterRepository.countBySeriesId(id).toInt()
     val downloadedChapters = chapterRepository.countDownloaded(id).toInt()
-    return DownloadSummaryDto(
-        totalChapters = totalChapters,
-        downloadedChapters = downloadedChapters,
-        hasDownloads = downloadedChapters > 0
-    )
-}
-
-private fun CachedSeries.toCatalogDto(downloadSummary: DownloadSummaryDto): CatalogSeriesDto {
     return CatalogSeriesDto(
         id = id.toString(),
         sourceUrl = sourceUrl,
@@ -385,8 +384,10 @@ private fun CachedSeries.toCatalogDto(downloadSummary: DownloadSummaryDto): Cata
         coverUrl = coverUrl,
         tags = tags,
         status = status.name,
-        download = downloadSummary,
-        inLibrary = inLibrary
+        totalChapters = totalChapters,
+        downloadedChapters = downloadedChapters,
+        inLibrary = inLibrary,
+        addedToLibraryAt = addedToLibraryAt?.toString()
     )
 }
 

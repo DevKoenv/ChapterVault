@@ -195,7 +195,8 @@ class MyConnector(override val executor: Executor) : Connector {
     override val baseUrls = listOf("manga.example.com")
 
     override val config = ConnectorConfig(
-        name = "MyConnector",
+        id = "my-connector",      // Unique ID for API lookups
+        name = "My Connector",    // Display name
         version = "1.0.0",
         // ... rate limits, features
     )

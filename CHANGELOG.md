@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-05
+
 ### Added
 
 - **Series Caching**: Lookup results are now cached in the database, giving all series a stable ID
@@ -23,10 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Connector IDs**: Connectors now have explicit `id` field in `ConnectorConfig` for stable API lookups
+- **Flattened API Responses**: Removed nested `download` object - `totalChapters`, `downloadedChapters` are now top-level fields
 - `CatalogSeriesDto.id` is now always populated (non-nullable) since lookup results are cached
 - Series are automatically added to library when downloading
 - Database schema uses `createMissingTablesAndColumns` for automatic migrations
-- Search operations require a `source` parameter to search one connector at a time
+- Search operations require a `source` parameter (connector ID) to search one connector at a time
+- `ConnectorRegistry.findById()` is now the preferred lookup method (replaces `findByName`)
 
 ### Removed
 
@@ -85,10 +90,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History Summary
 
-| Version | Date       | Highlights             |
-|---------|------------|------------------------|
-| 0.1.0   | 2026-01-29 | Initial public release |
+| Version | Date       | Highlights                          |
+|---------|------------|-------------------------------------|
+| 0.2.0   | 2026-02-05 | Library management, caching, stable IDs |
+| 0.1.0   | 2026-01-31 | Initial public release              |
 
-[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...HEAD
-
+[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/DevKoenv/ChapterVault/releases/tag/v0.1.0

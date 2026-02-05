@@ -37,7 +37,15 @@ class ConnectorRegistryImpl : ConnectorRegistry {
     }
 
     /**
+     * Find a connector by its unique ID.
+     */
+    override fun findById(id: String): Connector? {
+        return connectors.find { it.config.id.equals(id, ignoreCase = true) }
+    }
+
+    /**
      * Find a connector by name.
+     * @deprecated Use [findById] instead.
      */
     override fun findByName(name: String): Connector? {
         return connectors.find { it.config.name.equals(name, ignoreCase = true) }

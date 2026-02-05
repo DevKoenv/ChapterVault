@@ -48,7 +48,8 @@ class MyConnector(
 ) : Connector {
 
     override val config = ConnectorConfig(
-        name = "MyConnector",
+        id = "my-connector",
+        name = "My Connector",
         version = "1.0.0",
         rateLimitConfig = RateLimitConfig(
             minDelay = connectorConfig?.rateLimit?.minDelayMillis?.milliseconds ?: 500.milliseconds,

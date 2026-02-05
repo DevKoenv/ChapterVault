@@ -19,7 +19,14 @@ interface ConnectorRegistry {
     fun findConnector(url: String): Connector?
 
     /**
-     * Find a connector by name (case-insensitive)
+     * Find a connector by its unique ID.
+     * This is the preferred method for lookups.
+     */
+    fun findById(id: String): Connector?
+
+    /**
+     * Find a connector by name (case-insensitive).
+     * @deprecated Use [findById] instead for more reliable lookups.
      */
     fun findByName(name: String): Connector?
 
