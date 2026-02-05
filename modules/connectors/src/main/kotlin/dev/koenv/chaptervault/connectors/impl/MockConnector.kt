@@ -29,7 +29,8 @@ class MockConnector(
 ) : Connector {
     
     override val config = ConnectorConfig(
-        name = "MockConnector",
+        id = "mock-connector",
+        name = "Mock Connector",
         version = "1.0.0",
         rateLimitConfig = RateLimitConfig(
             minDelay = 100.milliseconds  // Faster for testing

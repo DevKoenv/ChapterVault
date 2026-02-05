@@ -8,7 +8,14 @@ import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
  */
 data class ConnectorConfig(
     /**
-     * Display name of the connector (e.g., "Webtoon", "MangaPlus")
+     * Unique identifier for this connector (e.g., "asura-scans", "mangadex").
+     * Should be lowercase, kebab-case, and stable across restarts.
+     * Used for API lookups and configuration.
+     */
+    val id: String,
+
+    /**
+     * Display name of the connector (e.g., "Asura Scans", "MangaDex")
      */
     val name: String,
 

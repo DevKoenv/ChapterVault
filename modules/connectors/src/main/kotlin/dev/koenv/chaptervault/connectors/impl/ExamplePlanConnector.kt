@@ -37,7 +37,8 @@ class ExamplePlanConnector(
     private val logger = LoggerFactory.getLogger(ExamplePlanConnector::class.java)
 
     override val config = ConnectorConfig(
-        name = "ExamplePlanConnector",
+        id = "example-plan",
+        name = "Example Plan Connector",
         version = "2.0.0",
         rateLimitConfig = RateLimitConfig(
             minDelay = connectorConfig?.rateLimit?.minDelayMillis?.milliseconds ?: 500.milliseconds,

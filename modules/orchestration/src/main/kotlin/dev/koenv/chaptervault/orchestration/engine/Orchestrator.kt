@@ -62,7 +62,7 @@ class Orchestrator(
 
             // Determine which connectors to search
             val connectorsToSearch = if (connectorName != null) {
-                val connector = connectorRegistry.findByName(connectorName)
+                val connector = connectorRegistry.findById(connectorName)
                 if (connector != null) listOf(connector) else emptyList()
             } else {
                 connectorRegistry.getAllConnectors()

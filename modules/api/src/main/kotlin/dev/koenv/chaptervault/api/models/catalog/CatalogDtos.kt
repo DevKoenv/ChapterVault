@@ -15,8 +15,10 @@ data class CatalogSeriesDto(
     val coverUrl: String?,
     val tags: List<String>,
     val status: String,
-    val download: DownloadSummaryDto,
-    val inLibrary: Boolean
+    val totalChapters: Int,
+    val downloadedChapters: Int,
+    val inLibrary: Boolean,
+    val addedToLibraryAt: String?
 )
 
 /**
@@ -32,9 +34,11 @@ data class CatalogSeriesDetailResponse(
     val coverUrl: String?,
     val tags: List<String>,
     val status: String,
-    val download: DownloadSummaryDto,
-    val chapters: List<CatalogChapterDto>,
-    val inLibrary: Boolean
+    val totalChapters: Int,
+    val downloadedChapters: Int,
+    val inLibrary: Boolean,
+    val addedToLibraryAt: String?,
+    val chapters: List<CatalogChapterDto>
 )
 
 /**
@@ -50,16 +54,6 @@ data class CatalogChapterDto(
     val pageCount: Int?,
     val downloaded: Boolean,
     val downloadStatus: String
-)
-
-/**
- * Download state summary for a series.
- */
-@Serializable
-data class DownloadSummaryDto(
-    val totalChapters: Int,
-    val downloadedChapters: Int,
-    val hasDownloads: Boolean
 )
 
 /**

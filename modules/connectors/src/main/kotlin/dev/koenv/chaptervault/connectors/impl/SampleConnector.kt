@@ -31,7 +31,8 @@ class SampleConnector(
     private val logger = LoggerFactory.getLogger(SampleConnector::class.java)
 
     override val config = ConnectorConfig(
-        name = "SampleConnector",
+        id = "sample-connector",
+        name = "Sample Connector",
         version = "1.0.0",
         rateLimitConfig = RateLimitConfig(
             minDelay = 1.seconds

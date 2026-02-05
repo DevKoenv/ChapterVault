@@ -39,7 +39,8 @@ class ExampleBrowserPlanConnector(
     private val logger = LoggerFactory.getLogger(ExampleBrowserPlanConnector::class.java)
 
     override val config = ConnectorConfig(
-        name = "ExampleBrowserPlanConnector",
+        id = "example-browser-plan",
+        name = "Example Browser Plan Connector",
         version = "2.0.0",
         rateLimitConfig = RateLimitConfig(
             minDelay = connectorConfig?.rateLimit?.minDelayMillis?.milliseconds ?: 2.seconds,
