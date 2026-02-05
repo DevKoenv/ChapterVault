@@ -1,7 +1,5 @@
 package dev.koenv.chaptervault.core.connector
 
-import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
-
 /**
  * Registry for managing connectors.
  * Orchestrator uses this to find the appropriate connector for a URL.

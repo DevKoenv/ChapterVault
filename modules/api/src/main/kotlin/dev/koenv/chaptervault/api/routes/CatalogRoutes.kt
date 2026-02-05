@@ -4,6 +4,7 @@ import dev.koenv.chaptervault.api.models.ErrorTypes
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.catalog.*
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
+import dev.koenv.chaptervault.core.domain.ChapterMetadata
 import dev.koenv.chaptervault.core.repository.CachedChapter
 import dev.koenv.chaptervault.core.repository.CachedSeries
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
