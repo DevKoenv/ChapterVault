@@ -210,6 +210,7 @@ class ConfigurationServiceImpl(
         )
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun parseHttp(raw: Map<String, Any>): HttpClientConfig {
         return HttpClientConfig(
             connectTimeoutSeconds = (raw["connectTimeoutSeconds"] as? Number)?.toLong()
@@ -237,6 +238,7 @@ class ConfigurationServiceImpl(
         )
     }
 
+    @Suppress("UNCHECKED_CAST")
     private fun parseCache(raw: Map<String, Any>): CacheCleanupConfig {
         val cleanup = (raw["cleanup"] as? Map<String, Any>) ?: raw
         return CacheCleanupConfig(
