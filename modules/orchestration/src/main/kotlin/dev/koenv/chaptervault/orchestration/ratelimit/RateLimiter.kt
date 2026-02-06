@@ -11,10 +11,10 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Rate limiter that enforces:
- * - Minimum delay between requests (minDelay)
- * - Maximum concurrent requests (maxConcurrent)
- * - Maximum requests per time window (maxRequestsPerWindow/windowDuration)
+ * Rate limiter that enforces (per feature, when configured):
+ * - Minimum delay between requests (minDelay) — disabled when [Duration.ZERO]
+ * - Maximum concurrent requests (maxConcurrent) — always active, defaults to 1 (serial)
+ * - Maximum requests per time window (maxRequestsPerWindow/windowDuration) — disabled when 0
  *
  * Uses a sliding window log algorithm for accurate rate limiting.
  */
@@ -44,8 +44,10 @@ class RateLimiter {
             // 3. Wait for window slot if at rate limit
             waitForWindowSlot(state, config)
 
-            // 4. Record this request timestamp
-            recordRequest(state)
+            // 4. Record this request timestamp (for minDelay and window tracking)
+            if (config.minDelay.isPositive() || config.maxRequestsPerWindow > 0) {
+                recordRequest(state)
+            }
 
             // 5. Execute the actual request
             return block()
@@ -78,7 +80,9 @@ class RateLimiter {
             waitForWindowSlot(state, config)
 
             // Record request
-            recordRequest(state)
+            if (config.minDelay.isPositive() || config.maxRequestsPerWindow > 0) {
+                recordRequest(state)
+            }
         } finally {
             // Note: For legacy API, we release immediately after acquiring
             // The caller is responsible for the actual request timing
@@ -94,15 +98,18 @@ class RateLimiter {
         val key = connector.config.name
         return connectorStates.getOrPut(key) {
             ConnectorState(
-                concurrencySemaphore = Semaphore(connector.config.rateLimitConfig.maxConcurrent)
+                concurrencySemaphore = Semaphore(connector.config.rateLimitConfig.maxConcurrent.coerceAtLeast(1))
             )
         }
     }
 
     /**
      * Wait for minDelay since the last request to this connector.
+     * Returns immediately if minDelay is not positive.
      */
     private suspend fun waitForMinDelay(state: ConnectorState, config: RateLimitConfig) {
+        if (!config.minDelay.isPositive()) return
+
         val delayNeeded = stateMutex.withLock {
             val now = System.currentTimeMillis()
             val timeSinceLast = now - state.lastRequestTime
@@ -119,9 +126,12 @@ class RateLimiter {
 
     /**
      * Wait for a slot in the rate limit window.
+     * Returns immediately if maxRequestsPerWindow is not positive.
      * Uses sliding window log algorithm.
      */
     private suspend fun waitForWindowSlot(state: ConnectorState, config: RateLimitConfig) {
+        if (config.maxRequestsPerWindow <= 0) return
+
         val maxRequests = config.maxRequestsPerWindow
         val windowDurationMs = config.windowDuration.inWholeMilliseconds
 
