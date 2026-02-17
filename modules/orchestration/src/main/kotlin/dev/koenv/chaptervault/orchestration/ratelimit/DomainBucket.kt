@@ -9,6 +9,23 @@ import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
+ * Point-in-time snapshot of a [DomainBucket]'s state.
+ */
+data class BucketSnapshot(
+    val name: String,
+    val maxConcurrent: Int,
+    val minDelayMs: Long,
+    val maxRequestsPerWindow: Int,
+    val windowDurationMs: Long,
+    val lastRequestTime: Long,
+    val requestsInCurrentWindow: Int,
+    val backoffUntil: Long,
+    val isInBackoff: Boolean,
+    val adaptiveDelayMultiplier: Double,
+    val consecutive429Count: Int
+)
+
+/**
  * A single rate limit bucket with concurrency control, minimum delay,
  * sliding window rate limiting, and adaptive backoff from 429 responses.
  *
@@ -170,5 +187,25 @@ internal class DomainBucket(
             lastRequestTime = now
             requestTimestamps.addLast(now)
         }
+    }
+
+    internal suspend fun snapshot(): BucketSnapshot = stateMutex.withLock {
+        val now = System.currentTimeMillis()
+        val windowStart = now - baseConfig.windowDuration.inWholeMilliseconds
+        val currentWindowCount = requestTimestamps.count { it >= windowStart }
+
+        BucketSnapshot(
+            name = name,
+            maxConcurrent = baseConfig.maxConcurrent,
+            minDelayMs = baseConfig.minDelay.inWholeMilliseconds,
+            maxRequestsPerWindow = baseConfig.maxRequestsPerWindow,
+            windowDurationMs = baseConfig.windowDuration.inWholeMilliseconds,
+            lastRequestTime = lastRequestTime,
+            requestsInCurrentWindow = currentWindowCount,
+            backoffUntil = backoffUntil,
+            isInBackoff = backoffUntil > now,
+            adaptiveDelayMultiplier = adaptiveDelayMultiplier,
+            consecutive429Count = consecutive429Count
+        )
     }
 }

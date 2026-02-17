@@ -7,6 +7,25 @@ import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 
 /**
+ * Snapshot of a [RateLimitConfig] for external consumption.
+ */
+data class RateLimitConfigSnapshot(
+    val minDelayMs: Long,
+    val maxConcurrent: Int,
+    val maxRequestsPerWindow: Int,
+    val windowDurationMs: Long
+)
+
+/**
+ * Point-in-time status of the [SiteRateLimiter].
+ */
+data class SiteRateLimiterStatus(
+    val registeredConnectors: List<String>,
+    val namedBucketConfigs: Map<String, RateLimitConfigSnapshot?>,
+    val activeBuckets: List<BucketSnapshot>
+)
+
+/**
  * Domain-aware site rate limiter that throttles individual outgoing HTTP requests.
  *
  * Resolves rate limit buckets at request time using two strategies:
@@ -168,6 +187,27 @@ class SiteRateLimiter {
             logger.debug("Creating rate limit bucket [{}]: {}", key, config)
             DomainBucket(key, config)
         }
+    }
+
+    suspend fun getStatus(): SiteRateLimiterStatus {
+        val configs = namedBucketConfigs.map { (key, config) ->
+            key to config?.let {
+                RateLimitConfigSnapshot(
+                    minDelayMs = it.minDelay.inWholeMilliseconds,
+                    maxConcurrent = it.maxConcurrent,
+                    maxRequestsPerWindow = it.maxRequestsPerWindow,
+                    windowDurationMs = it.windowDuration.inWholeMilliseconds
+                )
+            }
+        }.toMap()
+
+        val snapshots = buckets.values.map { it.snapshot() }
+
+        return SiteRateLimiterStatus(
+            registeredConnectors = connectorDefaultLimits.keys().toList(),
+            namedBucketConfigs = configs,
+            activeBuckets = snapshots
+        )
     }
 
     private fun extractHost(url: String): String? {

@@ -11,6 +11,26 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
+ * Snapshot of a single connector's rate limit state.
+ */
+data class ConnectorRateLimitSnapshot(
+    val connectorName: String,
+    val maxConcurrent: Int,
+    val minDelayMs: Long,
+    val maxRequestsPerWindow: Int,
+    val windowDurationMs: Long,
+    val lastRequestTime: Long,
+    val requestsInCurrentWindow: Int
+)
+
+/**
+ * Point-in-time status of the orchestrator-level [RateLimiter].
+ */
+data class OrchestratorRateLimiterStatus(
+    val connectors: List<ConnectorRateLimitSnapshot>
+)
+
+/**
  * Rate limiter that enforces (per feature, when configured):
  * - Minimum delay between requests (minDelay) — disabled when [Duration.ZERO]
  * - Maximum concurrent requests (maxConcurrent) — always active, defaults to 1 (serial)
@@ -64,6 +84,7 @@ class RateLimiter {
         val key = connector.config.name
         return connectorStates.getOrPut(key) {
             ConnectorState(
+                config = connector.config.rateLimitConfig,
                 concurrencySemaphore = Semaphore(connector.config.rateLimitConfig.maxConcurrent)
             )
         }
@@ -149,10 +170,33 @@ class RateLimiter {
         }
     }
 
+    suspend fun getStatus(): OrchestratorRateLimiterStatus {
+        val snapshots = connectorStates.map { (name, state) ->
+            state.mutex.withLock {
+                val now = System.currentTimeMillis()
+                val windowStart = now - state.config.windowDuration.inWholeMilliseconds
+                val currentWindowCount = state.requestTimestamps.count { it >= windowStart }
+
+                ConnectorRateLimitSnapshot(
+                    connectorName = name,
+                    maxConcurrent = state.config.maxConcurrent,
+                    minDelayMs = state.config.minDelay.inWholeMilliseconds,
+                    maxRequestsPerWindow = state.config.maxRequestsPerWindow,
+                    windowDurationMs = state.config.windowDuration.inWholeMilliseconds,
+                    lastRequestTime = state.lastRequestTime,
+                    requestsInCurrentWindow = currentWindowCount
+                )
+            }
+        }
+
+        return OrchestratorRateLimiterStatus(connectors = snapshots)
+    }
+
     /**
      * State tracked per connector.
      */
     private data class ConnectorState(
+        val config: RateLimitConfig,
         val mutex: Mutex = Mutex(),
         var lastRequestTime: Long = 0L,
         val concurrencySemaphore: Semaphore,
