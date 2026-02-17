@@ -44,7 +44,9 @@ internal class DomainBucket(
             waitForBackoff()
             waitForMinDelay()
             waitForWindowSlot()
-            recordRequest()
+            if (baseConfig.minDelay.isPositive() || baseConfig.maxRequestsPerWindow > 0) {
+                recordRequest()
+            }
             return block()
         } finally {
             concurrencySemaphore.release()
@@ -111,6 +113,8 @@ internal class DomainBucket(
     }
 
     private suspend fun waitForMinDelay() {
+        if (!baseConfig.minDelay.isPositive() && adaptiveDelayMultiplier <= 1.0) return
+
         val delayNeeded = stateMutex.withLock {
             val effectiveMinDelayMs = (baseConfig.minDelay.inWholeMilliseconds * adaptiveDelayMultiplier).toLong()
             val now = System.currentTimeMillis()
@@ -125,6 +129,8 @@ internal class DomainBucket(
     }
 
     private suspend fun waitForWindowSlot() {
+        if (baseConfig.maxRequestsPerWindow <= 0) return
+
         val maxRequests = baseConfig.maxRequestsPerWindow
         val windowDurationMs = baseConfig.windowDuration.inWholeMilliseconds
 
