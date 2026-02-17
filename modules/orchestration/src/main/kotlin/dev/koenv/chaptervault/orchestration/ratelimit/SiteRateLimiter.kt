@@ -34,8 +34,11 @@ class SiteRateLimiter {
     // null value means unlimited (bypass)
     private val namedBucketConfigs = ConcurrentHashMap<String, RateLimitConfig?>()
 
-    // Default limits for auto-created host buckets (from most recently registered connector)
-    private var globalDefaultLimits = RateLimitConfig()
+    // Per-connector default limits for auto-created host buckets
+    private val connectorDefaultLimits = ConcurrentHashMap<String, RateLimitConfig>()
+
+    // Fallback limits when connectorName is unknown
+    private val fallbackLimits = RateLimitConfig()
 
     // Live bucket instances: bucketKey -> DomainBucket
     private val buckets = ConcurrentHashMap<String, DomainBucket>()
@@ -51,7 +54,7 @@ class SiteRateLimiter {
      * can define independent buckets with the same name (e.g., both can have "cdn").
      */
     fun registerConnector(connectorName: String, config: SiteRateLimits) {
-        globalDefaultLimits = config.defaultLimits
+        connectorDefaultLimits[connectorName] = config.defaultLimits
 
         config.buckets.forEach { (bucketName, bucketConfig) ->
             val key = "$connectorName:$bucketName"
@@ -150,13 +153,14 @@ class SiteRateLimiter {
         }
 
         // 2. Host-based auto-bucketing
+        val defaults = connectorName?.let { connectorDefaultLimits[it] } ?: fallbackLimits
         val host = extractHost(url)
         if (host == null) {
             logger.debug("Could not extract host from URL: {}", url)
-            return getOrCreateBucket("unknown", globalDefaultLimits)
+            return getOrCreateBucket("unknown", defaults)
         }
 
-        return getOrCreateBucket("host:$host", globalDefaultLimits)
+        return getOrCreateBucket("host:$host", defaults)
     }
 
     private fun getOrCreateBucket(key: String, config: RateLimitConfig): DomainBucket {

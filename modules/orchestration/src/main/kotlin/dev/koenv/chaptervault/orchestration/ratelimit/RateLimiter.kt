@@ -24,7 +24,6 @@ class RateLimiter {
 
     // State per connector (keyed by connector name for consistency across instances)
     private val connectorStates = ConcurrentHashMap<String, ConnectorState>()
-    private val stateMutex = Mutex()
 
     /**
      * Execute a block with rate limiting applied.
@@ -61,7 +60,7 @@ class RateLimiter {
      * Get or create state for a connector.
      * Uses connector name as key for consistency.
      */
-    private suspend fun getOrCreateState(connector: Connector): ConnectorState {
+    private fun getOrCreateState(connector: Connector): ConnectorState {
         val key = connector.config.name
         return connectorStates.getOrPut(key) {
             ConnectorState(
@@ -77,7 +76,7 @@ class RateLimiter {
     private suspend fun waitForMinDelay(state: ConnectorState, config: RateLimitConfig) {
         if (!config.minDelay.isPositive()) return
 
-        val delayNeeded = stateMutex.withLock {
+        val delayNeeded = state.mutex.withLock {
             val now = System.currentTimeMillis()
             val timeSinceLast = now - state.lastRequestTime
             val minDelayMs = config.minDelay.inWholeMilliseconds
@@ -104,7 +103,7 @@ class RateLimiter {
 
         // Keep trying until we have a slot
         while (true) {
-            val waitTime = stateMutex.withLock {
+            val waitTime = state.mutex.withLock {
                 val now = System.currentTimeMillis()
                 val windowStart = now - windowDurationMs
 
@@ -143,7 +142,7 @@ class RateLimiter {
      * Record that a request was made.
      */
     private suspend fun recordRequest(state: ConnectorState) {
-        stateMutex.withLock {
+        state.mutex.withLock {
             val now = System.currentTimeMillis()
             state.lastRequestTime = now
             state.requestTimestamps.addLast(now)
@@ -154,13 +153,9 @@ class RateLimiter {
      * State tracked per connector.
      */
     private data class ConnectorState(
-        // For minDelay enforcement
+        val mutex: Mutex = Mutex(),
         var lastRequestTime: Long = 0L,
-
-        // For maxConcurrent enforcement
         val concurrencySemaphore: Semaphore,
-
-        // For sliding window rate limiting
         val requestTimestamps: ArrayDeque<Long> = ArrayDeque()
     )
 }
