@@ -58,39 +58,6 @@ class RateLimiter {
     }
 
     /**
-     * Legacy API: Acquire permission to make a request.
-     * Prefer using withRateLimit() instead.
-     */
-    @Deprecated(
-        "Use withRateLimit() which wraps the entire operation",
-        ReplaceWith("withRateLimit(connector) { /* your request code */ }"),
-        DeprecationLevel.WARNING
-    )
-    suspend fun acquire(connector: Connector, config: RateLimitConfig) {
-        val state = getOrCreateState(connector)
-
-        // Acquire concurrency permit
-        state.concurrencySemaphore.acquire()
-
-        try {
-            // Wait for minDelay
-            waitForMinDelay(state, config)
-
-            // Wait for window slot
-            waitForWindowSlot(state, config)
-
-            // Record request
-            if (config.minDelay.isPositive() || config.maxRequestsPerWindow > 0) {
-                recordRequest(state)
-            }
-        } finally {
-            // Note: For legacy API, we release immediately after acquiring
-            // The caller is responsible for the actual request timing
-            state.concurrencySemaphore.release()
-        }
-    }
-
-    /**
      * Get or create state for a connector.
      * Uses connector name as key for consistency.
      */
@@ -98,7 +65,7 @@ class RateLimiter {
         val key = connector.config.name
         return connectorStates.getOrPut(key) {
             ConnectorState(
-                concurrencySemaphore = Semaphore(connector.config.rateLimitConfig.maxConcurrent.coerceAtLeast(1))
+                concurrencySemaphore = Semaphore(connector.config.rateLimitConfig.maxConcurrent)
             )
         }
     }

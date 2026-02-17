@@ -10,6 +10,7 @@ import dev.koenv.chaptervault.core.domain.SeriesSearchResult
 import dev.koenv.chaptervault.core.domain.SeriesStatus
 import dev.koenv.chaptervault.core.execution.*
 import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
+import dev.koenv.chaptervault.core.ratelimit.siteRateLimits
 import dev.koenv.chaptervault.core.storage.StorageSink
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.milliseconds
@@ -46,6 +47,22 @@ class ExamplePlanConnector(
             maxRequestsPerWindow = connectorConfig?.rateLimit?.maxRequestsPerMinute ?: 60,
             windowDuration = 60.seconds
         ),
+        siteRateLimits = siteRateLimits {
+            // Default limits apply to auto-created per-host buckets
+            defaults {
+                maxConcurrent = 2
+                minDelay = 500.milliseconds
+                maxRequestsPerWindow = 60
+            }
+            // CDN images are served from a separate domain, no rate limiting needed
+            bucket("cdn") { unlimited() }
+            // API endpoints can handle higher throughput than HTML pages
+            bucket("api") {
+                maxConcurrent = 4
+                minDelay = 100.milliseconds
+                maxRequestsPerWindow = 120
+            }
+        },
         features = ConnectorFeatures(
             supportsSearch = true,
             requiresAuth = false,
@@ -237,10 +254,12 @@ class ExamplePlanConnector(
         logger.info("Found {} pages to download", pageUrls.size)
 
         // Step 2: Download all pages using bulkDownload
+        // Tag items with "cdn" bucket since page images are served from a CDN domain
+        // that can handle much higher throughput (configured as unlimited above)
         val downloadPlan = executionPlan {
             bulkDownload(maxConcurrency = 3, retries = 2, id = "pages") {
                 pageUrls.forEachIndexed { index, url ->
-                    item("page-$index", url, headers = defaultHeaders(), referer = chapterUrl)
+                    item("page-$index", url, headers = defaultHeaders(), referer = chapterUrl, rateLimitBucket = "cdn")
                 }
             }
         }
