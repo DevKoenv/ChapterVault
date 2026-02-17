@@ -7,6 +7,7 @@ import dev.koenv.chaptervault.api.routes.catalogRoutes
 import dev.koenv.chaptervault.api.routes.downloadRoutes
 import dev.koenv.chaptervault.api.routes.libraryRoutes
 import dev.koenv.chaptervault.orchestration.cache.CacheCleanupService
+import dev.koenv.chaptervault.orchestration.ratelimit.SiteRateLimiter
 import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
@@ -40,7 +41,8 @@ data class ApiConfiguration(
     val chapterRepository: ChapterRepositoryPort,
     val downloadTaskRepository: DownloadTaskRepositoryPort,
     val storageDir: File,
-    val cacheCleanupService: CacheCleanupService? = null
+    val cacheCleanupService: CacheCleanupService? = null,
+    val siteRateLimiter: SiteRateLimiter? = null
 )
 
 fun Application.configureApi(config: ApiConfiguration) {
@@ -125,6 +127,6 @@ fun Application.configureApi(config: ApiConfiguration) {
             config.downloadTaskRepository
         )
         libraryRoutes(config.seriesRepository, config.chapterRepository, config.orchestrator)
-        adminRoutes(config.cacheCleanupService)
+        adminRoutes(config.cacheCleanupService, config.siteRateLimiter, config.orchestrator)
     }
 }

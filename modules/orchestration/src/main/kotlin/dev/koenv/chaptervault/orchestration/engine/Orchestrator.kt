@@ -10,6 +10,7 @@ import dev.koenv.chaptervault.core.repository.TaskStatus as DbTaskStatus
 import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
+import dev.koenv.chaptervault.orchestration.ratelimit.OrchestratorRateLimiterStatus
 import dev.koenv.chaptervault.orchestration.ratelimit.RateLimiter
 import dev.koenv.chaptervault.orchestration.task.*
 import kotlinx.coroutines.*
@@ -474,6 +475,10 @@ class Orchestrator(
         }
     }
     
+    suspend fun getRateLimiterStatus(): OrchestratorRateLimiterStatus {
+        return rateLimiter.getStatus()
+    }
+
     private fun findConnectorOrThrow(url: String): Connector {
         return connectorRegistry.findConnector(url)
             ?: throw IllegalArgumentException("No connector found for URL: $url")

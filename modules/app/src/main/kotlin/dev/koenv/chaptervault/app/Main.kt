@@ -126,7 +126,8 @@ fun main() {
         chapterRepository = chapterRepository,
         downloadTaskRepository = downloadTaskRepository,
         storageDir = storageDir,
-        cacheCleanupService = cacheCleanupService
+        cacheCleanupService = cacheCleanupService,
+        siteRateLimiter = siteRateLimiter
     )
 
     // Server configuration
