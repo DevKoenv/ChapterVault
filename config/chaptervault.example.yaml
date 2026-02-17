@@ -127,6 +127,23 @@ connectors:
       max_concurrent: 3
       max_requests_per_minute: 100
 
+    # Site-level rate limits (domain-aware)
+    # Controls how fast requests are sent to external sites.
+    # Defaults apply to auto-created per-host buckets.
+    # Named buckets let connectors route specific requests differently.
+    # site_rate_limits:
+    #   defaults:
+    #     min_delay_millis: 500
+    #     max_concurrent: 2
+    #     max_requests_per_minute: 60
+    #   buckets:
+    #     cdn:
+    #       unlimited: true     # CDN images — no rate limiting needed
+    #     api:
+    #       min_delay_millis: 100
+    #       max_concurrent: 4
+    #       max_requests_per_minute: 120
+
     # Custom connector-specific settings
     # Access via: config.getString("quality"), config.getBoolean("downloadCovers"), etc.
     quality: "high"

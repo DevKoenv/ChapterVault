@@ -25,6 +25,43 @@ sealed class Instruction {
     open val timeout: Long? = null
 }
 
+/**
+ * Defines which rate limiting layers an outgoing request participates in.
+ *
+ * The system has two independent rate limiting layers:
+ * - **Connector-level** (orchestrator → connector): Applied per connector method call (search, download, etc.)
+ * - **Site-level** (connector → site): Applied per individual HTTP request inside the executor
+ */
+enum class RateLimitScope {
+    /**
+     * Applies orchestrator → connector rate limits only; skips site-level limits.
+     *
+     * Use for internal connector operations or non-site-bound work that must respect connector fairness.
+     */
+    CONNECTOR,
+
+    /**
+     * Applies connector → site rate limits only; skips connector-level limits.
+     *
+     * Use for outbound HTTP that should count against site politeness but not connector concurrency.
+     */
+    SITE,
+
+    /**
+     * Applies both connector-level and site-level rate limits (default for scraping requests).
+     *
+     * Use for all normal origin/API/image HTTP calls.
+     */
+    CONNECTOR_AND_SITE,
+
+    /**
+     * Applies no rate limiting.
+     *
+     * Use only for local, cached, or purely in-memory operations.
+     */
+    NONE
+}
+
 // ============================================================================
 // HTTP Instructions
 // ============================================================================
@@ -37,7 +74,9 @@ data class FetchHtml(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
     val referer: String? = null,
-    override val timeout: Long? = null
+    override val timeout: Long? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 /**
@@ -48,7 +87,9 @@ data class FetchJson(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
     val referer: String? = null,
-    override val timeout: Long? = null
+    override val timeout: Long? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 /**
@@ -59,7 +100,9 @@ data class FetchBytes(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
     val referer: String? = null,
-    override val timeout: Long? = null
+    override val timeout: Long? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 /**
@@ -70,7 +113,9 @@ data class PostForm(
     val url: String,
     val formData: Map<String, String>,
     val headers: Map<String, String> = emptyMap(),
-    override val timeout: Long? = null
+    override val timeout: Long? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 /**
@@ -81,7 +126,9 @@ data class PostJson(
     val url: String,
     val jsonBody: String,
     val headers: Map<String, String> = emptyMap(),
-    override val timeout: Long? = null
+    override val timeout: Long? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 // ============================================================================
@@ -95,7 +142,9 @@ data class BrowserNavigate(
     override val id: String,
     val url: String,
     val waitUntil: WaitCondition = WaitCondition.NETWORK_IDLE,
-    override val timeout: Long? = null
+    override val timeout: Long? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 /**
@@ -205,7 +254,9 @@ data class BrowserScrollToBottom(
 data class BrowserDownloadFile(
     override val id: String,
     val url: String,
-    val referer: String? = null
+    val referer: String? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 /**
@@ -296,7 +347,9 @@ data class FetchDocument(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
     val referer: String? = null,
-    override val timeout: Long? = null
+    override val timeout: Long? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 /**
@@ -322,7 +375,9 @@ data class ExtractData(
     val spec: ExtractionSpec,
     val headers: Map<String, String> = emptyMap(),
     val referer: String? = null,
-    override val timeout: Long? = null
+    override val timeout: Long? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 ) : Instruction()
 
 /**
@@ -359,7 +414,9 @@ data class DownloadItem(
     val id: String,
     val url: String,
     val headers: Map<String, String> = emptyMap(),
-    val referer: String? = null
+    val referer: String? = null,
+    val rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
+    val rateLimitBucket: String? = null
 )
 
 // ============================================================================

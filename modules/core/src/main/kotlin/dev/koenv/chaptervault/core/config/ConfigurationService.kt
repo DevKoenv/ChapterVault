@@ -151,6 +151,7 @@ data class ConnectorSpecificConfig(
     val priority: Int? = null,  // Override default priority
     val auth: AuthConfig? = null,
     val rateLimit: RateLimitOverride? = null,
+    val siteRateLimits: SiteRateLimitsOverride? = null,
     val custom: Map<String, Any> = emptyMap()  // Connector-specific settings
 ) {
     /**
@@ -191,6 +192,43 @@ data class AuthConfig(
  * Rate limit override for a connector.
  */
 data class RateLimitOverride(
+    val minDelayMillis: Long? = null,
+    val maxConcurrent: Int? = null,
+    val maxRequestsPerMinute: Int? = null
+)
+
+/**
+ * Site-level rate limits override from YAML configuration.
+ *
+ * Supports overriding default limits and defining named bucket overrides.
+ *
+ * YAML format:
+ * ```yaml
+ * site_rate_limits:
+ *   defaults:
+ *     min_delay_millis: 500
+ *     max_concurrent: 2
+ *     max_requests_per_minute: 60
+ *   buckets:
+ *     cdn:
+ *       unlimited: true
+ *     api:
+ *       min_delay_millis: 100
+ *       max_concurrent: 4
+ * ```
+ */
+data class SiteRateLimitsOverride(
+    val defaultMinDelayMillis: Long? = null,
+    val defaultMaxConcurrent: Int? = null,
+    val defaultMaxRequestsPerMinute: Int? = null,
+    val buckets: Map<String, BucketOverride> = emptyMap()
+)
+
+/**
+ * Override for a single named rate limit bucket.
+ */
+data class BucketOverride(
+    val unlimited: Boolean = false,
     val minDelayMillis: Long? = null,
     val maxConcurrent: Int? = null,
     val maxRequestsPerMinute: Int? = null

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Domain-aware site rate limiting**: New `SiteRateLimiter` with per-host auto-bucketing and named bucket support, throttling individual outgoing HTTP requests independently of the orchestrator-level rate limiter
+- **Named rate limit buckets**: Connectors can declare named buckets (e.g., `cdn`, `api`) with independent limits or unlimited throughput via `SiteRateLimits`
+- **`RateLimitScope` enum**: Instructions and download items declare which rate limiting layers they participate in (`CONNECTOR`, `SITE`, `CONNECTOR_AND_SITE`, `NONE`)
+- **Adaptive backoff**: `SiteRateLimiter` supports AIMD-based backoff on 429 responses with `Retry-After` header support
+- **YAML `siteRateLimits` override**: Per-connector domain-aware rate limit configuration via `connectors.<name>.siteRateLimits` in config file, with support for default limits and named bucket overrides
+
+### Removed
+
+- **`SiteRateLimitConfig`**: Replaced by `SiteRateLimits` with domain-aware bucketing
+- **`SiteRateLimitOverride`**: Replaced by `SiteRateLimitsOverride` with bucket support
+- **Legacy `acquire()` methods**: Removed from both `RateLimiter` and `SiteRateLimiter` in favor of `withRateLimit()` which correctly holds concurrency permits for the duration of the request
+- **YAML `siteRateLimit` key**: Replaced by `siteRateLimits` with richer configuration
+
 ## [0.2.0] - 2026-02-05
 
 ### Added

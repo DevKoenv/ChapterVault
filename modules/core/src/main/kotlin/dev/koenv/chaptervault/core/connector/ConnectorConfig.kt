@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.core.connector
 
 import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
+import dev.koenv.chaptervault.core.ratelimit.SiteRateLimits
 
 /**
  * Configuration and capabilities for a connector.
@@ -28,6 +29,15 @@ data class ConnectorConfig(
      * Rate limiting configuration for this connector
      */
     val rateLimitConfig: RateLimitConfig = RateLimitConfig(),
+
+    /**
+     * Domain-aware site-level rate limit configuration.
+     *
+     * Declares named buckets with specific rate limits. Instructions can tag themselves
+     * with a bucket name via `rateLimitBucket`; untagged requests are auto-bucketed
+     * by host with [SiteRateLimits.defaultLimits].
+     */
+    val siteRateLimits: SiteRateLimits = SiteRateLimits(),
 
     /**
      * Feature flags indicating what this connector supports

@@ -17,6 +17,7 @@ import dev.koenv.chaptervault.orchestration.config.ConfigurationServiceImpl
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import dev.koenv.chaptervault.orchestration.execution.LocalExecutor
 import dev.koenv.chaptervault.orchestration.fetch.FetchClientImpl
+import dev.koenv.chaptervault.orchestration.ratelimit.SiteRateLimiter
 import dev.koenv.chaptervault.storage.impl.FileStorageSink
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.engine.*
@@ -71,7 +72,8 @@ fun main() {
     // Initialize HTTP client and executor for connectors
     val httpConfig = configService.getHttpConfig()
     val fetchClient = FetchClientImpl(httpConfig)
-    val executor = LocalExecutor(fetchClient)
+    val siteRateLimiter = SiteRateLimiter()
+    val executor = LocalExecutor(fetchClient, siteRateLimiter = siteRateLimiter)
     logger.info { "Executor initialized (User-Agent: ${httpConfig.userAgent})" }
 
     // Initialize connector registry
@@ -89,6 +91,12 @@ fun main() {
     // See docs/LEGAL_SOURCES.md for a list of sources that can be legally integrated
     // Example:
     // connectorRegistry.register(MyLegalConnector(executor))
+
+    // Register site rate limit configs from all connectors
+    for (connector in connectorRegistry.getAllConnectors()) {
+        val connConfig = connector.config
+        siteRateLimiter.registerConnector(connConfig.name, connConfig.siteRateLimits)
+    }
 
     logger.info { "Registered ${connectorRegistry.getAllConnectors().count()} connectors" }
     if (connectorRegistry.getAllConnectors().none()) {

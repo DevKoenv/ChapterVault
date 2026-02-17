@@ -275,9 +275,15 @@ class ConfigurationServiceImpl(
         val auth = (raw["auth"] as? Map<String, Any>)?.let { parseAuth(it) }
         val rateLimit = (raw["rateLimit"] as? Map<String, Any>)?.let { parseRateLimit(it) }
             ?: (raw["rate_limit"] as? Map<String, Any>)?.let { parseRateLimit(it) }
+        val siteRateLimits = (raw["siteRateLimits"] as? Map<String, Any>)?.let { parseSiteRateLimits(it) }
+            ?: (raw["site_rate_limits"] as? Map<String, Any>)?.let { parseSiteRateLimits(it) }
 
         // Everything else goes to custom
-        val reserved = setOf("enabled", "priority", "auth", "rateLimit", "rate_limit")
+        val reserved = setOf(
+            "enabled", "priority", "auth",
+            "rateLimit", "rate_limit",
+            "siteRateLimits", "site_rate_limits"
+        )
         val custom = raw.filterKeys { it !in reserved }
 
         return ConnectorSpecificConfig(
@@ -285,6 +291,7 @@ class ConfigurationServiceImpl(
             priority = (raw["priority"] as? Number)?.toInt(),
             auth = auth,
             rateLimit = rateLimit,
+            siteRateLimits = siteRateLimits,
             custom = custom
         )
     }
@@ -303,6 +310,45 @@ class ConfigurationServiceImpl(
 
     private fun parseRateLimit(raw: Map<String, Any>): RateLimitOverride {
         return RateLimitOverride(
+            minDelayMillis = (raw["minDelayMillis"] as? Number)?.toLong()
+                ?: (raw["min_delay_millis"] as? Number)?.toLong(),
+            maxConcurrent = (raw["maxConcurrent"] as? Number)?.toInt()
+                ?: (raw["max_concurrent"] as? Number)?.toInt(),
+            maxRequestsPerMinute = (raw["maxRequestsPerMinute"] as? Number)?.toInt()
+                ?: (raw["max_requests_per_minute"] as? Number)?.toInt()
+        )
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseSiteRateLimits(raw: Map<String, Any>): SiteRateLimitsOverride {
+        val defaults = (raw["defaults"] as? Map<String, Any>)
+        val bucketsRaw = (raw["buckets"] as? Map<String, Any>) ?: emptyMap()
+
+        val buckets = bucketsRaw.mapNotNull { (name, value) ->
+            val bucketRaw = value as? Map<String, Any> ?: return@mapNotNull null
+            name to parseBucketOverride(bucketRaw)
+        }.toMap()
+
+        return SiteRateLimitsOverride(
+            defaultMinDelayMillis = defaults?.let {
+                (it["minDelayMillis"] as? Number)?.toLong()
+                    ?: (it["min_delay_millis"] as? Number)?.toLong()
+            },
+            defaultMaxConcurrent = defaults?.let {
+                (it["maxConcurrent"] as? Number)?.toInt()
+                    ?: (it["max_concurrent"] as? Number)?.toInt()
+            },
+            defaultMaxRequestsPerMinute = defaults?.let {
+                (it["maxRequestsPerMinute"] as? Number)?.toInt()
+                    ?: (it["max_requests_per_minute"] as? Number)?.toInt()
+            },
+            buckets = buckets
+        )
+    }
+
+    private fun parseBucketOverride(raw: Map<String, Any>): BucketOverride {
+        return BucketOverride(
+            unlimited = raw["unlimited"]?.toString()?.toBooleanStrictOrNull() ?: false,
             minDelayMillis = (raw["minDelayMillis"] as? Number)?.toLong()
                 ?: (raw["min_delay_millis"] as? Number)?.toLong(),
             maxConcurrent = (raw["maxConcurrent"] as? Number)?.toInt()

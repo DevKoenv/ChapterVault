@@ -43,14 +43,6 @@ class ConnectorRegistryImpl : ConnectorRegistry {
         return connectors.find { it.config.id.equals(id, ignoreCase = true) }
     }
 
-    /**
-     * Find a connector by name.
-     * @deprecated Use [findById] instead.
-     */
-    override fun findByName(name: String): Connector? {
-        return connectors.find { it.config.name.equals(name, ignoreCase = true) }
-    }
-
     override fun getAllConnectors(): List<Connector> {
         return connectors.toList()
     }
