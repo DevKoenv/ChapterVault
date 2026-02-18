@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-18
+
 ### Added
 
 - **Domain-aware site rate limiting**: New `SiteRateLimiter` with per-host auto-bucketing and named bucket support, throttling individual outgoing HTTP requests independently of the orchestrator-level rate limiter
@@ -15,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Adaptive backoff**: `SiteRateLimiter` supports AIMD-based backoff on 429 responses with `Retry-After` header support
 - **YAML `siteRateLimits` override**: Per-connector domain-aware rate limit configuration via `connectors.<name>.siteRateLimits` in config file, with support for default limits and named bucket overrides
 - **Rate limit status endpoint**: `GET /api/v1/admin/ratelimits` exposes live rate limiter state including site buckets, backoff status, and per-connector orchestrator limits
+- **`window_duration_millis` YAML support**: Both `rate_limit` and `site_rate_limits` overrides now accept `window_duration_millis` to configure the rate limit time window per connector
+
+### Changed
+
+- **`max_requests_per_minute` renamed to `max_requests_per_window`** in YAML configuration (`rate_limit`, `site_rate_limits.defaults`, and bucket overrides); `max_requests_per_minute` is still accepted as a legacy alias
+
+### Fixed
+
+- **YAML rate limit overrides not applied**: `connectors.<name>.rate_limit` and `connectors.<name>.site_rate_limits` were parsed correctly but silently discarded; overrides are now applied at startup via `applyTo` extension functions before rate limiters accept any requests
+- **`RateLimitBuilder` DSL defaults**: `defaults { }` and `bucket { }` blocks no longer silently activate a 1-second min-delay and 60-requests-per-window limit when only one field is set; defaults now match `RateLimitConfig` (zero delay, no window limit)
 
 ### Removed
 
@@ -106,11 +118,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History Summary
 
-| Version | Date       | Highlights                          |
-|---------|------------|-------------------------------------|
-| 0.2.0   | 2026-02-05 | Library management, caching, stable IDs |
-| 0.1.0   | 2026-01-31 | Initial public release              |
+| Version | Date       | Highlights                                                    |
+|---------|------------|---------------------------------------------------------------|
+| 0.3.0   | 2026-02-18 | Domain-aware rate limiting, adaptive backoff, YAML overrides  |
+| 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                       |
+| 0.1.0   | 2026-01-31 | Initial public release                                        |
 
-[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/DevKoenv/ChapterVault/releases/tag/v0.1.0

@@ -13,7 +13,7 @@ object BuildConfig {
     /**
      * Application version - must match root build.gradle.kts
      */
-    const val VERSION = "0.2.0"
+    const val VERSION = "0.3.0"
 
     /**
      * Application name
