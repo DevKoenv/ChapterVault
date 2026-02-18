@@ -45,7 +45,7 @@ class ExampleBrowserPlanConnector(
         rateLimitConfig = RateLimitConfig(
             minDelay = connectorConfig?.rateLimit?.minDelayMillis?.milliseconds ?: 2.seconds,
             maxConcurrent = connectorConfig?.rateLimit?.maxConcurrent ?: 1,
-            maxRequestsPerWindow = connectorConfig?.rateLimit?.maxRequestsPerMinute ?: 20,
+            maxRequestsPerWindow = connectorConfig?.rateLimit?.maxRequestsPerWindow ?: 20,
             windowDuration = 60.seconds
         ),
         features = ConnectorFeatures(

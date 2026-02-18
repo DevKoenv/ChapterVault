@@ -46,12 +46,26 @@ class RateLimiter {
     private val connectorStates = ConcurrentHashMap<String, ConnectorState>()
 
     /**
+     * Pre-register a connector with an effective rate limit config.
+     * Should be called at startup after applying any YAML configuration overrides,
+     * before requests are made. If the connector is already registered, this is a no-op.
+     */
+    fun registerConnector(connectorName: String, config: RateLimitConfig) {
+        connectorStates.getOrPut(connectorName) {
+            ConnectorState(
+                config = config,
+                concurrencySemaphore = Semaphore(config.maxConcurrent)
+            )
+        }
+    }
+
+    /**
      * Execute a block with rate limiting applied.
      * This is the preferred API - wraps the entire operation with rate limit enforcement.
      */
     suspend fun <T> withRateLimit(connector: Connector, block: suspend () -> T): T {
-        val config = connector.config.rateLimitConfig
         val state = getOrCreateState(connector)
+        val config = state.config
 
         // 1. Acquire concurrency permit (blocks if at max concurrent)
         state.concurrencySemaphore.acquire()

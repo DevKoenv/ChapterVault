@@ -314,8 +314,11 @@ class ConfigurationServiceImpl(
                 ?: (raw["min_delay_millis"] as? Number)?.toLong(),
             maxConcurrent = (raw["maxConcurrent"] as? Number)?.toInt()
                 ?: (raw["max_concurrent"] as? Number)?.toInt(),
-            maxRequestsPerMinute = (raw["maxRequestsPerMinute"] as? Number)?.toInt()
-                ?: (raw["max_requests_per_minute"] as? Number)?.toInt()
+            maxRequestsPerWindow = (raw["maxRequestsPerWindow"] as? Number)?.toInt()
+                ?: (raw["max_requests_per_window"] as? Number)?.toInt()
+                ?: (raw["max_requests_per_minute"] as? Number)?.toInt(),
+            windowDurationMillis = (raw["windowDurationMillis"] as? Number)?.toLong()
+                ?: (raw["window_duration_millis"] as? Number)?.toLong()
         )
     }
 
@@ -338,9 +341,14 @@ class ConfigurationServiceImpl(
                 (it["maxConcurrent"] as? Number)?.toInt()
                     ?: (it["max_concurrent"] as? Number)?.toInt()
             },
-            defaultMaxRequestsPerMinute = defaults?.let {
-                (it["maxRequestsPerMinute"] as? Number)?.toInt()
+            defaultMaxRequestsPerWindow = defaults?.let {
+                (it["maxRequestsPerWindow"] as? Number)?.toInt()
+                    ?: (it["max_requests_per_window"] as? Number)?.toInt()
                     ?: (it["max_requests_per_minute"] as? Number)?.toInt()
+            },
+            defaultWindowDurationMillis = defaults?.let {
+                (it["windowDurationMillis"] as? Number)?.toLong()
+                    ?: (it["window_duration_millis"] as? Number)?.toLong()
             },
             buckets = buckets
         )
@@ -353,8 +361,11 @@ class ConfigurationServiceImpl(
                 ?: (raw["min_delay_millis"] as? Number)?.toLong(),
             maxConcurrent = (raw["maxConcurrent"] as? Number)?.toInt()
                 ?: (raw["max_concurrent"] as? Number)?.toInt(),
-            maxRequestsPerMinute = (raw["maxRequestsPerMinute"] as? Number)?.toInt()
-                ?: (raw["max_requests_per_minute"] as? Number)?.toInt()
+            maxRequestsPerWindow = (raw["maxRequestsPerWindow"] as? Number)?.toInt()
+                ?: (raw["max_requests_per_window"] as? Number)?.toInt()
+                ?: (raw["max_requests_per_minute"] as? Number)?.toInt(),
+            windowDurationMillis = (raw["windowDurationMillis"] as? Number)?.toLong()
+                ?: (raw["window_duration_millis"] as? Number)?.toLong()
         )
     }
 

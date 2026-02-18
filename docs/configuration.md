@@ -162,10 +162,51 @@ connectors:
         rate_limit:
             min_delay_millis: 2000
             max_concurrent: 1
-            max_requests_per_minute: 30
+            max_requests_per_window: 30
+            # window_duration_millis: 60000  # Default: 60 seconds
         # Connector-specific custom settings
         preferred_quality: "high"
 ```
+
+### Site-Level Rate Limiting
+
+In addition to the orchestrator-level `rate_limit`, each connector can configure domain-aware site rate limits that throttle the actual outgoing HTTP requests. This two-layer approach lets you control both how many connector operations run simultaneously and how aggressively each domain is hit.
+
+```yaml
+connectors:
+    MyConnector:
+        rate_limit:               # Orchestrator layer: controls connector task concurrency
+            min_delay_millis: 500
+            max_concurrent: 2
+            max_requests_per_window: 60
+        site_rate_limits:         # Site layer: controls outgoing HTTP request rate per domain
+            defaults:             # Applied to all auto-created per-host buckets
+                min_delay_millis: 300
+                max_concurrent: 3
+                max_requests_per_window: 120
+                window_duration_millis: 60000
+            buckets:
+                cdn:              # Unlimited throughput for CDN image requests
+                    unlimited: true
+                api:              # Stricter limits for the API subdomain
+                    min_delay_millis: 100
+                    max_concurrent: 4
+                    max_requests_per_window: 200
+```
+
+Connectors tag individual instructions with a `rateLimitBucket` name to route them to a named bucket instead of the default host-based bucket. When a 429 response is received, the limiter automatically increases the delay using AIMD-based adaptive backoff.
+
+### Rate Limit Status
+
+Inspect live rate limiter state via the admin API:
+
+```bash
+curl http://localhost:8080/api/v1/admin/ratelimits
+```
+
+The response includes:
+- **`orchestrator`**: Per-connector state (concurrent slots, window counts, last request time)
+- **`site`**: Active per-domain buckets including backoff state and adaptive delay multiplier
 
 ## Docker Configuration
 
@@ -303,8 +344,9 @@ services:
 
 **Rate limiting errors:**
 
-- Increase `minDelayMs` in connector configuration
-- Decrease `maxConcurrent` and `maxRequestsPerMinute`
+- Increase `min_delay_millis` in connector `rate_limit` configuration
+- Decrease `max_concurrent` and `max_requests_per_window`
+- Check the live rate limiter state: `GET /api/v1/admin/ratelimits`
 
 **Out of memory errors:**
 

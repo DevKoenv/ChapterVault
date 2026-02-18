@@ -17,6 +17,8 @@ import dev.koenv.chaptervault.orchestration.config.ConfigurationServiceImpl
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import dev.koenv.chaptervault.orchestration.execution.LocalExecutor
 import dev.koenv.chaptervault.orchestration.fetch.FetchClientImpl
+import dev.koenv.chaptervault.core.config.applyTo
+import dev.koenv.chaptervault.orchestration.ratelimit.RateLimiter
 import dev.koenv.chaptervault.orchestration.ratelimit.SiteRateLimiter
 import dev.koenv.chaptervault.storage.impl.FileStorageSink
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -92,10 +94,23 @@ fun main() {
     // Example:
     // connectorRegistry.register(MyLegalConnector(executor))
 
-    // Register site rate limit configs from all connectors
+    // Apply YAML configuration overrides and register connectors with both rate limiters
+    val rateLimiter = RateLimiter()
     for (connector in connectorRegistry.getAllConnectors()) {
         val connConfig = connector.config
-        siteRateLimiter.registerConnector(connConfig.name, connConfig.siteRateLimits)
+        val override = configService.getConnectorConfig(connConfig.name)
+
+        val effectiveRateLimit = override?.rateLimit?.applyTo(connConfig.rateLimitConfig)
+            ?: connConfig.rateLimitConfig
+        val effectiveSiteLimits = override?.siteRateLimits?.applyTo(connConfig.siteRateLimits)
+            ?: connConfig.siteRateLimits
+
+        rateLimiter.registerConnector(connConfig.name, effectiveRateLimit)
+        siteRateLimiter.registerConnector(connConfig.name, effectiveSiteLimits)
+
+        if (override?.rateLimit != null || override?.siteRateLimits != null) {
+            logger.info { "Applied rate limit config overrides for connector: ${connConfig.name}" }
+        }
     }
 
     logger.info { "Registered ${connectorRegistry.getAllConnectors().count()} connectors" }
@@ -107,6 +122,7 @@ fun main() {
     val orchestrator = Orchestrator(
         connectorRegistry = connectorRegistry,
         storageSink = storageSink,
+        rateLimiter = rateLimiter,
         seriesRepository = seriesRepository,
         chapterRepository = chapterRepository,
         downloadTaskRepository = downloadTaskRepository

@@ -19,29 +19,36 @@ This document outlines features, improvements, and items that need attention for
 
 ### What's Working
 
-| Feature                  | Status   | Notes                                           |
-|--------------------------|----------|-------------------------------------------------|
-| Multi-connector search   | Complete | Priority-based with rate limiting               |
-| Series metadata fetching | Complete | Title, author, description, cover, tags, status |
-| Chapter list retrieval   | Complete | Parsed from source pages                        |
-| Chapter download to CBZ  | Complete | ComicInfo.xml metadata included                 |
-| REST API                 | Complete | Catalog, library, downloads endpoints           |
-| OPDS v1.2 catalog        | Complete | Navigation, search, chapter download            |
-| Database persistence     | Complete | H2, SQLite, PostgreSQL support                  |
-| Download task tracking   | Complete | Progress, status, error handling                |
-| Rate limiting            | Complete | Per-connector configurable                      |
-| Declarative extraction   | Complete | `extractData`, `bulkDownload` DSL               |
+| Feature                     | Status   | Notes                                                    |
+|-----------------------------|----------|----------------------------------------------------------|
+| Multi-connector search      | Complete | Priority-based with rate limiting                        |
+| Series metadata fetching    | Complete | Title, author, description, cover, tags, status          |
+| Chapter list retrieval      | Complete | Parsed from source pages                                 |
+| Chapter download to CBZ     | Complete | ComicInfo.xml metadata included                          |
+| REST API                    | Complete | Catalog, library, downloads, admin endpoints             |
+| OPDS v1.2 catalog           | Complete | Navigation, search, chapter download                     |
+| Database persistence        | Complete | H2, SQLite, PostgreSQL support                           |
+| Download task tracking      | Complete | Progress, status, error handling                         |
+| Series/metadata caching     | Complete | Stable IDs from database, TTL-based cleanup              |
+| Library management          | Complete | `inLibrary` flag, add/remove, auto-add on download       |
+| Rate limiting (orchestrator)| Complete | Per-connector, YAML-overridable                          |
+| Rate limiting (site-level)  | Complete | Domain-aware, named buckets, YAML-overridable, v0.3.0    |
+| Adaptive backoff            | Complete | AIMD on 429 with Retry-After support, v0.3.0             |
+| Rate limit status endpoint  | Complete | Live bucket state via admin API, v0.3.0                  |
+| Declarative extraction      | Complete | `extractData`, `bulkDownload` DSL                        |
 
 ### What's Incomplete
 
-| Feature             | Status          | Notes                              |
-|---------------------|-----------------|------------------------------------|
-| OPDS page streaming | Stubbed         | Returns 501 Not Implemented        |
-| Authentication      | Framework only  | Config structures exist, not wired |
-| Proxy support       | Not integrated  | Configuration defined only         |
-| Real connectors     | Examples only   | Mock/Sample/Example connectors     |
-| Resume downloads    | Not implemented | No continuation on failure         |
-| Web UI              | Not implemented | API only                           |
+| Feature                   | Status          | Notes                                          |
+|---------------------------|-----------------|------------------------------------------------|
+| OPDS page streaming       | Stubbed         | Returns 501 Not Implemented                    |
+| Authentication            | Framework only  | Config structures exist, not wired to requests |
+| Proxy support             | Not integrated  | Configuration parsed, never applied            |
+| Real connectors           | Examples only   | Mock/Sample/Example connectors only            |
+| Resume downloads          | Not implemented | No continuation on failure                     |
+| Config validation         | Not implemented | Invalid YAML silently falls back to defaults   |
+| Health/metrics endpoints  | Not implemented | No `/health` or `/metrics` endpoints           |
+| Web UI                    | Not implemented | API only                                       |
 
 ---
 
@@ -70,14 +77,14 @@ This document outlines features, improvements, and items that need attention for
 - [ ] Resume interrupted downloads
 - [ ] Retry individual failed pages without re-downloading entire chapter
 - [ ] Better error reporting per-page
-- [ ] Handle rate limit errors gracefully (429 responses)
+- [x] Handle rate limit errors gracefully (429 responses) — adaptive backoff in v0.3.0
 
 #### 4. Configuration Validation
 
-- [ ] Validate YAML configuration on startup
-- [ ] Clear error messages for misconfiguration
-- [ ] Environment variable documentation
-- [ ] Example configuration files
+- [ ] Validate YAML configuration on startup with clear error messages
+- [ ] Warn on unknown config keys (currently silently ignored)
+- [x] Environment variable documentation — see [configuration.md](configuration.md)
+- [x] Example configuration file — `config/chaptervault.example.yaml`
 
 ### P1 - Important (Should Have)
 
@@ -107,7 +114,7 @@ This document outlines features, improvements, and items that need attention for
 
 - [ ] `/health` endpoint
 - [ ] `/metrics` endpoint (download counts, errors)
-- [ ] Connector status endpoint
+- [x] Connector status endpoint — available via `/api/v1/admin/ratelimits`
 
 ### P2 - Nice to Have
 
@@ -256,10 +263,10 @@ This document outlines features, improvements, and items that need attention for
 
 ### Refactoring
 
-- [ ] **Gradle plugin warning** - Fix multiple Kotlin plugin loading
+- [ ] **Gradle plugin warning** - Fix multiple Kotlin plugin loading (`:api`, `:app` both declare plugin versions)
 - [ ] **Consistent error handling** - Unified exception hierarchy
 - [ ] **Logging standardization** - Consistent log levels and messages
-- [ ] **Configuration consolidation** - Single source of truth for config
+- [ ] **Proxy wiring** - `ProxyConfig` is parsed but never passed to the HTTP client or browser pool
 
 ### Documentation
 
@@ -340,12 +347,15 @@ class MyConnector(override val executor: Executor) : Connector {
 
 ## Version History
 
-| Version | Status  | Release Target |
-|---------|---------|----------------|
-| v0.1.0  | Current | -              |
-| v1.0.0  | Planned | TBD            |
-| v1.1.0  | Planned | TBD            |
-| v2.0.0  | Future  | TBD            |
+| Version | Status   | Date       |
+|---------|----------|------------|
+| v0.1.0  | Released | 2026-01-31 |
+| v0.2.0  | Released | 2026-02-05 |
+| v0.3.0  | Released | 2026-02-18 |
+| v0.4.0  | Planned  | TBD        |
+| v1.0.0  | Planned  | TBD        |
+| v1.1.0  | Planned  | TBD        |
+| v2.0.0  | Future   | TBD        |
 
 ---
 

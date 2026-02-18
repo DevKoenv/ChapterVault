@@ -1,7 +1,11 @@
 package dev.koenv.chaptervault.core.config
 
 import dev.koenv.chaptervault.core.BuildConfig
+import dev.koenv.chaptervault.core.ratelimit.BucketConfig
+import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
+import dev.koenv.chaptervault.core.ratelimit.SiteRateLimits
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Configuration service interface for reading application configuration.
@@ -194,7 +198,8 @@ data class AuthConfig(
 data class RateLimitOverride(
     val minDelayMillis: Long? = null,
     val maxConcurrent: Int? = null,
-    val maxRequestsPerMinute: Int? = null
+    val maxRequestsPerWindow: Int? = null,
+    val windowDurationMillis: Long? = null
 )
 
 /**
@@ -208,7 +213,8 @@ data class RateLimitOverride(
  *   defaults:
  *     min_delay_millis: 500
  *     max_concurrent: 2
- *     max_requests_per_minute: 60
+ *     max_requests_per_window: 60
+ *     window_duration_millis: 60000
  *   buckets:
  *     cdn:
  *       unlimited: true
@@ -220,7 +226,8 @@ data class RateLimitOverride(
 data class SiteRateLimitsOverride(
     val defaultMinDelayMillis: Long? = null,
     val defaultMaxConcurrent: Int? = null,
-    val defaultMaxRequestsPerMinute: Int? = null,
+    val defaultMaxRequestsPerWindow: Int? = null,
+    val defaultWindowDurationMillis: Long? = null,
     val buckets: Map<String, BucketOverride> = emptyMap()
 )
 
@@ -231,7 +238,8 @@ data class BucketOverride(
     val unlimited: Boolean = false,
     val minDelayMillis: Long? = null,
     val maxConcurrent: Int? = null,
-    val maxRequestsPerMinute: Int? = null
+    val maxRequestsPerWindow: Int? = null,
+    val windowDurationMillis: Long? = null
 )
 
 /**
@@ -246,3 +254,49 @@ data class CacheCleanupConfig(
     /** How often the cleanup job runs (in hours) */
     val runIntervalHours: Int = 24
 )
+
+/**
+ * Apply this override onto [base], replacing only the fields that are explicitly set.
+ */
+fun RateLimitOverride.applyTo(base: RateLimitConfig): RateLimitConfig = base.copy(
+    minDelay = minDelayMillis?.milliseconds ?: base.minDelay,
+    maxConcurrent = maxConcurrent ?: base.maxConcurrent,
+    maxRequestsPerWindow = maxRequestsPerWindow ?: base.maxRequestsPerWindow,
+    windowDuration = windowDurationMillis?.milliseconds ?: base.windowDuration
+)
+
+/**
+ * Apply this override onto [base], replacing only the fields that are explicitly set.
+ * Named buckets in this override are merged into the base bucket map;
+ * buckets present in [base] but absent from this override are kept unchanged.
+ */
+fun SiteRateLimitsOverride.applyTo(base: SiteRateLimits): SiteRateLimits {
+    val mergedDefaults = base.defaultLimits.copy(
+        minDelay = defaultMinDelayMillis?.milliseconds ?: base.defaultLimits.minDelay,
+        maxConcurrent = defaultMaxConcurrent ?: base.defaultLimits.maxConcurrent,
+        maxRequestsPerWindow = defaultMaxRequestsPerWindow ?: base.defaultLimits.maxRequestsPerWindow,
+        windowDuration = defaultWindowDurationMillis?.milliseconds ?: base.defaultLimits.windowDuration
+    )
+    val mergedBuckets = base.buckets.toMutableMap()
+    buckets.forEach { (name, override) ->
+        mergedBuckets[name] = override.applyTo(mergedBuckets[name] ?: BucketConfig())
+    }
+    return SiteRateLimits(defaultLimits = mergedDefaults, buckets = mergedBuckets)
+}
+
+/**
+ * Apply this override onto [base], replacing only the fields that are explicitly set.
+ * If [unlimited] is true, returns an unlimited bucket regardless of [base].
+ */
+fun BucketOverride.applyTo(base: BucketConfig): BucketConfig {
+    if (unlimited) return BucketConfig(limits = null)
+    val baseLimits = base.limits ?: RateLimitConfig()
+    return BucketConfig(
+        limits = baseLimits.copy(
+            minDelay = minDelayMillis?.milliseconds ?: baseLimits.minDelay,
+            maxConcurrent = maxConcurrent ?: baseLimits.maxConcurrent,
+            maxRequestsPerWindow = maxRequestsPerWindow ?: baseLimits.maxRequestsPerWindow,
+            windowDuration = windowDurationMillis?.milliseconds ?: baseLimits.windowDuration
+        )
+    )
+}
