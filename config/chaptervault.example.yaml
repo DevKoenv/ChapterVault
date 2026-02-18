@@ -125,7 +125,8 @@ connectors:
     rate_limit:
       min_delay_millis: 500
       max_concurrent: 3
-      max_requests_per_minute: 100
+      max_requests_per_window: 100
+      # window_duration_millis: 60000  # Default: 60 seconds
 
     # Site-level rate limits (domain-aware)
     # Controls how fast requests are sent to external sites.
@@ -135,14 +136,15 @@ connectors:
     #   defaults:
     #     min_delay_millis: 500
     #     max_concurrent: 2
-    #     max_requests_per_minute: 60
+    #     max_requests_per_window: 60
+    #     window_duration_millis: 60000
     #   buckets:
     #     cdn:
     #       unlimited: true     # CDN images — no rate limiting needed
     #     api:
     #       min_delay_millis: 100
     #       max_concurrent: 4
-    #       max_requests_per_minute: 120
+    #       max_requests_per_window: 120
 
     # Custom connector-specific settings
     # Access via: config.getString("quality"), config.getBoolean("downloadCovers"), etc.
@@ -156,7 +158,7 @@ connectors:
   #   auth:
   #     api_key: "your_api_key_here"
   #   rate_limit:
-  #     max_requests_per_minute: 60
+  #     max_requests_per_window: 60
 
   # Disable a connector
   # SomeConnector:

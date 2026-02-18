@@ -102,9 +102,9 @@ class BucketBuilder {
 
 @SiteRateLimitsDsl
 class RateLimitBuilder {
-    var minDelay: Duration = 1.seconds
+    var minDelay: Duration = Duration.ZERO
     var maxConcurrent: Int = 1
-    var maxRequestsPerWindow: Int = 60
+    var maxRequestsPerWindow: Int = 0
     var windowDuration: Duration = 60.seconds
 
     fun build(): RateLimitConfig = RateLimitConfig(

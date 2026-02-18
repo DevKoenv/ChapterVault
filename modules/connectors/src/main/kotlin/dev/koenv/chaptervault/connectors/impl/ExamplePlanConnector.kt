@@ -44,7 +44,7 @@ class ExamplePlanConnector(
         rateLimitConfig = RateLimitConfig(
             minDelay = connectorConfig?.rateLimit?.minDelayMillis?.milliseconds ?: 500.milliseconds,
             maxConcurrent = connectorConfig?.rateLimit?.maxConcurrent ?: 2,
-            maxRequestsPerWindow = connectorConfig?.rateLimit?.maxRequestsPerMinute ?: 60,
+            maxRequestsPerWindow = connectorConfig?.rateLimit?.maxRequestsPerWindow ?: 60,
             windowDuration = 60.seconds
         ),
         siteRateLimits = siteRateLimits {
