@@ -85,7 +85,7 @@ class Orchestrator(
             // Cache search results in database
             if (results.isNotEmpty() && seriesRepository != null) {
                 try {
-                    seriesRepository.saveAllFromSearch(results)
+                    seriesRepository.upsertAllFromSearch(results)
                     logger.debug("Cached {} search results in database", results.size)
                 } catch (e: Exception) {
                     logger.warn("Failed to cache search results: {}", e.message)
@@ -221,7 +221,7 @@ class Orchestrator(
                 logger.info("[Task {}] Fetched metadata for: {}", taskId, seriesMetadata.title)
 
                 // Save series to database and add to library
-                var cachedSeries = seriesRepository?.save(seriesMetadata)
+                var cachedSeries = seriesRepository?.upsert(seriesMetadata)
                 val seriesId = cachedSeries?.id
 
                 // Auto-add to library on download

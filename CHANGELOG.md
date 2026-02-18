@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - TBD
+
+### Changed
+
+- **Unified repository models**: `CachedSeries` renamed to `Series`, `CachedChapter` renamed to `Chapter`; nullable fields naturally encode "not yet fetched" — no explicit partial/complete distinction
+- **Unified API DTOs**: `CatalogSeriesDto`, `LibrarySeriesDto`, `CatalogChapterDto`, `LibraryChapterDto` replaced by shared `SeriesDto`, `ChapterDto`, `SeriesDetailResponse` used across all endpoints
+- **Always-fresh detail endpoints**: `GET /api/v1/catalog/series/{id}`, `POST /api/v1/catalog/lookup` (URL), and `POST /api/v1/catalog/series/{id}/refresh` always fetch metadata from the source connector — no conditional based on `metadataFetchedAt`
+- **Merge semantics on upsert**: `upsert()` and `upsertAllFromSearch()` never downgrade known fields to null — a subsequent search result cannot clear an `author` populated by a full metadata fetch
+- **Library series detail shows all chapters**: `GET /api/v1/library/series/{id}` now returns all chapters with `downloadStatus` field instead of only downloaded chapters
+- **`ChapterDto` includes download fields**: `downloadStatus`, `downloadedAt`, `filePath`, `fileSize` exposed on every chapter response
+
+### Removed
+
+- **`metadataFetchedAt` field** from `Series` model and repository — field nullability encodes data quality, not an explicit timestamp
+- **`CachedSeries` / `CachedChapter` types** — replaced by `Series` / `Chapter`
+- **`save()` / `saveFromSearch()` / `saveAllFromSearch()` methods** on `SeriesRepositoryPort` — replaced by `upsert()` / `upsertFromSearch()` / `upsertAllFromSearch()` with merge semantics
+- **`CatalogSeriesDto` / `CatalogSeriesDetailResponse` / `CatalogChapterDto`** — replaced by `SeriesDto` / `SeriesDetailResponse` / `ChapterDto`
+- **`LibrarySeriesDto` / `LibrarySeriesDetailResponse` / `LibraryChapterDto`** — replaced by shared catalog types
+- **`domain/Series.kt` / `domain/Chapter.kt`** lightweight url-only domain types — unused, removed to eliminate ambiguity
+
 ## [0.3.0] - 2026-02-18
 
 ### Added
@@ -120,11 +140,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | Highlights                                                    |
 |---------|------------|---------------------------------------------------------------|
+| 0.4.0   | TBD | Entity unification, unified DTOs, merge semantics             |
 | 0.3.0   | 2026-02-18 | Domain-aware rate limiting, adaptive backoff, YAML overrides  |
 | 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                       |
 | 0.1.0   | 2026-01-31 | Initial public release                                        |
 
-[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/DevKoenv/ChapterVault/releases/tag/v0.1.0

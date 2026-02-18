@@ -4,11 +4,9 @@ import dev.koenv.chaptervault.api.models.ErrorTypes
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.catalog.*
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
-import dev.koenv.chaptervault.core.domain.ChapterMetadata
-import dev.koenv.chaptervault.core.repository.CachedChapter
-import dev.koenv.chaptervault.core.repository.CachedSeries
+import dev.koenv.chaptervault.core.repository.Chapter
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
-import dev.koenv.chaptervault.core.repository.DownloadStatus
+import dev.koenv.chaptervault.core.repository.Series
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import io.ktor.http.*
@@ -61,7 +59,7 @@ fun Route.catalogRoutes(
          * At least one of `url` or `query` must be provided.
          * When using `query`, the `source` parameter is required.
          *
-         * Returns [CatalogSeriesDetailResponse] for URL lookups.
+         * Returns [SeriesDetailResponse] for URL lookups.
          * Returns [CatalogLookupResponse] for search queries.
          */
         post("/lookup") {
@@ -99,25 +97,21 @@ fun Route.catalogRoutes(
             }
 
             if (url != null) {
-                // URL lookup - fetch series metadata directly
+                // URL lookup - always fetch fresh metadata and chapter list from connector
                 try {
-                    var series = seriesRepository.findByUrl(url)
+                    val metadata = orchestrator.fetchSeriesMetadata(url)
+                    val series = seriesRepository.upsert(metadata, null)
 
-                    if (series == null) {
-                        val metadata = orchestrator.fetchSeriesMetadata(url)
-                        series = seriesRepository.save(metadata, null)
-                    } else if (series.metadataFetchedAt == null) {
-                        val metadata = orchestrator.fetchSeriesMetadata(url)
-                        series = seriesRepository.save(metadata, series.language)
-                    }
+                    val chapters = orchestrator.fetchChapterList(url)
+                    chapterRepository.saveAll(chapters, series.id)
 
-                    val chapters = chapterRepository.findBySeriesId(series.id)
-                    val totalChapters = chapterRepository.countBySeriesId(series.id).toInt()
+                    val allChapters = chapterRepository.findBySeriesId(series.id)
+                    val totalChapters = allChapters.size
                     val downloadedChapters = chapterRepository.countDownloaded(series.id).toInt()
 
                     call.respond(
                         HttpStatusCode.OK,
-                        CatalogSeriesDetailResponse(
+                        SeriesDetailResponse(
                             id = series.id.toString(),
                             sourceUrl = series.sourceUrl,
                             title = series.title,
@@ -130,7 +124,7 @@ fun Route.catalogRoutes(
                             downloadedChapters = downloadedChapters,
                             inLibrary = series.inLibrary,
                             addedToLibraryAt = series.addedToLibraryAt?.toString(),
-                            chapters = chapters.map { it.toCatalogChapterDto() }
+                            chapters = allChapters.map { it.toChapterDto() }
                         )
                     )
                 } catch (e: IllegalArgumentException) {
@@ -189,10 +183,10 @@ fun Route.catalogRoutes(
 
                 try {
                     val searchResults = orchestrator.searchSeries(query!!, source)
-                    val cachedSeries = seriesRepository.saveAllFromSearch(searchResults)
+                    val seriesList = seriesRepository.upsertAllFromSearch(searchResults)
 
-                    val results = cachedSeries.map { series ->
-                        series.toCatalogDto(chapterRepository)
+                    val results = seriesList.map { series ->
+                        series.toSeriesDto(chapterRepository)
                     }
 
                     call.respond(
@@ -220,7 +214,7 @@ fun Route.catalogRoutes(
         /**
          * GET /api/v1/catalog/series/{seriesId}
          * Get series detail with all chapters.
-         * Auto-fetches full metadata from source if not yet fetched.
+         * Always fetches fresh metadata from the source connector.
          */
         get("/series/{seriesId}") {
             val seriesIdParam = call.parameters["seriesId"]
@@ -241,8 +235,8 @@ fun Route.catalogRoutes(
                 return@get
             }
 
-            var series = seriesRepository.findById(seriesId)
-            if (series == null) {
+            val existing = seriesRepository.findById(seriesId)
+            if (existing == null) {
                 call.respond(
                     HttpStatusCode.NotFound,
                     ProblemDetail(
@@ -256,23 +250,26 @@ fun Route.catalogRoutes(
                 return@get
             }
 
-            // Auto-fetch full metadata if not yet fetched
-            if (series.metadataFetchedAt == null) {
-                try {
-                    val freshMetadata = orchestrator.fetchSeriesMetadata(series.sourceUrl)
-                    series = seriesRepository.save(freshMetadata, series.language)
-                } catch (_: Exception) {
-                    // Fetch failed - continue with cached search data
-                }
+            // Always fetch fresh metadata and chapter list from connector
+            val series = try {
+                val freshMetadata = orchestrator.fetchSeriesMetadata(existing.sourceUrl)
+                val updated = seriesRepository.upsert(freshMetadata, existing.language)
+
+                val chapters = orchestrator.fetchChapterList(existing.sourceUrl)
+                chapterRepository.saveAll(chapters, seriesId)
+
+                updated
+            } catch (_: Exception) {
+                existing
             }
 
-            val chapters = chapterRepository.findBySeriesId(seriesId)
-            val totalChapters = chapterRepository.countBySeriesId(seriesId).toInt()
+            val allChapters = chapterRepository.findBySeriesId(seriesId)
+            val totalChapters = allChapters.size
             val downloadedChapters = chapterRepository.countDownloaded(seriesId).toInt()
 
             call.respond(
                 HttpStatusCode.OK,
-                CatalogSeriesDetailResponse(
+                SeriesDetailResponse(
                     id = series.id.toString(),
                     sourceUrl = series.sourceUrl,
                     title = series.title,
@@ -285,7 +282,7 @@ fun Route.catalogRoutes(
                     downloadedChapters = downloadedChapters,
                     inLibrary = series.inLibrary,
                     addedToLibraryAt = series.addedToLibraryAt?.toString(),
-                    chapters = chapters.map { it.toCatalogChapterDto() }
+                    chapters = allChapters.map { it.toChapterDto() }
                 )
             )
         }
@@ -329,19 +326,19 @@ fun Route.catalogRoutes(
             }
 
             try {
-                // Fetch fresh metadata from the source
                 val freshMetadata = orchestrator.fetchSeriesMetadata(existingSeries.sourceUrl)
+                val updatedSeries = seriesRepository.upsert(freshMetadata, existingSeries.language)
 
-                // Save the updated metadata (this will update metadataFetchedAt)
-                val updatedSeries = seriesRepository.save(freshMetadata, existingSeries.language)
+                val chapters = orchestrator.fetchChapterList(existingSeries.sourceUrl)
+                chapterRepository.saveAll(chapters, seriesId)
 
-                val chapters = chapterRepository.findBySeriesId(seriesId)
-                val totalChapters = chapterRepository.countBySeriesId(seriesId).toInt()
+                val allChapters = chapterRepository.findBySeriesId(seriesId)
+                val totalChapters = allChapters.size
                 val downloadedChapters = chapterRepository.countDownloaded(seriesId).toInt()
 
                 call.respond(
                     HttpStatusCode.OK,
-                    CatalogSeriesDetailResponse(
+                    SeriesDetailResponse(
                         id = updatedSeries.id.toString(),
                         sourceUrl = updatedSeries.sourceUrl,
                         title = updatedSeries.title,
@@ -354,7 +351,7 @@ fun Route.catalogRoutes(
                         downloadedChapters = downloadedChapters,
                         inLibrary = updatedSeries.inLibrary,
                         addedToLibraryAt = updatedSeries.addedToLibraryAt?.toString(),
-                        chapters = chapters.map { it.toCatalogChapterDto() }
+                        chapters = allChapters.map { it.toChapterDto() }
                     )
                 )
             } catch (e: Exception) {
@@ -373,10 +370,10 @@ fun Route.catalogRoutes(
     }
 }
 
-private fun CachedSeries.toCatalogDto(chapterRepository: ChapterRepositoryPort): CatalogSeriesDto {
+private fun Series.toSeriesDto(chapterRepository: ChapterRepositoryPort): SeriesDto {
     val totalChapters = chapterRepository.countBySeriesId(id).toInt()
     val downloadedChapters = chapterRepository.countDownloaded(id).toInt()
-    return CatalogSeriesDto(
+    return SeriesDto(
         id = id.toString(),
         sourceUrl = sourceUrl,
         title = title,
@@ -392,15 +389,17 @@ private fun CachedSeries.toCatalogDto(chapterRepository: ChapterRepositoryPort):
     )
 }
 
-private fun CachedChapter.toCatalogChapterDto(): CatalogChapterDto {
-    return CatalogChapterDto(
+private fun Chapter.toChapterDto(): ChapterDto {
+    return ChapterDto(
         id = id.toString(),
         sourceUrl = sourceUrl,
         title = title,
         chapterNumber = chapterNumber,
         publishDate = publishDate,
         pageCount = pageCount,
-        downloaded = downloadStatus == DownloadStatus.DOWNLOADED,
-        downloadStatus = downloadStatus.name
+        downloadStatus = downloadStatus.name,
+        downloadedAt = downloadedAt?.toString(),
+        filePath = filePath,
+        fileSize = fileSize
     )
 }

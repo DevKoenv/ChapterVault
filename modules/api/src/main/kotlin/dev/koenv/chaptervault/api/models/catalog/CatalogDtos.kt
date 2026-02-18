@@ -3,10 +3,10 @@ package dev.koenv.chaptervault.api.models.catalog
 import kotlinx.serialization.Serializable
 
 /**
- * Series summary for catalog/lookup results.
+ * Unified series DTO used across catalog and library endpoints.
  */
 @Serializable
-data class CatalogSeriesDto(
+data class SeriesDto(
     val id: String,
     val sourceUrl: String,
     val title: String,
@@ -22,10 +22,10 @@ data class CatalogSeriesDto(
 )
 
 /**
- * Detailed series response with chapters.
+ * Unified detailed series response with chapters.
  */
 @Serializable
-data class CatalogSeriesDetailResponse(
+data class SeriesDetailResponse(
     val id: String,
     val sourceUrl: String,
     val title: String,
@@ -38,22 +38,24 @@ data class CatalogSeriesDetailResponse(
     val downloadedChapters: Int,
     val inLibrary: Boolean,
     val addedToLibraryAt: String?,
-    val chapters: List<CatalogChapterDto>
+    val chapters: List<ChapterDto>
 )
 
 /**
- * Chapter info for catalog view.
+ * Unified chapter DTO used across catalog and library endpoints.
  */
 @Serializable
-data class CatalogChapterDto(
+data class ChapterDto(
     val id: String,
     val sourceUrl: String,
     val title: String,
     val chapterNumber: String,
     val publishDate: String?,
     val pageCount: Int?,
-    val downloaded: Boolean,
-    val downloadStatus: String
+    val downloadStatus: String,
+    val downloadedAt: String?,
+    val filePath: String?,
+    val fileSize: Long?
 )
 
 /**
@@ -107,6 +109,6 @@ data class CatalogLookupRequest(
  */
 @Serializable
 data class CatalogLookupResponse(
-    val series: List<CatalogSeriesDto>,
+    val series: List<SeriesDto>,
     val source: String
 )
