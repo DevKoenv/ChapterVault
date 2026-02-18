@@ -3,11 +3,13 @@ package dev.koenv.chaptervault.api.routes
 import dev.koenv.chaptervault.api.models.ErrorTypes
 import dev.koenv.chaptervault.api.models.Pagination
 import dev.koenv.chaptervault.api.models.ProblemDetail
+import dev.koenv.chaptervault.api.models.catalog.ChapterDto
+import dev.koenv.chaptervault.api.models.catalog.SeriesDetailResponse
+import dev.koenv.chaptervault.api.models.catalog.SeriesDto
 import dev.koenv.chaptervault.api.models.library.*
-import dev.koenv.chaptervault.core.repository.CachedChapter
-import dev.koenv.chaptervault.core.repository.CachedSeries
+import dev.koenv.chaptervault.core.repository.Chapter
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
-import dev.koenv.chaptervault.core.repository.DownloadStatus
+import dev.koenv.chaptervault.core.repository.Series
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import io.ktor.http.*
@@ -40,7 +42,7 @@ fun Route.libraryRoutes(
                 val paginatedSeries = librarySeries.drop(offset).take(limit)
 
                 val response = paginatedSeries.map { series ->
-                    series.toLibraryDto(chapterRepository)
+                    series.toSeriesDto(chapterRepository)
                 }
 
                 call.respond(
@@ -71,7 +73,7 @@ fun Route.libraryRoutes(
 
         /**
          * GET /api/v1/library/series/{seriesId}
-         * Get series with downloaded chapters only.
+         * Get series with all chapters and their download status.
          */
         get("/series/{seriesId}") {
             val seriesIdParam = call.parameters["seriesId"]
@@ -107,28 +109,13 @@ fun Route.libraryRoutes(
                 return@get
             }
 
-            // Only return downloaded chapters
-            val downloadedChapters = chapterRepository.findDownloaded(seriesId)
-
-            if (downloadedChapters.isEmpty()) {
-                call.respond(
-                    HttpStatusCode.NotFound,
-                    ProblemDetail(
-                        type = ErrorTypes.NOT_FOUND,
-                        title = "No Downloaded Content",
-                        status = 404,
-                        detail = "Series has no downloaded chapters",
-                        instance = call.request.local.uri
-                    )
-                )
-                return@get
-            }
-
-            val totalChapterCount = chapterRepository.countBySeriesId(seriesId).toInt()
+            val allChapters = chapterRepository.findBySeriesId(seriesId)
+            val totalChapters = allChapters.size
+            val downloadedChapters = chapterRepository.countDownloaded(seriesId).toInt()
 
             call.respond(
                 HttpStatusCode.OK,
-                LibrarySeriesDetailResponse(
+                SeriesDetailResponse(
                     id = series.id.toString(),
                     sourceUrl = series.sourceUrl,
                     title = series.title,
@@ -137,11 +124,11 @@ fun Route.libraryRoutes(
                     coverUrl = series.coverUrl,
                     tags = series.tags,
                     status = series.status.name,
-                    downloadedChapterCount = downloadedChapters.size,
-                    totalChapterCount = totalChapterCount,
+                    totalChapters = totalChapters,
+                    downloadedChapters = downloadedChapters,
                     inLibrary = series.inLibrary,
                     addedToLibraryAt = series.addedToLibraryAt?.toString(),
-                    chapters = downloadedChapters.map { it.toLibraryChapterDto() }
+                    chapters = allChapters.map { it.toChapterDto() }
                 )
             )
         }
@@ -265,11 +252,10 @@ fun Route.libraryRoutes(
     }
 }
 
-private fun CachedSeries.toLibraryDto(chapterRepository: ChapterRepositoryPort): LibrarySeriesDto {
-    val downloadedCount = chapterRepository.countDownloaded(id).toInt()
-    val totalCount = chapterRepository.countBySeriesId(id).toInt()
-
-    return LibrarySeriesDto(
+private fun Series.toSeriesDto(chapterRepository: ChapterRepositoryPort): SeriesDto {
+    val totalChapters = chapterRepository.countBySeriesId(id).toInt()
+    val downloadedChapters = chapterRepository.countDownloaded(id).toInt()
+    return SeriesDto(
         id = id.toString(),
         sourceUrl = sourceUrl,
         title = title,
@@ -278,21 +264,22 @@ private fun CachedSeries.toLibraryDto(chapterRepository: ChapterRepositoryPort):
         coverUrl = coverUrl,
         tags = tags,
         status = status.name,
-        downloadedChapterCount = downloadedCount,
-        totalChapterCount = totalCount,
+        totalChapters = totalChapters,
+        downloadedChapters = downloadedChapters,
         inLibrary = inLibrary,
         addedToLibraryAt = addedToLibraryAt?.toString()
     )
 }
 
-private fun CachedChapter.toLibraryChapterDto(): LibraryChapterDto {
-    return LibraryChapterDto(
+private fun Chapter.toChapterDto(): ChapterDto {
+    return ChapterDto(
         id = id.toString(),
         sourceUrl = sourceUrl,
         title = title,
         chapterNumber = chapterNumber,
         publishDate = publishDate,
         pageCount = pageCount,
+        downloadStatus = downloadStatus.name,
         downloadedAt = downloadedAt?.toString(),
         filePath = filePath,
         fileSize = fileSize

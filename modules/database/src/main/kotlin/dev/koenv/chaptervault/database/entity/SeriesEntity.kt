@@ -22,7 +22,6 @@ class SeriesEntity(id: EntityID<UUID>) : UUIDEntity(id = id) {
     var language by SeriesTable.language
     var inLibrary by SeriesTable.inLibrary
     var addedToLibraryAt by SeriesTable.addedToLibraryAt
-    var metadataFetchedAt by SeriesTable.metadataFetchedAt
     var createdAt by SeriesTable.createdAt
     var updatedAt by SeriesTable.updatedAt
     var tags by SeriesTagEntity via SeriesTagsTable

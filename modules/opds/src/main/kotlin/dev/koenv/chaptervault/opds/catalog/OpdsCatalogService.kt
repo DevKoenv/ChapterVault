@@ -1,9 +1,9 @@
 package dev.koenv.chaptervault.opds.catalog
 
-import dev.koenv.chaptervault.core.repository.CachedChapter
-import dev.koenv.chaptervault.core.repository.CachedSeries
+import dev.koenv.chaptervault.core.repository.Chapter
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
 import dev.koenv.chaptervault.core.repository.DownloadStatus
+import dev.koenv.chaptervault.core.repository.Series
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.opds.builder.opdsFeed
 import dev.koenv.chaptervault.opds.model.*
@@ -164,7 +164,6 @@ class OpdsCatalogService(
                     content(buildChapterDescription(chapter, series))
 
                     // Acquisition link for download
-                    val file = chapter.filePath?.let { File(it) }
                     val mimeType = getMimeTypeForFile(chapter.storageFormat)
 
                     link {
@@ -286,7 +285,7 @@ class OpdsCatalogService(
         return chapterRepository.countDownloaded(seriesId) > 0
     }
 
-    private fun buildSeriesDescription(series: CachedSeries): String {
+    private fun buildSeriesDescription(series: Series): String {
         val chapterCount = chapterRepository.countDownloaded(series.id)
         return buildString {
             append("Series: ${series.title}")
@@ -298,7 +297,7 @@ class OpdsCatalogService(
         }
     }
 
-    private fun buildChapterDescription(chapter: CachedChapter, series: CachedSeries): String {
+    private fun buildChapterDescription(chapter: Chapter, series: Series): String {
         return buildString {
             append("Chapter ${chapter.chapterNumber}: ${chapter.title}")
             chapter.pageCount?.let { append(" ($it pages)") }

@@ -17,37 +17,37 @@ interface ChapterRepositoryPort {
     /**
      * Find chapter by source URL
      */
-    fun findByUrl(url: String): CachedChapter?
+    fun findByUrl(url: String): Chapter?
 
     /**
      * Find chapter by internal ID
      */
-    fun findById(id: UUID): CachedChapter?
+    fun findById(id: UUID): Chapter?
 
     /**
      * Find all chapters for a series
      */
-    fun findBySeriesId(seriesId: UUID): List<CachedChapter>
+    fun findBySeriesId(seriesId: UUID): List<Chapter>
 
     /**
      * Find downloaded chapters for a series
      */
-    fun findDownloaded(seriesId: UUID): List<CachedChapter>
+    fun findDownloaded(seriesId: UUID): List<Chapter>
 
     /**
      * Find chapters not yet downloaded for a series
      */
-    fun findNotDownloaded(seriesId: UUID): List<CachedChapter>
+    fun findNotDownloaded(seriesId: UUID): List<Chapter>
 
     /**
      * Save or update chapter metadata
      */
-    fun save(metadata: ChapterMetadata, seriesId: UUID): CachedChapter
+    fun save(metadata: ChapterMetadata, seriesId: UUID): Chapter
 
     /**
      * Save multiple chapters at once
      */
-    fun saveAll(chapters: List<ChapterMetadata>, seriesId: UUID): List<CachedChapter>
+    fun saveAll(chapters: List<ChapterMetadata>, seriesId: UUID): List<Chapter>
 
     /**
      * Mark chapter as currently downloading
