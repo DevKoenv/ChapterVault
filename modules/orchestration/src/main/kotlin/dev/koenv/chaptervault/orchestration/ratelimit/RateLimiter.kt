@@ -78,9 +78,7 @@ class RateLimiter {
             waitForWindowSlot(state, config)
 
             // 4. Record this request timestamp (for minDelay and window tracking)
-            if (config.minDelay.isPositive() || config.maxRequestsPerWindow > 0) {
-                recordRequest(state)
-            }
+            recordRequest(state)
 
             // 5. Execute the actual request
             return block()
@@ -95,7 +93,7 @@ class RateLimiter {
      * Uses connector name as key for consistency.
      */
     private fun getOrCreateState(connector: Connector): ConnectorState {
-        val key = connector.config.name
+        val key = connector.config.id
         return connectorStates.getOrPut(key) {
             ConnectorState(
                 config = connector.config.rateLimitConfig,
@@ -180,7 +178,9 @@ class RateLimiter {
         state.mutex.withLock {
             val now = System.currentTimeMillis()
             state.lastRequestTime = now
-            state.requestTimestamps.addLast(now)
+            if (state.config.maxRequestsPerWindow > 0) {
+                state.requestTimestamps.addLast(now)
+            }
         }
     }
 

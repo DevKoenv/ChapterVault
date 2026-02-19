@@ -38,6 +38,11 @@ internal class DomainBucket(
     private val baseConfig: RateLimitConfig
 ) {
 
+    companion object {
+        /** Floor delay (ms) applied when adaptiveDelayMultiplier is elevated but baseConfig.minDelay is zero. */
+        private const val ADAPTIVE_FLOOR_DELAY_MS = 100L
+    }
+
     private val logger = LoggerFactory.getLogger(DomainBucket::class.java)
 
     private val concurrencySemaphore = Semaphore(baseConfig.maxConcurrent)
@@ -61,9 +66,7 @@ internal class DomainBucket(
             waitForBackoff()
             waitForMinDelay()
             waitForWindowSlot()
-            if (baseConfig.minDelay.isPositive() || baseConfig.maxRequestsPerWindow > 0) {
-                recordRequest()
-            }
+            recordRequest()
             return block()
         } finally {
             concurrencySemaphore.release()
@@ -133,7 +136,12 @@ internal class DomainBucket(
         if (!baseConfig.minDelay.isPositive() && adaptiveDelayMultiplier <= 1.0) return
 
         val delayNeeded = stateMutex.withLock {
-            val effectiveMinDelayMs = (baseConfig.minDelay.inWholeMilliseconds * adaptiveDelayMultiplier).toLong()
+            val baseDelayMs = if (baseConfig.minDelay.isPositive()) {
+                baseConfig.minDelay.inWholeMilliseconds
+            } else {
+                ADAPTIVE_FLOOR_DELAY_MS
+            }
+            val effectiveMinDelayMs = (baseDelayMs * adaptiveDelayMultiplier).toLong()
             val now = System.currentTimeMillis()
             val timeSinceLast = now - lastRequestTime
             maxOf(0L, effectiveMinDelayMs - timeSinceLast)
@@ -185,7 +193,9 @@ internal class DomainBucket(
         stateMutex.withLock {
             val now = System.currentTimeMillis()
             lastRequestTime = now
-            requestTimestamps.addLast(now)
+            if (baseConfig.maxRequestsPerWindow > 0) {
+                requestTimestamps.addLast(now)
+            }
         }
     }
 

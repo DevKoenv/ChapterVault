@@ -98,18 +98,19 @@ fun main() {
     val rateLimiter = RateLimiter()
     for (connector in connectorRegistry.getAllConnectors()) {
         val connConfig = connector.config
-        val override = configService.getConnectorConfig(connConfig.name)
+        val override = configService.getConnectorConfig(connConfig.id)
+            ?: configService.getConnectorConfig(connConfig.name)
 
         val effectiveRateLimit = override?.rateLimit?.applyTo(connConfig.rateLimitConfig)
             ?: connConfig.rateLimitConfig
         val effectiveSiteLimits = override?.siteRateLimits?.applyTo(connConfig.siteRateLimits)
             ?: connConfig.siteRateLimits
 
-        rateLimiter.registerConnector(connConfig.name, effectiveRateLimit)
-        siteRateLimiter.registerConnector(connConfig.name, effectiveSiteLimits)
+        rateLimiter.registerConnector(connConfig.id, effectiveRateLimit)
+        siteRateLimiter.registerConnector(connConfig.id, effectiveSiteLimits)
 
         if (override?.rateLimit != null || override?.siteRateLimits != null) {
-            logger.info { "Applied rate limit config overrides for connector: ${connConfig.name}" }
+            logger.info { "Applied rate limit config overrides for connector: ${connConfig.name} (${connConfig.id})" }
         }
     }
 
