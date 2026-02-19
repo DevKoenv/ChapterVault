@@ -284,10 +284,13 @@ data class FetchResponse(
 
 /**
  * Exception thrown on fetch errors.
+ *
+ * @param retryAfterSeconds Parsed `Retry-After` header value in seconds (for 429 responses).
  */
 class FetchException(
     message: String,
     val statusCode: Int? = null,
     val responseBody: String? = null,
+    val retryAfterSeconds: Long? = null,
     cause: Throwable? = null
 ) : Exception(message, cause)

@@ -44,7 +44,6 @@ object ErrorTypes {
     const val CONFLICT = "/errors/conflict"
     const val CONNECTOR_UNAVAILABLE = "/errors/connector-unavailable"
     const val CONNECTOR_NOT_FOUND = "/errors/connector-not-found"
-    const val RATE_LIMITED = "/errors/rate-limited"
     const val TASK_FAILED = "/errors/task-failed"
     const val FILE_NOT_FOUND = "/errors/file-not-found"
     const val INSUFFICIENT_STORAGE = "/errors/insufficient-storage"
