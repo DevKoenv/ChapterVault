@@ -119,14 +119,10 @@ class LocalExecutor(
      */
     private suspend fun <T> withSiteRateLimit(
         url: String,
-        scope: RateLimitScope,
         bucketTag: String?,
         context: ExecutionContext,
         block: suspend () -> T
     ): T {
-        if (scope != RateLimitScope.SITE && scope != RateLimitScope.CONNECTOR_AND_SITE) {
-            return block()
-        }
         val limiter = siteRateLimiter ?: return block()
         return limiter.withRateLimit(url, context.connectorName, bucketTag, block)
     }
@@ -161,7 +157,7 @@ class LocalExecutor(
         val session = getHttpSession(context)
         val options = buildFetchOptions(instruction.headers, instruction.referer, instruction.timeout, context)
 
-        val response = withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        val response = withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             session.get(instruction.url, options).also {
                 handleRateLimitResponse(instruction.url, instruction.rateLimitBucket, context, it.statusCode, it.headers)
             }
@@ -179,7 +175,7 @@ class LocalExecutor(
         headers["Accept"] = "application/json"
         val options = buildFetchOptions(headers, instruction.referer, instruction.timeout, context)
 
-        val response = withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        val response = withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             session.get(instruction.url, options).also {
                 handleRateLimitResponse(instruction.url, instruction.rateLimitBucket, context, it.statusCode, it.headers)
             }
@@ -195,14 +191,14 @@ class LocalExecutor(
         val session = getHttpSession(context)
         val options = buildFetchOptions(instruction.headers, instruction.referer, instruction.timeout, context)
 
-        return withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        return withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             try {
                 val bytes = session.downloadBytes(instruction.url, options)
                 siteRateLimiter?.reportSuccess(instruction.url, context.connectorName, instruction.rateLimitBucket)
                 BytesResult.success(instruction.id, bytes, guessMimeType(instruction.url))
             } catch (e: FetchException) {
                 if (e.statusCode == 429) {
-                    siteRateLimiter?.report429(instruction.url, context.connectorName, instruction.rateLimitBucket, null)
+                    siteRateLimiter?.report429(instruction.url, context.connectorName, instruction.rateLimitBucket, e.retryAfterSeconds)
                 }
                 BytesResult.failure(instruction.id, e.message ?: "Download failed")
             } catch (e: Exception) {
@@ -215,7 +211,7 @@ class LocalExecutor(
         val session = getHttpSession(context)
         val options = buildFetchOptions(instruction.headers, null, instruction.timeout, context)
 
-        val response = withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        val response = withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             session.postForm(instruction.url, instruction.formData, options).also {
                 handleRateLimitResponse(instruction.url, instruction.rateLimitBucket, context, it.statusCode, it.headers)
             }
@@ -233,7 +229,7 @@ class LocalExecutor(
         headers["Content-Type"] = "application/json"
         val options = buildFetchOptions(headers, null, instruction.timeout, context)
 
-        val response = withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        val response = withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             session.post(instruction.url, RequestBody.json(instruction.jsonBody), options).also {
                 handleRateLimitResponse(instruction.url, instruction.rateLimitBucket, context, it.statusCode, it.headers)
             }
@@ -253,7 +249,7 @@ class LocalExecutor(
         val session = getHttpSession(context)
         val options = buildFetchOptions(instruction.headers, instruction.referer, instruction.timeout, context)
 
-        val response = withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        val response = withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             session.get(instruction.url, options).also {
                 handleRateLimitResponse(instruction.url, instruction.rateLimitBucket, context, it.statusCode, it.headers)
             }
@@ -270,7 +266,7 @@ class LocalExecutor(
         val session = getHttpSession(context)
         val options = buildFetchOptions(instruction.headers, instruction.referer, instruction.timeout, context)
 
-        val response = withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        val response = withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             session.get(instruction.url, options).also {
                 handleRateLimitResponse(instruction.url, instruction.rateLimitBucket, context, it.statusCode, it.headers)
             }
@@ -324,14 +320,14 @@ class LocalExecutor(
         repeat(maxRetries + 1) { attempt ->
             try {
                 val options = buildFetchOptions(item.headers, item.referer, null, context)
-                val bytes = withSiteRateLimit(item.url, item.rateLimitScope, item.rateLimitBucket, context) {
+                val bytes = withSiteRateLimit(item.url, item.rateLimitBucket, context) {
                     try {
                         val data = session.downloadBytes(item.url, options)
                         siteRateLimiter?.reportSuccess(item.url, context.connectorName, item.rateLimitBucket)
                         data
                     } catch (e: FetchException) {
                         if (e.statusCode == 429) {
-                            siteRateLimiter?.report429(item.url, context.connectorName, item.rateLimitBucket, null)
+                            siteRateLimiter?.report429(item.url, context.connectorName, item.rateLimitBucket, e.retryAfterSeconds)
                         }
                         throw e
                     }
@@ -454,7 +450,7 @@ class LocalExecutor(
             WaitCondition.NETWORK_IDLE -> PageLoadState.NETWORK_IDLE
         }
 
-        val content = withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        val content = withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             session.navigate(instruction.url, waitUntil).also {
                 handleRateLimitResponse(instruction.url, instruction.rateLimitBucket, context, it.statusCode ?: 200, emptyMap())
             }
@@ -551,7 +547,7 @@ class LocalExecutor(
 
     private suspend fun executeBrowserDownloadFile(instruction: BrowserDownloadFile, context: ExecutionContext): BytesResult {
         val session = getBrowserSession(context)
-        val bytes = withSiteRateLimit(instruction.url, instruction.rateLimitScope, instruction.rateLimitBucket, context) {
+        val bytes = withSiteRateLimit(instruction.url, instruction.rateLimitBucket, context) {
             session.downloadFile(instruction.url, instruction.referer).also {
                 siteRateLimiter?.reportSuccess(instruction.url, context.connectorName, instruction.rateLimitBucket)
             }

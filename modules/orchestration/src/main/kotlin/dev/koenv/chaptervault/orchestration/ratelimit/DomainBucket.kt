@@ -3,7 +3,6 @@ package dev.koenv.chaptervault.orchestration.ratelimit
 import dev.koenv.chaptervault.core.ratelimit.RateLimitConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.milliseconds
@@ -26,16 +25,21 @@ data class BucketSnapshot(
 )
 
 /**
- * A single rate limit bucket with concurrency control, minimum delay,
- * sliding window rate limiting, and adaptive backoff from 429 responses.
+ * A site-level rate limit bucket with adaptive backoff from 429 responses.
+ *
+ * Delegates concurrency control, minimum delay, and sliding window enforcement to
+ * [SlidingWindowLimiter], and adds adaptive backoff (AIMD) on top.
  *
  * Each bucket corresponds to a host, named bucket tag, or domain group.
- * The semaphore is held for the duration of the actual HTTP request,
- * ensuring correct concurrency control.
+ *
+ * @param name Human-readable bucket name for logging
+ * @param baseConfig Rate limit configuration
+ * @param timeSource Injectable time provider for testability
  */
 internal class DomainBucket(
     val name: String,
-    private val baseConfig: RateLimitConfig
+    private val baseConfig: RateLimitConfig,
+    private val timeSource: () -> Long = System::currentTimeMillis
 ) {
 
     companion object {
@@ -45,15 +49,18 @@ internal class DomainBucket(
 
     private val logger = LoggerFactory.getLogger(DomainBucket::class.java)
 
-    private val concurrencySemaphore = Semaphore(baseConfig.maxConcurrent)
-    private val stateMutex = Mutex()
-    private var lastRequestTime: Long = 0L
-    private val requestTimestamps = ArrayDeque<Long>()
+    private val limiter = SlidingWindowLimiter(name, baseConfig, timeSource)
 
-    // Adaptive backoff state from 429 responses
+    // Adaptive backoff state (protected by its own mutex, separate from the limiter's state)
+    private val backoffMutex = Mutex()
     private var backoffUntil: Long = 0L
     private var adaptiveDelayMultiplier: Double = 1.0
     private var consecutive429Count: Int = 0
+
+    /** Timestamp of last access, used for stale bucket eviction. */
+    @Volatile
+    var lastAccessedAt: Long = timeSource()
+        private set
 
     /**
      * Execute a block while holding the rate limit permit.
@@ -61,15 +68,12 @@ internal class DomainBucket(
      * correct concurrency control over the actual HTTP request.
      */
     suspend fun <T> withPermit(block: suspend () -> T): T {
-        concurrencySemaphore.acquire()
-        try {
-            waitForBackoff()
-            waitForMinDelay()
-            waitForWindowSlot()
-            recordRequest()
-            return block()
-        } finally {
-            concurrencySemaphore.release()
+        lastAccessedAt = timeSource()
+        return limiter.withPermit(
+            effectiveMinDelayMs = computeEffectiveMinDelay(),
+            preAction = { waitForBackoff() }
+        ) {
+            block()
         }
     }
 
@@ -83,9 +87,9 @@ internal class DomainBucket(
      * @param retryAfterSeconds Parsed Retry-After header value, or null.
      */
     suspend fun report429(retryAfterSeconds: Long?) {
-        stateMutex.withLock {
+        backoffMutex.withLock {
             consecutive429Count++
-            val now = System.currentTimeMillis()
+            val now = timeSource()
 
             if (retryAfterSeconds != null && retryAfterSeconds > 0) {
                 backoffUntil = now + (retryAfterSeconds * 1000)
@@ -115,16 +119,32 @@ internal class DomainBucket(
      * Report a successful response, allowing adaptive backoff to recover.
      */
     suspend fun reportSuccess() {
-        stateMutex.withLock {
+        backoffMutex.withLock {
             consecutive429Count = 0
             // Additive decrease back toward baseline
             adaptiveDelayMultiplier = (adaptiveDelayMultiplier - 0.1).coerceAtLeast(1.0)
         }
     }
 
+    /**
+     * Compute the effective minimum delay in ms, applying the adaptive multiplier.
+     * Returns null when no delay is needed (base delay is zero and multiplier is at baseline).
+     */
+    private suspend fun computeEffectiveMinDelay(): Long? {
+        val multiplier = backoffMutex.withLock { adaptiveDelayMultiplier }
+        if (!baseConfig.minDelay.isPositive() && multiplier <= 1.0) return null
+
+        val baseDelayMs = if (baseConfig.minDelay.isPositive()) {
+            baseConfig.minDelay.inWholeMilliseconds
+        } else {
+            ADAPTIVE_FLOOR_DELAY_MS
+        }
+        return (baseDelayMs * multiplier).toLong()
+    }
+
     private suspend fun waitForBackoff() {
-        val waitUntil = stateMutex.withLock { backoffUntil }
-        val now = System.currentTimeMillis()
+        val waitUntil = backoffMutex.withLock { backoffUntil }
+        val now = timeSource()
         if (waitUntil > now) {
             val waitMs = waitUntil - now
             logger.debug("Bucket [{}]: waiting {}ms for 429 backoff", name, waitMs)
@@ -132,90 +152,23 @@ internal class DomainBucket(
         }
     }
 
-    private suspend fun waitForMinDelay() {
-        if (!baseConfig.minDelay.isPositive() && adaptiveDelayMultiplier <= 1.0) return
-
-        val delayNeeded = stateMutex.withLock {
-            val baseDelayMs = if (baseConfig.minDelay.isPositive()) {
-                baseConfig.minDelay.inWholeMilliseconds
-            } else {
-                ADAPTIVE_FLOOR_DELAY_MS
-            }
-            val effectiveMinDelayMs = (baseDelayMs * adaptiveDelayMultiplier).toLong()
-            val now = System.currentTimeMillis()
-            val timeSinceLast = now - lastRequestTime
-            maxOf(0L, effectiveMinDelayMs - timeSinceLast)
+    internal suspend fun snapshot(): BucketSnapshot {
+        val windowSnapshot = limiter.snapshot()
+        return backoffMutex.withLock {
+            val now = timeSource()
+            BucketSnapshot(
+                name = name,
+                maxConcurrent = windowSnapshot.maxConcurrent,
+                minDelayMs = windowSnapshot.minDelayMs,
+                maxRequestsPerWindow = windowSnapshot.maxRequestsPerWindow,
+                windowDurationMs = windowSnapshot.windowDurationMs,
+                lastRequestTime = windowSnapshot.lastRequestTime,
+                requestsInCurrentWindow = windowSnapshot.requestsInCurrentWindow,
+                backoffUntil = backoffUntil,
+                isInBackoff = backoffUntil > now,
+                adaptiveDelayMultiplier = adaptiveDelayMultiplier,
+                consecutive429Count = consecutive429Count
+            )
         }
-
-        if (delayNeeded > 0) {
-            logger.debug("Bucket [{}]: waiting {}ms for minDelay", name, delayNeeded)
-            delay(delayNeeded.milliseconds)
-        }
-    }
-
-    private suspend fun waitForWindowSlot() {
-        if (baseConfig.maxRequestsPerWindow <= 0) return
-
-        val maxRequests = baseConfig.maxRequestsPerWindow
-        val windowDurationMs = baseConfig.windowDuration.inWholeMilliseconds
-
-        while (true) {
-            val waitTime = stateMutex.withLock {
-                val now = System.currentTimeMillis()
-                val windowStart = now - windowDurationMs
-
-                // Remove expired timestamps from the sliding window
-                while (requestTimestamps.isNotEmpty() &&
-                    requestTimestamps.first() < windowStart
-                ) {
-                    requestTimestamps.removeFirst()
-                }
-
-                if (requestTimestamps.size < maxRequests) {
-                    0L
-                } else {
-                    val oldestTimestamp = requestTimestamps.first()
-                    val expiresAt = oldestTimestamp + windowDurationMs
-                    val waitNeeded = expiresAt - now
-                    // Add small buffer to avoid race conditions
-                    maxOf(1L, waitNeeded + 10)
-                }
-            }
-
-            if (waitTime == 0L) break
-
-            logger.debug("Bucket [{}]: waiting {}ms for window slot", name, waitTime)
-            delay(waitTime.milliseconds)
-        }
-    }
-
-    private suspend fun recordRequest() {
-        stateMutex.withLock {
-            val now = System.currentTimeMillis()
-            lastRequestTime = now
-            if (baseConfig.maxRequestsPerWindow > 0) {
-                requestTimestamps.addLast(now)
-            }
-        }
-    }
-
-    internal suspend fun snapshot(): BucketSnapshot = stateMutex.withLock {
-        val now = System.currentTimeMillis()
-        val windowStart = now - baseConfig.windowDuration.inWholeMilliseconds
-        val currentWindowCount = requestTimestamps.count { it >= windowStart }
-
-        BucketSnapshot(
-            name = name,
-            maxConcurrent = baseConfig.maxConcurrent,
-            minDelayMs = baseConfig.minDelay.inWholeMilliseconds,
-            maxRequestsPerWindow = baseConfig.maxRequestsPerWindow,
-            windowDurationMs = baseConfig.windowDuration.inWholeMilliseconds,
-            lastRequestTime = lastRequestTime,
-            requestsInCurrentWindow = currentWindowCount,
-            backoffUntil = backoffUntil,
-            isInBackoff = backoffUntil > now,
-            adaptiveDelayMultiplier = adaptiveDelayMultiplier,
-            consecutive429Count = consecutive429Count
-        )
     }
 }

@@ -5,6 +5,8 @@ import dev.koenv.chaptervault.core.ratelimit.SiteRateLimits
 import org.slf4j.LoggerFactory
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Snapshot of a [RateLimitConfig] for external consumption.
@@ -44,8 +46,12 @@ data class SiteRateLimiterStatus(
  *
  * Supports adaptive backoff: when a 429 response is received, [report429] increases
  * the delay for that bucket using AIMD (Additive Increase / Multiplicative Decrease).
+ *
+ * @param timeSource Injectable time provider for testability.
  */
-class SiteRateLimiter {
+class SiteRateLimiter(
+    private val timeSource: () -> Long = System::currentTimeMillis
+) {
 
     private val logger = LoggerFactory.getLogger(SiteRateLimiter::class.java)
 
@@ -145,6 +151,38 @@ class SiteRateLimiter {
     }
 
     // ========================================================================
+    // Bucket Eviction
+    // ========================================================================
+
+    /**
+     * Remove buckets that have not been accessed within [maxIdleDuration].
+     *
+     * Call periodically to prevent unbounded growth of the bucket map when many
+     * different hosts are accessed over time.
+     *
+     * @return Number of buckets evicted.
+     */
+    fun evictStaleBuckets(maxIdleDuration: Duration = 10.minutes): Int {
+        val cutoff = timeSource() - maxIdleDuration.inWholeMilliseconds
+        var evicted = 0
+
+        val iterator = buckets.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.value.lastAccessedAt < cutoff) {
+                iterator.remove()
+                evicted++
+                logger.debug("Evicted stale bucket [{}]", entry.key)
+            }
+        }
+
+        if (evicted > 0) {
+            logger.info("Evicted {} stale rate limit buckets (idle > {})", evicted, maxIdleDuration)
+        }
+        return evicted
+    }
+
+    // ========================================================================
     // Bucket Resolution
     // ========================================================================
 
@@ -185,7 +223,7 @@ class SiteRateLimiter {
     private fun getOrCreateBucket(key: String, config: RateLimitConfig): DomainBucket {
         return buckets.computeIfAbsent(key) {
             logger.debug("Creating rate limit bucket [{}]: {}", key, config)
-            DomainBucket(key, config)
+            DomainBucket(key, config, timeSource)
         }
     }
 
