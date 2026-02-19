@@ -65,8 +65,8 @@ class ExampleBrowserPlanConnector(
 
     override fun getExecutionContext(): ExecutionContext {
         return ExecutionContext(
-            connectorName = config.name,
-            sessionId = "connector:${config.name}",
+            connectorName = config.id,
+            sessionId = "connector:${config.id}",
             useBrowser = true
         )
     }

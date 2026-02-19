@@ -89,8 +89,8 @@ interface Connector {
      */
     fun getExecutionContext(): ExecutionContext {
         return ExecutionContext(
-            connectorName = config.name,
-            sessionId = "connector:${config.name}"
+            connectorName = config.id,
+            sessionId = "connector:${config.id}"
         )
     }
 
