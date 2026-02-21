@@ -2,6 +2,8 @@ package dev.koenv.chaptervault.app
 
 import dev.koenv.chaptervault.api.ApiConfiguration
 import dev.koenv.chaptervault.api.configureApi
+import dev.koenv.chaptervault.connectors.impl.ExampleBrowserPlanConnector
+import dev.koenv.chaptervault.connectors.impl.ExamplePlanConnector
 import dev.koenv.chaptervault.connectors.impl.MockConnector
 import dev.koenv.chaptervault.connectors.impl.SampleConnector
 import dev.koenv.chaptervault.connectors.registry.ConnectorRegistryImpl
@@ -87,6 +89,8 @@ fun main() {
         logger.info { "Development mode: registering mock connectors" }
         connectorRegistry.register(MockConnector(executor))
         connectorRegistry.register(SampleConnector(executor))
+        connectorRegistry.register(ExamplePlanConnector(executor))
+        connectorRegistry.register(ExampleBrowserPlanConnector(executor))
     }
 
     // TODO: Register production connectors here
