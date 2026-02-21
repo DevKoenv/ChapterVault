@@ -55,9 +55,12 @@ class SiteRateLimiter(
 
     private val logger = LoggerFactory.getLogger(SiteRateLimiter::class.java)
 
-    // Named bucket configs per connector: "connectorName:bucketTag" -> BucketConfig.limits
-    // null value means unlimited (bypass)
-    private val namedBucketConfigs = ConcurrentHashMap<String, RateLimitConfig?>()
+    // Named bucket configs per connector: "connectorName:bucketTag" -> RateLimitConfig (limited)
+    private val namedBucketLimits = ConcurrentHashMap<String, RateLimitConfig>()
+
+    // Named bucket keys where rate limiting is bypassed entirely (unlimited)
+    // Stored separately because ConcurrentHashMap does not permit null values
+    private val unlimitedBuckets: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     // Per-connector default limits for auto-created host buckets
     private val connectorDefaultLimits = ConcurrentHashMap<String, RateLimitConfig>()
@@ -83,12 +86,14 @@ class SiteRateLimiter(
 
         config.buckets.forEach { (bucketName, bucketConfig) ->
             val key = "$connectorName:$bucketName"
-            namedBucketConfigs[key] = bucketConfig.limits
-            logger.debug(
-                "Registered named bucket [{}]: {}",
-                key,
-                if (bucketConfig.limits == null) "unlimited" else bucketConfig.limits
-            )
+            val limits = bucketConfig.limits  // local val required for smart cast across module boundary
+            if (limits == null) {
+                unlimitedBuckets.add(key)
+                logger.debug("Registered named bucket [{}]: unlimited", key)
+            } else {
+                namedBucketLimits[key] = limits
+                logger.debug("Registered named bucket [{}]: {}", key, limits)
+            }
         }
 
         logger.debug(
@@ -194,12 +199,11 @@ class SiteRateLimiter(
         // 1. Check for named bucket tag
         if (bucketTag != null && connectorName != null) {
             val configKey = "$connectorName:$bucketTag"
-            if (namedBucketConfigs.containsKey(configKey)) {
-                val limits = namedBucketConfigs[configKey]
-                if (limits == null) {
-                    // Unlimited bucket — bypass rate limiting
-                    return null
-                }
+            if (unlimitedBuckets.contains(configKey)) {
+                return null // Unlimited bucket — bypass rate limiting
+            }
+            val limits = namedBucketLimits[configKey]
+            if (limits != null) {
                 return getOrCreateBucket("tag:$configKey", limits)
             }
             // Named bucket not found for this connector — fall through to host-based
@@ -228,16 +232,17 @@ class SiteRateLimiter(
     }
 
     suspend fun getStatus(): SiteRateLimiterStatus {
-        val configs = namedBucketConfigs.map { (key, config) ->
-            key to config?.let {
-                RateLimitConfigSnapshot(
-                    minDelayMs = it.minDelay.inWholeMilliseconds,
-                    maxConcurrent = it.maxConcurrent,
-                    maxRequestsPerWindow = it.maxRequestsPerWindow,
-                    windowDurationMs = it.windowDuration.inWholeMilliseconds
-                )
+        val configs = buildMap<String, RateLimitConfigSnapshot?> {
+            namedBucketLimits.forEach { (key, config) ->
+                put(key, RateLimitConfigSnapshot(
+                    minDelayMs = config.minDelay.inWholeMilliseconds,
+                    maxConcurrent = config.maxConcurrent,
+                    maxRequestsPerWindow = config.maxRequestsPerWindow,
+                    windowDurationMs = config.windowDuration.inWholeMilliseconds
+                ))
             }
-        }.toMap()
+            unlimitedBuckets.forEach { key -> put(key, null) }
+        }
 
         val snapshots = buckets.values.map { it.snapshot() }
 
