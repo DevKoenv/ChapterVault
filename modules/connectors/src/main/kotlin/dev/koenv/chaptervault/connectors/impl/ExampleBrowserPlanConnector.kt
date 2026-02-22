@@ -271,7 +271,7 @@ class ExampleBrowserPlanConnector(
 
         // Step 2: Download pages using bulkDownload (more efficient than individual browser downloads)
         val downloadPlan = executionPlan {
-            bulkDownload(maxConcurrency = 3, retries = 2, id = "pages") {
+            bulkDownload(retries = 2, id = "pages") {
                 pageUrls.forEachIndexed { index, url ->
                     item("page-$index", url, referer = chapterUrl)
                 }
