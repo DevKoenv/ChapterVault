@@ -13,7 +13,10 @@ import kotlin.time.Duration.Companion.seconds
  *         maxConcurrent = 2
  *         minDelay = 500.milliseconds
  *     }
+ *     // Bypass rate limiting entirely for CDN assets
  *     bucket("cdn") { unlimited() }
+ *     // Unlimited baseline but cap parallel connections
+ *     bucket("images") { unlimited(); maxConcurrent = 8 }
  *     bucket("api") {
  *         maxConcurrent = 4
  *         minDelay = 100.milliseconds
@@ -63,41 +66,62 @@ class SiteRateLimitsBuilder {
 
 @SiteRateLimitsDsl
 class BucketBuilder {
-    private var limits: RateLimitConfig? = RateLimitConfig()
+    private var limits: RateLimitConfig = RateLimitConfig()
     private var isUnlimited = false
 
     var minDelay: Duration
-        get() = limits?.minDelay ?: 1.seconds
-        set(value) { ensureLimits(); limits = limits!!.copy(minDelay = value) }
+        get() = limits.minDelay
+        set(value) { limits = ensureUnlimitedBase().copy(minDelay = value) }
 
     var maxConcurrent: Int
-        get() = limits?.maxConcurrent ?: 1
-        set(value) { ensureLimits(); limits = limits!!.copy(maxConcurrent = value) }
+        get() = limits.maxConcurrent
+        set(value) { limits = ensureUnlimitedBase().copy(maxConcurrent = value) }
 
     var maxRequestsPerWindow: Int
-        get() = limits?.maxRequestsPerWindow ?: 60
-        set(value) { ensureLimits(); limits = limits!!.copy(maxRequestsPerWindow = value) }
+        get() = limits.maxRequestsPerWindow
+        set(value) { limits = ensureUnlimitedBase().copy(maxRequestsPerWindow = value) }
 
     var windowDuration: Duration
-        get() = limits?.windowDuration ?: 60.seconds
-        set(value) { ensureLimits(); limits = limits!!.copy(windowDuration = value) }
+        get() = limits.windowDuration
+        set(value) { limits = ensureUnlimitedBase().copy(windowDuration = value) }
 
     /**
-     * Mark this bucket as unlimited — requests bypass rate limiting entirely.
+     * Remove all rate limits from this bucket.
+     *
+     * Called alone, the bucket is bypassed entirely — requests execute with no semaphore,
+     * no delay, and no window tracking (zero overhead).
+     *
+     * Any property set **after** this call layers a specific constraint on top of the
+     * fully-permissive baseline, leaving all other dimensions unrestricted:
+     * ```kotlin
+     * bucket("images") { unlimited(); maxConcurrent = 8 }  // concurrency-only cap
+     * bucket("cdn")    { unlimited() }                      // true bypass, zero overhead
+     * ```
      */
     fun unlimited() {
         isUnlimited = true
-        limits = null
+        limits = UNLIMITED_BASE
     }
 
-    private fun ensureLimits() {
-        if (limits == null) {
-            limits = RateLimitConfig()
-        }
-        isUnlimited = false
+    // When a field is set after unlimited(), keep the permissive base so only the
+    // explicitly overridden dimension is constrained.
+    private fun ensureUnlimitedBase(): RateLimitConfig =
+        if (isUnlimited) limits else limits.also { isUnlimited = false }
+
+    fun build(): BucketConfig {
+        // unlimited() with no subsequent overrides → bypass the rate limiter entirely
+        if (isUnlimited && limits == UNLIMITED_BASE) return BucketConfig(limits = null)
+        return BucketConfig(limits = limits)
     }
 
-    fun build(): BucketConfig = BucketConfig(limits = if (isUnlimited) null else limits)
+    companion object {
+        val UNLIMITED_BASE = RateLimitConfig(
+            minDelay = Duration.ZERO,
+            maxConcurrent = Int.MAX_VALUE,
+            maxRequestsPerWindow = 0,
+            windowDuration = 60.seconds
+        )
+    }
 }
 
 @SiteRateLimitsDsl

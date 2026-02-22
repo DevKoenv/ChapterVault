@@ -58,9 +58,9 @@ class SiteRateLimiter(
     // Named bucket configs per connector: "connectorName:bucketTag" -> RateLimitConfig (limited)
     private val namedBucketLimits = ConcurrentHashMap<String, RateLimitConfig>()
 
-    // Named bucket keys where rate limiting is bypassed entirely (unlimited)
+    // Named bucket keys where rate limiting is bypassed entirely (bypass() in DSL)
     // Stored separately because ConcurrentHashMap does not permit null values
-    private val unlimitedBuckets: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val bypassedBuckets: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     // Per-connector default limits for auto-created host buckets
     private val connectorDefaultLimits = ConcurrentHashMap<String, RateLimitConfig>()
@@ -88,8 +88,8 @@ class SiteRateLimiter(
             val key = "$connectorName:$bucketName"
             val limits = bucketConfig.limits  // local val required for smart cast across module boundary
             if (limits == null) {
-                unlimitedBuckets.add(key)
-                logger.debug("Registered named bucket [{}]: unlimited", key)
+                bypassedBuckets.add(key)
+                logger.debug("Registered named bucket [{}]: bypassed (no rate limiting)", key)
             } else {
                 namedBucketLimits[key] = limits
                 logger.debug("Registered named bucket [{}]: {}", key, limits)
@@ -199,8 +199,8 @@ class SiteRateLimiter(
         // 1. Check for named bucket tag
         if (bucketTag != null && connectorName != null) {
             val configKey = "$connectorName:$bucketTag"
-            if (unlimitedBuckets.contains(configKey)) {
-                return null // Unlimited bucket — bypass rate limiting
+            if (bypassedBuckets.contains(configKey)) {
+                return null // Bypassed bucket — skip rate limiting entirely
             }
             val limits = namedBucketLimits[configKey]
             if (limits != null) {
@@ -241,7 +241,7 @@ class SiteRateLimiter(
                     windowDurationMs = config.windowDuration.inWholeMilliseconds
                 ))
             }
-            unlimitedBuckets.forEach { key -> put(key, null) }
+            bypassedBuckets.forEach { key -> put(key, null) }
         }
 
         val snapshots = buckets.values.map { it.snapshot() }

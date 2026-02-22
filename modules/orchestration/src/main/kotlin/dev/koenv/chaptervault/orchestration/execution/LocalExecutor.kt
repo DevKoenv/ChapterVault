@@ -17,8 +17,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
+
 import org.slf4j.LoggerFactory
 
 /**
@@ -287,15 +286,15 @@ class LocalExecutor(
         }
 
         val session = getHttpSession(context)
-        val semaphore = Semaphore(instruction.maxConcurrency)
         val results = mutableMapOf<String, DownloadItemResult>()
 
+        // Concurrency is governed by the rate-limit bucket on each item.
+        // All coroutines are launched immediately; the bucket's semaphore
+        // inside withSiteRateLimit is the single gate on HTTP in-flight count.
         coroutineScope {
             val deferred = instruction.items.map { item ->
                 async {
-                    semaphore.withPermit {
-                        downloadItemWithRetry(session, item, instruction.retries, instruction.retryDelayMs, context)
-                    }
+                    downloadItemWithRetry(session, item, instruction.retries, instruction.retryDelayMs, context)
                 }
             }
 

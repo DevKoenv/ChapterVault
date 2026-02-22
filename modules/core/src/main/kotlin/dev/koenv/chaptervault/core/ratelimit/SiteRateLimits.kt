@@ -35,7 +35,10 @@ data class SiteRateLimits(
 data class BucketConfig(
     /**
      * Rate limits for this bucket.
-     * Null means unlimited — requests routed to this bucket bypass rate limiting entirely.
+     *
+     * Null means the bucket is bypassed — requests execute with no semaphore, no delay,
+     * and no window tracking. Produced by [dev.koenv.chaptervault.core.ratelimit.BucketBuilder.unlimited]
+     * when called with no subsequent property overrides.
      */
     val limits: RateLimitConfig? = RateLimitConfig()
 )

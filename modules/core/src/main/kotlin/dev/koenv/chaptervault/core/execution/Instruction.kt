@@ -339,15 +339,18 @@ data class ExtractData(
  *
  * This replaces the pattern of creating N individual FetchBytes instructions
  * and manually handling results. The executor handles:
- * - Concurrent downloads with semaphore (maxConcurrency)
  * - Per-item retries with exponential backoff
  * - Partial failure tracking (some succeed, some fail)
  *
+ * Concurrency is controlled by the rate-limit bucket declared on each item
+ * via [DownloadItem.rateLimitBucket]. The bucket's [maxConcurrent][dev.koenv.chaptervault.core.ratelimit.RateLimitConfig.maxConcurrent]
+ * is the single source of truth for how many requests are in-flight at once.
+ *
  * Example:
  * ```kotlin
- * bulkDownload(maxConcurrency = 3, retries = 2) {
+ * bulkDownload(retries = 2) {
  *     pageUrls.forEachIndexed { index, url ->
- *         item("page-$index", url, referer = chapterUrl)
+ *         item("page-$index", url, referer = chapterUrl, rateLimitBucket = "cdn")
  *     }
  * }
  * ```
@@ -355,7 +358,6 @@ data class ExtractData(
 data class BulkDownload(
     override val id: String,
     val items: List<DownloadItem>,
-    val maxConcurrency: Int = 3,
     val retries: Int = 2,
     val retryDelayMs: Long = 1000,
     override val timeout: Long? = null

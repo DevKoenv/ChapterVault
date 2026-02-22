@@ -257,7 +257,7 @@ class ExamplePlanConnector(
         // Tag items with "cdn" bucket since page images are served from a CDN domain
         // that can handle much higher throughput (configured as unlimited above)
         val downloadPlan = executionPlan {
-            bulkDownload(maxConcurrency = 3, retries = 2, id = "pages") {
+            bulkDownload(retries = 2, id = "pages") {
                 pageUrls.forEachIndexed { index, url ->
                     item("page-$index", url, headers = defaultHeaders(), referer = chapterUrl, rateLimitBucket = "cdn")
                 }

@@ -197,19 +197,23 @@ class PlanBuilder {
     }
 
     /**
-     * Download multiple files with concurrency control and retry logic.
+     * Download multiple files with retry logic.
+     *
+     * Concurrency is governed entirely by the rate-limit bucket set on each [item][BulkDownloadBuilder.item]
+     * via `rateLimitBucket`. Set [maxConcurrent][dev.koenv.chaptervault.core.ratelimit.RateLimitConfig.maxConcurrent]
+     * on the corresponding bucket in the connector's [siteRateLimits][dev.koenv.chaptervault.core.connector.ConnectorConfig.siteRateLimits]
+     * config to cap how many downloads are in-flight at once.
      *
      * Example:
      * ```kotlin
-     * bulkDownload(maxConcurrency = 3, retries = 2) {
+     * bulkDownload(retries = 2) {
      *     pageUrls.forEachIndexed { index, url ->
-     *         item("page-$index", url, referer = chapterUrl)
+     *         item("page-$index", url, referer = chapterUrl, rateLimitBucket = "cdn")
      *     }
      * }
      * ```
      */
     fun bulkDownload(
-        maxConcurrency: Int = 3,
         retries: Int = 2,
         retryDelayMs: Long = 1000,
         timeout: Long? = null,
@@ -218,7 +222,7 @@ class PlanBuilder {
     ): InstructionRef<BulkDownloadResult> {
         val itemsBuilder = BulkDownloadBuilder()
         itemsBuilder.items()
-        val instruction = BulkDownload(id, itemsBuilder.build(), maxConcurrency, retries, retryDelayMs, timeout)
+        val instruction = BulkDownload(id, itemsBuilder.build(), retries, retryDelayMs, timeout)
         instructions.add(instruction)
         return InstructionRef(id)
     }
@@ -611,9 +615,9 @@ class ExtractionSpecBuilder {
  * Builder for bulk download items.
  *
  * ```kotlin
- * bulkDownload(maxConcurrency = 3) {
+ * bulkDownload(retries = 2) {
  *     pageUrls.forEachIndexed { index, url ->
- *         item("page-$index", url, referer = chapterUrl)
+ *         item("page-$index", url, referer = chapterUrl, rateLimitBucket = "cdn")
  *     }
  * }
  * ```
