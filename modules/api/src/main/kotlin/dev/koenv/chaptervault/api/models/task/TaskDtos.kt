@@ -1,6 +1,5 @@
 package dev.koenv.chaptervault.api.models.task
 
-import dev.koenv.chaptervault.api.models.Pagination
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -27,8 +26,7 @@ data class TaskStatusResponse(
 
 @Serializable
 data class TaskListResponse(
-    val tasks: List<TaskStatusResponse>,
-    val pagination: Pagination
+    val tasks: List<TaskStatusResponse>
 )
 
 @Serializable

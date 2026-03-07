@@ -1,7 +1,6 @@
 package dev.koenv.chaptervault.api.routes
 
 import dev.koenv.chaptervault.api.models.ErrorTypes
-import dev.koenv.chaptervault.api.models.Pagination
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.catalog.*
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
@@ -235,8 +234,8 @@ fun Route.catalogRoutes(
         }
 
         /**
-         * GET /api/v1/catalog/series/{seriesId}/chapters?page=1&pageSize=100
-         * Paginated chapter list for a series.
+         * GET /api/v1/catalog/series/{seriesId}/chapters
+         * Full chapter list for a series.
          */
         get("/series/{seriesId}/chapters") {
             val seriesIdParam = call.parameters["seriesId"]
@@ -271,25 +270,9 @@ fun Route.catalogRoutes(
                 return@get
             }
 
-            val page = call.request.queryParameters["page"]?.toIntOrNull()?.coerceAtLeast(1) ?: 1
-            val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull()?.coerceIn(1, 500) ?: 100
-            val offset = (page - 1) * pageSize
-
-            val allChapters = chapterRepository.findBySeriesId(seriesId)
-            val total = allChapters.size.toLong()
-            val pageChapters = allChapters.drop(offset).take(pageSize)
-
             call.respond(
                 HttpStatusCode.OK,
-                ChapterListResponse(
-                    chapters = pageChapters.map { it.toChapterDto() },
-                    pagination = Pagination(
-                        offset = offset,
-                        limit = pageSize,
-                        total = total,
-                        hasMore = offset + pageChapters.size < total
-                    )
-                )
+                ChapterListResponse(chapters = chapterRepository.findBySeriesId(seriesId).map { it.toChapterDto() })
             )
         }
     }

@@ -1,7 +1,6 @@
 package dev.koenv.chaptervault.api.routes
 
 import dev.koenv.chaptervault.api.models.ErrorTypes
-import dev.koenv.chaptervault.api.models.Pagination
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.task.TaskCreatedResponse
 import dev.koenv.chaptervault.api.models.task.TaskListResponse
@@ -22,7 +21,7 @@ fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
     route("/api/v1/tasks") {
 
         /**
-         * GET /api/v1/tasks
+         * GET /api/v1/tasks?status=
          * List all tasks, optionally filtered by status.
          */
         get {
@@ -33,24 +32,9 @@ fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
                     null
                 }
             }
-            val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
-
-            val allTasks = downloadTaskRepository.findAll(statusFilter)
-            val total = allTasks.size.toLong()
-            val paginatedTasks = allTasks.drop(offset).take(limit)
-
             call.respond(
                 HttpStatusCode.OK,
-                TaskListResponse(
-                    tasks = paginatedTasks.map { it.toStatusResponse() },
-                    pagination = Pagination(
-                        offset = offset,
-                        limit = limit,
-                        total = total,
-                        hasMore = offset + paginatedTasks.size < total
-                    )
-                )
+                TaskListResponse(tasks = downloadTaskRepository.findAll(statusFilter).map { it.toStatusResponse() })
             )
         }
 
