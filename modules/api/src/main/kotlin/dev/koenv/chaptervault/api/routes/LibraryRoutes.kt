@@ -1,7 +1,6 @@
 package dev.koenv.chaptervault.api.routes
 
 import dev.koenv.chaptervault.api.models.ErrorTypes
-import dev.koenv.chaptervault.api.models.Pagination
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.catalog.ChapterDto
 import dev.koenv.chaptervault.api.models.catalog.ChapterListResponse
@@ -38,31 +37,9 @@ fun Route.libraryRoutes(
          * List all series in the user's library.
          */
         get("/series") {
-            val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
-
             try {
-                val librarySeries = seriesRepository.findAllInLibrary()
-
-                val total = librarySeries.size.toLong()
-                val paginatedSeries = librarySeries.drop(offset).take(limit)
-
-                val response = paginatedSeries.map { series ->
-                    series.toSeriesDto(chapterRepository)
-                }
-
-                call.respond(
-                    HttpStatusCode.OK,
-                    LibrarySeriesListResponse(
-                        series = response,
-                        pagination = Pagination(
-                            offset = offset,
-                            limit = limit,
-                            total = total,
-                            hasMore = offset + response.size < total
-                        )
-                    )
-                )
+                val series = seriesRepository.findAllInLibrary().map { it.toSeriesDto(chapterRepository) }
+                call.respond(HttpStatusCode.OK, LibrarySeriesListResponse(series = series))
             } catch (e: Exception) {
                 call.respond(
                     HttpStatusCode.InternalServerError,
@@ -290,8 +267,8 @@ fun Route.libraryRoutes(
         }
 
         /**
-         * GET /api/v1/library/series/{seriesId}/chapters?page=1&pageSize=100
-         * Paginated chapter list with download state for a library series.
+         * GET /api/v1/library/series/{seriesId}/chapters
+         * Full chapter list with download state for a library series.
          */
         get("/series/{seriesId}/chapters") {
             val seriesIdParam = call.parameters["seriesId"]
@@ -326,25 +303,9 @@ fun Route.libraryRoutes(
                 return@get
             }
 
-            val page = call.request.queryParameters["page"]?.toIntOrNull()?.coerceAtLeast(1) ?: 1
-            val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull()?.coerceIn(1, 500) ?: 100
-            val offset = (page - 1) * pageSize
-
-            val allChapters = chapterRepository.findBySeriesId(seriesId)
-            val total = allChapters.size.toLong()
-            val pageChapters = allChapters.drop(offset).take(pageSize)
-
             call.respond(
                 HttpStatusCode.OK,
-                ChapterListResponse(
-                    chapters = pageChapters.map { it.toChapterDto() },
-                    pagination = Pagination(
-                        offset = offset,
-                        limit = pageSize,
-                        total = total,
-                        hasMore = offset + pageChapters.size < total
-                    )
-                )
+                ChapterListResponse(chapters = chapterRepository.findBySeriesId(seriesId).map { it.toChapterDto() })
             )
         }
 
