@@ -8,6 +8,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SeriesDto(
     val id: String,
+    val connector: String,
+    val externalId: String,
     val sourceUrl: String,
     val title: String,
     val description: String?,

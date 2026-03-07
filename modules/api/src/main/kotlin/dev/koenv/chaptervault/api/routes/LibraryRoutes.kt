@@ -194,6 +194,8 @@ fun Route.libraryRoutes(
                 HttpStatusCode.OK,
                 SeriesDetailResponse(
                     id = series.id.toString(),
+                    connector = series.connector,
+                    externalId = series.externalId,
                     sourceUrl = series.sourceUrl,
                     title = series.title,
                     description = series.description,
@@ -366,6 +368,8 @@ fun Route.libraryRoutes(
                     HttpStatusCode.OK,
                     SeriesDetailResponse(
                         id = updatedSeries.id.toString(),
+                        connector = updatedSeries.connector,
+                        externalId = updatedSeries.externalId,
                         sourceUrl = updatedSeries.sourceUrl,
                         title = updatedSeries.title,
                         description = updatedSeries.description,
@@ -571,6 +575,8 @@ private fun Series.toSeriesDto(chapterRepository: ChapterRepositoryPort): Series
     val downloadedChapters = chapterRepository.countDownloaded(id).toInt()
     return SeriesDto(
         id = id.toString(),
+        connector = connector,
+        externalId = externalId,
         sourceUrl = sourceUrl,
         title = title,
         description = description,
@@ -591,6 +597,7 @@ private fun Chapter.toChapterDto(): ChapterDto {
         sourceUrl = sourceUrl,
         title = title,
         chapterNumber = chapterNumber,
+        chapterIndex = chapterIndex,
         publishDate = publishDate,
         pageCount = pageCount,
         downloadStatus = downloadStatus.name,

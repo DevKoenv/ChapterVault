@@ -11,6 +11,7 @@ data class ChapterDto(
     val sourceUrl: String,
     val title: String,
     val chapterNumber: String,
+    val chapterIndex: Int?,
     val publishDate: String?,
     val pageCount: Int?,
     val downloadStatus: String,
