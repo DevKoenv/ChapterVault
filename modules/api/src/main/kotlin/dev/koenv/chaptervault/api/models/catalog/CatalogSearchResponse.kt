@@ -3,10 +3,10 @@ package dev.koenv.chaptervault.api.models.catalog
 import kotlinx.serialization.Serializable
 
 /**
- * Response for lookup operations that return multiple results.
+ * Response for catalog search (keyword or URL lookup).
  */
 @Serializable
-data class CatalogLookupResponse(
+data class CatalogSearchResponse(
     val series: List<SeriesDto>,
-    val source: String
+    val connector: String?
 )

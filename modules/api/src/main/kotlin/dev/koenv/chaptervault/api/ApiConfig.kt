@@ -4,8 +4,8 @@ import dev.koenv.chaptervault.api.models.ErrorTypes
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.routes.adminRoutes
 import dev.koenv.chaptervault.api.routes.catalogRoutes
-import dev.koenv.chaptervault.api.routes.downloadRoutes
 import dev.koenv.chaptervault.api.routes.libraryRoutes
+import dev.koenv.chaptervault.api.routes.taskRoutes
 import dev.koenv.chaptervault.orchestration.cache.CacheCleanupService
 import dev.koenv.chaptervault.orchestration.ratelimit.SiteRateLimiter
 import dev.koenv.chaptervault.core.BuildConfig
@@ -120,13 +120,8 @@ fun Application.configureApi(config: ApiConfiguration) {
         }
 
         catalogRoutes(config.orchestrator, config.connectorRegistry, config.seriesRepository, config.chapterRepository)
-        downloadRoutes(
-            config.orchestrator,
-            config.seriesRepository,
-            config.chapterRepository,
-            config.downloadTaskRepository
-        )
-        libraryRoutes(config.seriesRepository, config.chapterRepository, config.orchestrator)
+        taskRoutes(config.downloadTaskRepository)
+        libraryRoutes(config.seriesRepository, config.chapterRepository, config.orchestrator, config.downloadTaskRepository)
         adminRoutes(config.cacheCleanupService, config.siteRateLimiter, config.orchestrator)
     }
 }
