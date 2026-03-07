@@ -7,8 +7,8 @@ import org.jetbrains.exposed.v1.dao.IntEntityClass
 /**
  * DAO entity for Series Tags
  */
-class SeriesTagEntity(id: EntityID<Int>) : IntEntity(id) {
-    companion object : IntEntityClass<SeriesTagEntity>(SeriesTagTable)
+class TagEntity(id: EntityID<Int>) : IntEntity(id) {
+    companion object : IntEntityClass<TagEntity>(TagTable)
 
-    var name by SeriesTagTable.name
+    var name by TagTable.name
 }

@@ -58,6 +58,7 @@ class SampleConnector(
         SeriesMetadata(
             url = "https://sample-comics.example.net/series/test-comic-1",
             title = "Sample adventures of a comic",
+            externalId = "test-comic-1",
             description = "A thrilling comic series about adventures.",
             author = "Author A",
             coverUrl = "https://sample-comics.example.net/covers/1.jpg",
@@ -67,6 +68,7 @@ class SampleConnector(
         SeriesMetadata(
             url = "https://sample-comics.example.net/series/test-comic-2",
             title = "Some fantasy tales",
+            externalId = "test-comic-2",
             description = "Dive into a world of fantasy and magic.",
             author = "Author B",
             coverUrl = "https://sample-comics.example.net/covers/2.jpg",
@@ -85,6 +87,8 @@ class SampleConnector(
                 seriesUrl = series.url,
                 title = "Chapter $chapterNum of ${series.title}",
                 chapterNumber = chapterNum.toString(),
+                externalId = "ch$chapterNum",
+                chapterIndex = chapterNum * 1000,
                 publishDate = "2024-01-${String.format("%02d", chapterNum)}",
                 pageCount = 3
             )
@@ -101,6 +105,7 @@ class SampleConnector(
                 SeriesSearchResult(
                     url = it.url,
                     title = it.title,
+                    externalId = it.externalId,
                     description = it.description,
                     coverUrl = it.coverUrl
                 )

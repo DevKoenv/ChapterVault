@@ -63,12 +63,14 @@ class MockConnector(
             SeriesSearchResult(
                 url = "https://mock-comics.example.com/series/test-comic-1",
                 title = "Test Comic 1 - $query",
+                externalId = "test-comic-1",
                 description = "A test comic about $query",
                 coverUrl = "https://mock-comics.example.com/covers/1.jpg"
             ),
             SeriesSearchResult(
                 url = "https://mock-comics.example.com/series/test-comic-2",
                 title = "Test Comic 2 - $query",
+                externalId = "test-comic-2",
                 description = "Another test comic about $query",
                 coverUrl = "https://mock-comics.example.com/covers/2.jpg"
             )
@@ -83,6 +85,7 @@ class MockConnector(
         return SeriesMetadata(
             url = seriesUrl,
             title = "Mock Series: $seriesId",
+            externalId = seriesId,
             description = "This is a mock series for testing purposes. It demonstrates the connector architecture.",
             author = "Mock Author",
             coverUrl = "https://mock-comics.example.com/covers/$seriesId.jpg",
@@ -102,6 +105,8 @@ class MockConnector(
                 seriesUrl = seriesUrl,
                 title = "Chapter $chapterNum: The Adventure Continues",
                 chapterNumber = chapterNum.toString(),
+                externalId = "ch$chapterNum",
+                chapterIndex = chapterNum * 1000,
                 publishDate = "2024-01-${String.format("%02d", chapterNum)}",
                 pageCount = 3  // Each chapter has 3 pages
             )

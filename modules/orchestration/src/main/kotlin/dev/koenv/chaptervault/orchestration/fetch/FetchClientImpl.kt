@@ -93,7 +93,14 @@ class FetchClientImpl(
                 applyOptions(options)
             }
             if (!response.status.isSuccess()) {
-                throw FetchException("HTTP ${response.status.value} for $url", response.status.value)
+                val retryAfter = if (response.status.value == 429) {
+                    response.headers["Retry-After"]?.toLongOrNull()
+                } else null
+                throw FetchException(
+                    "HTTP ${response.status.value} for $url",
+                    response.status.value,
+                    retryAfterSeconds = retryAfter
+                )
             }
             response.readRawBytes()
         }
@@ -341,7 +348,14 @@ class SessionFetchClientImpl(
                 applyOptions(options)
             }
             if (!response.status.isSuccess()) {
-                throw FetchException("HTTP ${response.status.value} for $url", response.status.value)
+                val retryAfter = if (response.status.value == 429) {
+                    response.headers["Retry-After"]?.toLongOrNull()
+                } else null
+                throw FetchException(
+                    "HTTP ${response.status.value} for $url",
+                    response.status.value,
+                    retryAfterSeconds = retryAfter
+                )
             }
             response.readRawBytes()
         }

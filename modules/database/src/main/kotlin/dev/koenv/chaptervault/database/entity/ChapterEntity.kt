@@ -12,9 +12,12 @@ class ChapterEntity(id: EntityID<UUID>) : UUIDEntity(id) {
     companion object : UUIDEntityClass<ChapterEntity>(ChapterTable)
 
     var series by SeriesEntity referencedOn ChapterTable.seriesId
+    var connector by ChapterTable.connector
+    var externalId by ChapterTable.externalId
     var sourceUrl by ChapterTable.sourceUrl
     var title by ChapterTable.title
     var chapterNumber by ChapterTable.chapterNumber
+    var chapterIndex by ChapterTable.chapterIndex
     var publishDate by ChapterTable.publishDate
     var pageCount by ChapterTable.pageCount
     var downloadStatus by ChapterTable.downloadStatus

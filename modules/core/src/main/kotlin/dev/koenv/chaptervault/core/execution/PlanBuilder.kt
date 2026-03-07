@@ -75,11 +75,10 @@ class PlanBuilder {
         headers: Map<String, String> = emptyMap(),
         referer: String? = null,
         timeout: Long? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("html")
     ): InstructionRef<HtmlResult> {
-        val instruction = FetchHtml(id, url, headers, referer, timeout, rateLimitScope, rateLimitBucket)
+        val instruction = FetchHtml(id, url, headers, referer, timeout, rateLimitBucket)
         instructions.add(instruction)
         return InstructionRef(id)
     }
@@ -92,11 +91,10 @@ class PlanBuilder {
         headers: Map<String, String> = emptyMap(),
         referer: String? = null,
         timeout: Long? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("json")
     ): InstructionRef<JsonResult> {
-        val instruction = FetchJson(id, url, headers, referer, timeout, rateLimitScope, rateLimitBucket)
+        val instruction = FetchJson(id, url, headers, referer, timeout, rateLimitBucket)
         instructions.add(instruction)
         return InstructionRef(id)
     }
@@ -109,11 +107,10 @@ class PlanBuilder {
         headers: Map<String, String> = emptyMap(),
         referer: String? = null,
         timeout: Long? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("bytes")
     ): InstructionRef<BytesResult> {
-        val instruction = FetchBytes(id, url, headers, referer, timeout, rateLimitScope, rateLimitBucket)
+        val instruction = FetchBytes(id, url, headers, referer, timeout, rateLimitBucket)
         instructions.add(instruction)
         return InstructionRef(id)
     }
@@ -126,11 +123,10 @@ class PlanBuilder {
         formData: Map<String, String>,
         headers: Map<String, String> = emptyMap(),
         timeout: Long? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("form")
     ): InstructionRef<HtmlResult> {
-        val instruction = PostForm(id, url, formData, headers, timeout, rateLimitScope, rateLimitBucket)
+        val instruction = PostForm(id, url, formData, headers, timeout, rateLimitBucket)
         instructions.add(instruction)
         return InstructionRef(id)
     }
@@ -143,11 +139,10 @@ class PlanBuilder {
         jsonBody: String,
         headers: Map<String, String> = emptyMap(),
         timeout: Long? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("post")
     ): InstructionRef<JsonResult> {
-        val instruction = PostJson(id, url, jsonBody, headers, timeout, rateLimitScope, rateLimitBucket)
+        val instruction = PostJson(id, url, jsonBody, headers, timeout, rateLimitBucket)
         instructions.add(instruction)
         return InstructionRef(id)
     }
@@ -164,11 +159,10 @@ class PlanBuilder {
         headers: Map<String, String> = emptyMap(),
         referer: String? = null,
         timeout: Long? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("doc")
     ): InstructionRef<DocumentResult> {
-        val instruction = FetchDocument(id, url, headers, referer, timeout, rateLimitScope, rateLimitBucket)
+        val instruction = FetchDocument(id, url, headers, referer, timeout, rateLimitBucket)
         instructions.add(instruction)
         return InstructionRef(id)
     }
@@ -191,32 +185,35 @@ class PlanBuilder {
         headers: Map<String, String> = emptyMap(),
         referer: String? = null,
         timeout: Long? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("extract"),
         spec: ExtractionSpecBuilder.() -> Unit
     ): InstructionRef<ExtractedDataResult> {
         val specBuilder = ExtractionSpecBuilder()
         specBuilder.spec()
-        val instruction = ExtractData(id, url, specBuilder.build(), headers, referer, timeout, rateLimitScope, rateLimitBucket)
+        val instruction = ExtractData(id, url, specBuilder.build(), headers, referer, timeout, rateLimitBucket)
         instructions.add(instruction)
         return InstructionRef(id)
     }
 
     /**
-     * Download multiple files with concurrency control and retry logic.
+     * Download multiple files with retry logic.
+     *
+     * Concurrency is governed entirely by the rate-limit bucket set on each [item][BulkDownloadBuilder.item]
+     * via `rateLimitBucket`. Set [maxConcurrent][dev.koenv.chaptervault.core.ratelimit.RateLimitConfig.maxConcurrent]
+     * on the corresponding bucket in the connector's [siteRateLimits][dev.koenv.chaptervault.core.connector.ConnectorConfig.siteRateLimits]
+     * config to cap how many downloads are in-flight at once.
      *
      * Example:
      * ```kotlin
-     * bulkDownload(maxConcurrency = 3, retries = 2) {
+     * bulkDownload(retries = 2) {
      *     pageUrls.forEachIndexed { index, url ->
-     *         item("page-$index", url, referer = chapterUrl)
+     *         item("page-$index", url, referer = chapterUrl, rateLimitBucket = "cdn")
      *     }
      * }
      * ```
      */
     fun bulkDownload(
-        maxConcurrency: Int = 3,
         retries: Int = 2,
         retryDelayMs: Long = 1000,
         timeout: Long? = null,
@@ -225,7 +222,7 @@ class PlanBuilder {
     ): InstructionRef<BulkDownloadResult> {
         val itemsBuilder = BulkDownloadBuilder()
         itemsBuilder.items()
-        val instruction = BulkDownload(id, itemsBuilder.build(), maxConcurrency, retries, retryDelayMs, timeout)
+        val instruction = BulkDownload(id, itemsBuilder.build(), retries, retryDelayMs, timeout)
         instructions.add(instruction)
         return InstructionRef(id)
     }
@@ -319,11 +316,10 @@ class BrowserPlanBuilder(private val nextId: (String) -> String) {
         url: String,
         waitUntil: WaitCondition = WaitCondition.NETWORK_IDLE,
         timeout: Long? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("nav")
     ): InstructionRef<HtmlResult> {
-        instructions.add(BrowserNavigate(id, url, waitUntil, timeout, rateLimitScope, rateLimitBucket))
+        instructions.add(BrowserNavigate(id, url, waitUntil, timeout, rateLimitBucket))
         return InstructionRef(id)
     }
 
@@ -458,11 +454,10 @@ class BrowserPlanBuilder(private val nextId: (String) -> String) {
     fun downloadFile(
         url: String,
         referer: String? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null,
         id: String = nextId("download")
     ): InstructionRef<BytesResult> {
-        instructions.add(BrowserDownloadFile(id, url, referer, rateLimitScope, rateLimitBucket))
+        instructions.add(BrowserDownloadFile(id, url, referer, rateLimitBucket))
         return InstructionRef(id)
     }
 
@@ -620,9 +615,9 @@ class ExtractionSpecBuilder {
  * Builder for bulk download items.
  *
  * ```kotlin
- * bulkDownload(maxConcurrency = 3) {
+ * bulkDownload(retries = 2) {
  *     pageUrls.forEachIndexed { index, url ->
- *         item("page-$index", url, referer = chapterUrl)
+ *         item("page-$index", url, referer = chapterUrl, rateLimitBucket = "cdn")
  *     }
  * }
  * ```
@@ -644,10 +639,9 @@ class BulkDownloadBuilder {
         url: String,
         headers: Map<String, String> = emptyMap(),
         referer: String? = null,
-        rateLimitScope: RateLimitScope = RateLimitScope.CONNECTOR_AND_SITE,
         rateLimitBucket: String? = null
     ) {
-        items.add(DownloadItem(id, url, headers, referer, rateLimitScope, rateLimitBucket))
+        items.add(DownloadItem(id, url, headers, referer, rateLimitBucket))
     }
 
     /**

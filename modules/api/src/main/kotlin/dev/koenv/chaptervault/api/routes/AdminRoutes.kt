@@ -67,10 +67,10 @@ fun Route.adminRoutes(
         }
 
         /**
-         * GET /api/v1/admin/cache/status
+         * GET /api/v1/admin/cache
          * Get cache status including count of stale series.
          */
-        get("/cache/status") {
+        get("/cache") {
             if (cacheCleanupService == null) {
                 call.respond(
                     HttpStatusCode.ServiceUnavailable,

@@ -1,8 +1,9 @@
 package dev.koenv.chaptervault.database.repository
 
-import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
 import dev.koenv.chaptervault.core.repository.PersistedTask
 import dev.koenv.chaptervault.core.repository.TaskStatus
+import dev.koenv.chaptervault.core.repository.TaskTargetType
+import dev.koenv.chaptervault.core.repository.TaskRepositoryPort
 import dev.koenv.chaptervault.core.repository.TaskType
 import dev.koenv.chaptervault.database.entity.*
 import org.jetbrains.exposed.v1.core.eq
@@ -14,33 +15,34 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Exposed-based implementation of DownloadTaskRepositoryPort.
+ * Exposed-based implementation of TaskRepositoryPort.
  * Uses H2/SQLite/PostgreSQL via Exposed ORM.
+ * Tasks reference domain entities by type+id string (no FK) for decoupling.
  */
-class DownloadTaskRepository(private val database: Database) : DownloadTaskRepositoryPort {
+class TaskRepository(private val database: Database) : TaskRepositoryPort {
 
     override fun initialize() {
         transaction(database) {
-            SchemaUtils.create(DownloadTaskTable)
+            SchemaUtils.create(TaskTable)
         }
     }
 
     override fun findById(taskId: UUID): PersistedTask? {
         return transaction(database) {
-            DownloadTaskEntity.findById(taskId)?.toPersistedTask()
+            TaskEntity.findById(taskId)?.toPersistedTask()
         }
     }
 
     override fun findPending(): List<PersistedTask> {
         return transaction(database) {
-            DownloadTaskEntity.find { DownloadTaskTable.status eq TaskStatus.PENDING.name }
+            TaskEntity.find { TaskTable.status eq TaskStatus.PENDING.name }
                 .map { it.toPersistedTask() }
         }
     }
 
     override fun findRunning(): List<PersistedTask> {
         return transaction(database) {
-            DownloadTaskEntity.find { DownloadTaskTable.status eq TaskStatus.RUNNING.name }
+            TaskEntity.find { TaskTable.status eq TaskStatus.RUNNING.name }
                 .map { it.toPersistedTask() }
         }
     }
@@ -48,27 +50,27 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
     override fun findAll(status: TaskStatus?): List<PersistedTask> {
         return transaction(database) {
             val query = if (status != null) {
-                DownloadTaskEntity.find { DownloadTaskTable.status eq status.name }
+                TaskEntity.find { TaskTable.status eq status.name }
             } else {
-                DownloadTaskEntity.all()
+                TaskEntity.all()
             }
             query.map { it.toPersistedTask() }
         }
     }
 
     override fun create(
-        taskType: TaskType,
+        type: TaskType,
         targetUrl: String,
-        seriesId: UUID?,
-        chapterId: UUID?
+        targetType: TaskTargetType,
+        targetId: UUID?
     ): PersistedTask {
         return transaction(database) {
             val now = Instant.now()
-            val entity = DownloadTaskEntity.new {
-                this.taskType = taskType.name
+            val entity = TaskEntity.new {
+                this.type = type.name
                 this.targetUrl = targetUrl
-                this.series = seriesId?.let { SeriesEntity.findById(it) }
-                this.chapter = chapterId?.let { ChapterEntity.findById(it) }
+                this.targetType = targetType.name
+                this.targetId = targetId?.toString()
                 this.status = TaskStatus.PENDING.name
                 this.currentProgress = 0
                 this.totalProgress = 0
@@ -86,7 +88,7 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
         total: Int?
     ) {
         transaction(database) {
-            val entity = DownloadTaskEntity.findById(taskId)
+            val entity = TaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
 
             entity.status = status.name
@@ -102,7 +104,7 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
 
     override fun markStarted(taskId: UUID, totalProgress: Int) {
         transaction(database) {
-            val entity = DownloadTaskEntity.findById(taskId)
+            val entity = TaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
             entity.status = TaskStatus.RUNNING.name
             entity.startedAt = Instant.now()
@@ -112,7 +114,7 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
 
     override fun markCompleted(taskId: UUID) {
         transaction(database) {
-            val entity = DownloadTaskEntity.findById(taskId)
+            val entity = TaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
             entity.status = TaskStatus.COMPLETED.name
             entity.completedAt = Instant.now()
@@ -122,7 +124,7 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
 
     override fun markFailed(taskId: UUID, errorMessage: String?) {
         transaction(database) {
-            val entity = DownloadTaskEntity.findById(taskId)
+            val entity = TaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
             entity.status = TaskStatus.FAILED.name
             entity.errorMessage = errorMessage
@@ -132,7 +134,7 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
 
     override fun markCancelled(taskId: UUID) {
         transaction(database) {
-            val entity = DownloadTaskEntity.findById(taskId)
+            val entity = TaskEntity.findById(taskId)
                 ?: throw IllegalArgumentException("Task not found: $taskId")
             entity.status = TaskStatus.CANCELLED.name
             entity.completedAt = Instant.now()
@@ -141,16 +143,16 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
 
     override fun delete(taskId: UUID) {
         transaction(database) {
-            DownloadTaskEntity.findById(taskId)?.delete()
+            TaskEntity.findById(taskId)?.delete()
         }
     }
 
     override fun cleanupOldTasks(olderThan: Instant) {
         transaction(database) {
-            DownloadTaskEntity.find {
-                (DownloadTaskTable.status eq TaskStatus.COMPLETED.name) or
-                (DownloadTaskTable.status eq TaskStatus.FAILED.name) or
-                (DownloadTaskTable.status eq TaskStatus.CANCELLED.name)
+            TaskEntity.find {
+                (TaskTable.status eq TaskStatus.COMPLETED.name) or
+                (TaskTable.status eq TaskStatus.FAILED.name) or
+                (TaskTable.status eq TaskStatus.CANCELLED.name)
             }.filter {
                 it.completedAt?.isBefore(olderThan) == true
             }.forEach {
@@ -161,7 +163,7 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
 
     override fun resetRunningTasks() {
         transaction(database) {
-            DownloadTaskEntity.find { DownloadTaskTable.status eq TaskStatus.RUNNING.name }
+            TaskEntity.find { TaskTable.status eq TaskStatus.RUNNING.name }
                 .forEach {
                     it.status = TaskStatus.PENDING.name
                     it.startedAt = null
@@ -169,13 +171,13 @@ class DownloadTaskRepository(private val database: Database) : DownloadTaskRepos
         }
     }
 
-    private fun DownloadTaskEntity.toPersistedTask(): PersistedTask {
+    private fun TaskEntity.toPersistedTask(): PersistedTask {
         return PersistedTask(
             id = id.value,
-            taskType = TaskType.valueOf(taskType),
+            taskType = TaskType.valueOf(type),
             targetUrl = targetUrl,
-            seriesId = series?.id?.value,
-            chapterId = chapter?.id?.value,
+            targetType = TaskTargetType.valueOf(targetType),
+            targetId = targetId?.let { UUID.fromString(it) },
             status = TaskStatus.valueOf(status),
             message = message,
             currentProgress = currentProgress,

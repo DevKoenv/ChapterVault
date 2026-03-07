@@ -1,7 +1,7 @@
 package dev.koenv.chaptervault.database.repository
 
 import dev.koenv.chaptervault.core.domain.ChapterMetadata
-import dev.koenv.chaptervault.core.repository.CachedChapter
+import dev.koenv.chaptervault.core.repository.Chapter
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
 import dev.koenv.chaptervault.core.repository.DownloadStatus
 import dev.koenv.chaptervault.database.entity.*
@@ -25,95 +25,108 @@ class ChapterRepository(private val database: Database) : ChapterRepositoryPort 
         }
     }
 
-    override fun findByUrl(url: String): CachedChapter? {
+    override fun findByUrl(url: String): Chapter? {
         return transaction(database) {
             val entity = ChapterEntity.find { ChapterTable.sourceUrl eq url }.firstOrNull()
-            entity?.toCachedChapter()
+            entity?.toChapter()
         }
     }
 
-    override fun findById(id: UUID): CachedChapter? {
+    override fun findById(id: UUID): Chapter? {
         return transaction(database) {
             val entity = ChapterEntity.findById(id)
-            entity?.toCachedChapter()
+            entity?.toChapter()
         }
     }
 
-    override fun findBySeriesId(seriesId: UUID): List<CachedChapter> {
+    override fun findBySeriesId(seriesId: UUID): List<Chapter> {
         return transaction(database) {
             ChapterEntity.find { ChapterTable.seriesId eq seriesId }
-                .map { it.toCachedChapter() }
+                .map { it.toChapter() }
+                .sortedWith(compareBy(nullsLast()) { it.chapterIndex })
         }
     }
 
-    override fun findDownloaded(seriesId: UUID): List<CachedChapter> {
+    override fun findDownloaded(seriesId: UUID): List<Chapter> {
         return transaction(database) {
             ChapterEntity.find {
                 (ChapterTable.seriesId eq seriesId) and
                 (ChapterTable.downloadStatus eq DownloadStatus.DOWNLOADED.name)
-            }.map { it.toCachedChapter() }
+            }.map { it.toChapter() }
         }
     }
 
-    override fun findNotDownloaded(seriesId: UUID): List<CachedChapter> {
+    override fun findNotDownloaded(seriesId: UUID): List<Chapter> {
         return transaction(database) {
             ChapterEntity.find {
                 (ChapterTable.seriesId eq seriesId) and
                 (ChapterTable.downloadStatus eq DownloadStatus.NOT_DOWNLOADED.name)
-            }.map { it.toCachedChapter() }
+            }.map { it.toChapter() }
         }
     }
 
-    override fun save(metadata: ChapterMetadata, seriesId: UUID): CachedChapter {
+    override fun save(metadata: ChapterMetadata, seriesId: UUID, connectorId: String): Chapter {
         return transaction(database) {
             val now = Instant.now()
             val series = SeriesEntity.findById(seriesId)
                 ?: throw IllegalArgumentException("Series not found: $seriesId")
 
-            val entity = ChapterEntity.find { ChapterTable.sourceUrl eq metadata.url }.firstOrNull()
+            val entity = ChapterEntity.find {
+                (ChapterTable.connector eq connectorId) and (ChapterTable.externalId eq metadata.externalId)
+            }.firstOrNull()
                 ?: ChapterEntity.new {
                     this.series = series
+                    connector = connectorId
+                    externalId = metadata.externalId
                     sourceUrl = metadata.url
                     downloadStatus = DownloadStatus.NOT_DOWNLOADED.name
                     createdAt = now
                 }
 
             entity.apply {
+                sourceUrl = metadata.url
                 title = metadata.title
                 chapterNumber = metadata.chapterNumber
+                chapterIndex = metadata.chapterIndex
                 publishDate = metadata.publishDate
                 pageCount = metadata.pageCount
                 updatedAt = now
             }
 
-            entity.toCachedChapter()
+            entity.toChapter()
         }
     }
 
-    override fun saveAll(chapters: List<ChapterMetadata>, seriesId: UUID): List<CachedChapter> {
+    override fun saveAll(chapters: List<ChapterMetadata>, seriesId: UUID, connectorId: String): List<Chapter> {
         return transaction(database) {
             chapters.map { metadata ->
                 val now = Instant.now()
                 val series = SeriesEntity.findById(seriesId)
                     ?: throw IllegalArgumentException("Series not found: $seriesId")
 
-                val entity = ChapterEntity.find { ChapterTable.sourceUrl eq metadata.url }.firstOrNull()
+                val entity = ChapterEntity.find {
+                    (ChapterTable.connector eq connectorId) and (ChapterTable.externalId eq metadata.externalId)
+                }.firstOrNull()
                     ?: ChapterEntity.new {
                         this.series = series
+                        connector = connectorId
+                        externalId = metadata.externalId
                         sourceUrl = metadata.url
                         downloadStatus = DownloadStatus.NOT_DOWNLOADED.name
                         createdAt = now
                     }
 
                 entity.apply {
+                    sourceUrl = metadata.url
                     title = metadata.title
                     chapterNumber = metadata.chapterNumber
+                    chapterIndex = metadata.chapterIndex
                     publishDate = metadata.publishDate
                     pageCount = metadata.pageCount
                     updatedAt = now
                 }
 
-                entity.toCachedChapter()
+                entity.toChapter()
             }
         }
     }
@@ -189,13 +202,16 @@ class ChapterRepository(private val database: Database) : ChapterRepositoryPort 
         }
     }
 
-    private fun ChapterEntity.toCachedChapter(): CachedChapter {
-        return CachedChapter(
+    private fun ChapterEntity.toChapter(): Chapter {
+        return Chapter(
             id = id.value,
             seriesId = series.id.value,
+            connector = connector,
+            externalId = externalId,
             sourceUrl = sourceUrl,
             title = title,
             chapterNumber = chapterNumber,
+            chapterIndex = chapterIndex,
             publishDate = publishDate,
             pageCount = pageCount,
             downloadStatus = DownloadStatus.valueOf(downloadStatus),

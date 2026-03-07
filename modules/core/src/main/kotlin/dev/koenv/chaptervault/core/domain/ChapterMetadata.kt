@@ -9,6 +9,8 @@ data class ChapterMetadata(
     val seriesUrl: String,
     val title: String,
     val chapterNumber: String,
+    val externalId: String,
+    val chapterIndex: Int? = null,
     val publishDate: String? = null,
     val pageCount: Int? = null  // Optional: some sites provide this during browsing
 )

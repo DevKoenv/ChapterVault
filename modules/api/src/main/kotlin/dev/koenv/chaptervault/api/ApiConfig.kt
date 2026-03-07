@@ -4,14 +4,14 @@ import dev.koenv.chaptervault.api.models.ErrorTypes
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.routes.adminRoutes
 import dev.koenv.chaptervault.api.routes.catalogRoutes
-import dev.koenv.chaptervault.api.routes.downloadRoutes
 import dev.koenv.chaptervault.api.routes.libraryRoutes
+import dev.koenv.chaptervault.api.routes.taskRoutes
 import dev.koenv.chaptervault.orchestration.cache.CacheCleanupService
 import dev.koenv.chaptervault.orchestration.ratelimit.SiteRateLimiter
 import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
-import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
+import dev.koenv.chaptervault.core.repository.TaskRepositoryPort
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import io.ktor.http.ContentType
@@ -39,7 +39,7 @@ data class ApiConfiguration(
     val connectorRegistry: ConnectorRegistry,
     val seriesRepository: SeriesRepositoryPort,
     val chapterRepository: ChapterRepositoryPort,
-    val downloadTaskRepository: DownloadTaskRepositoryPort,
+    val taskRepository: TaskRepositoryPort,
     val storageDir: File,
     val cacheCleanupService: CacheCleanupService? = null,
     val siteRateLimiter: SiteRateLimiter? = null
@@ -120,13 +120,8 @@ fun Application.configureApi(config: ApiConfiguration) {
         }
 
         catalogRoutes(config.orchestrator, config.connectorRegistry, config.seriesRepository, config.chapterRepository)
-        downloadRoutes(
-            config.orchestrator,
-            config.seriesRepository,
-            config.chapterRepository,
-            config.downloadTaskRepository
-        )
-        libraryRoutes(config.seriesRepository, config.chapterRepository, config.orchestrator)
+        taskRoutes(config.taskRepository)
+        libraryRoutes(config.seriesRepository, config.chapterRepository, config.orchestrator, config.taskRepository)
         adminRoutes(config.cacheCleanupService, config.siteRateLimiter, config.orchestrator)
     }
 }

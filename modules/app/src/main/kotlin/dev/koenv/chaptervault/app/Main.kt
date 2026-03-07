@@ -2,13 +2,15 @@ package dev.koenv.chaptervault.app
 
 import dev.koenv.chaptervault.api.ApiConfiguration
 import dev.koenv.chaptervault.api.configureApi
+import dev.koenv.chaptervault.connectors.impl.ExampleBrowserPlanConnector
+import dev.koenv.chaptervault.connectors.impl.ExamplePlanConnector
 import dev.koenv.chaptervault.connectors.impl.MockConnector
 import dev.koenv.chaptervault.connectors.impl.SampleConnector
 import dev.koenv.chaptervault.connectors.registry.ConnectorRegistryImpl
 import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.database.DatabaseConfig
 import dev.koenv.chaptervault.database.repository.ChapterRepository
-import dev.koenv.chaptervault.database.repository.DownloadTaskRepository
+import dev.koenv.chaptervault.database.repository.TaskRepository
 import dev.koenv.chaptervault.database.repository.SeriesRepository
 import dev.koenv.chaptervault.opds.OpdsConfiguration
 import dev.koenv.chaptervault.opds.configureOpds
@@ -59,7 +61,7 @@ fun main() {
     // Initialize repositories (order matters for foreign key constraints)
     val seriesRepository = SeriesRepository(database).also { it.initialize() }
     val chapterRepository = ChapterRepository(database).also { it.initialize() }
-    val downloadTaskRepository = DownloadTaskRepository(database).also { it.initialize() }
+    val taskRepository = TaskRepository(database).also { it.initialize() }
 
     // Run data migrations after all schemas are created
     seriesRepository.runMigrations(chapterRepository)
@@ -87,6 +89,8 @@ fun main() {
         logger.info { "Development mode: registering mock connectors" }
         connectorRegistry.register(MockConnector(executor))
         connectorRegistry.register(SampleConnector(executor))
+        connectorRegistry.register(ExamplePlanConnector(executor))
+        connectorRegistry.register(ExampleBrowserPlanConnector(executor))
     }
 
     // TODO: Register production connectors here
@@ -98,18 +102,19 @@ fun main() {
     val rateLimiter = RateLimiter()
     for (connector in connectorRegistry.getAllConnectors()) {
         val connConfig = connector.config
-        val override = configService.getConnectorConfig(connConfig.name)
+        val override = configService.getConnectorConfig(connConfig.id)
+            ?: configService.getConnectorConfig(connConfig.name)
 
         val effectiveRateLimit = override?.rateLimit?.applyTo(connConfig.rateLimitConfig)
             ?: connConfig.rateLimitConfig
         val effectiveSiteLimits = override?.siteRateLimits?.applyTo(connConfig.siteRateLimits)
             ?: connConfig.siteRateLimits
 
-        rateLimiter.registerConnector(connConfig.name, effectiveRateLimit)
-        siteRateLimiter.registerConnector(connConfig.name, effectiveSiteLimits)
+        rateLimiter.registerConnector(connConfig.id, effectiveRateLimit)
+        siteRateLimiter.registerConnector(connConfig.id, effectiveSiteLimits)
 
         if (override?.rateLimit != null || override?.siteRateLimits != null) {
-            logger.info { "Applied rate limit config overrides for connector: ${connConfig.name}" }
+            logger.info { "Applied rate limit config overrides for connector: ${connConfig.name} (${connConfig.id})" }
         }
     }
 
@@ -125,7 +130,7 @@ fun main() {
         rateLimiter = rateLimiter,
         seriesRepository = seriesRepository,
         chapterRepository = chapterRepository,
-        downloadTaskRepository = downloadTaskRepository
+        taskRepository = taskRepository
     )
     logger.info { "Orchestrator initialized" }
 
@@ -140,7 +145,7 @@ fun main() {
         connectorRegistry = connectorRegistry,
         seriesRepository = seriesRepository,
         chapterRepository = chapterRepository,
-        downloadTaskRepository = downloadTaskRepository,
+        taskRepository = taskRepository,
         storageDir = storageDir,
         cacheCleanupService = cacheCleanupService,
         siteRateLimiter = siteRateLimiter

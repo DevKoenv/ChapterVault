@@ -5,6 +5,8 @@ import dev.koenv.chaptervault.core.ratelimit.SiteRateLimits
 import org.slf4j.LoggerFactory
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Snapshot of a [RateLimitConfig] for external consumption.
@@ -44,14 +46,21 @@ data class SiteRateLimiterStatus(
  *
  * Supports adaptive backoff: when a 429 response is received, [report429] increases
  * the delay for that bucket using AIMD (Additive Increase / Multiplicative Decrease).
+ *
+ * @param timeSource Injectable time provider for testability.
  */
-class SiteRateLimiter {
+class SiteRateLimiter(
+    private val timeSource: () -> Long = System::currentTimeMillis
+) {
 
     private val logger = LoggerFactory.getLogger(SiteRateLimiter::class.java)
 
-    // Named bucket configs per connector: "connectorName:bucketTag" -> BucketConfig.limits
-    // null value means unlimited (bypass)
-    private val namedBucketConfigs = ConcurrentHashMap<String, RateLimitConfig?>()
+    // Named bucket configs per connector: "connectorName:bucketTag" -> RateLimitConfig (limited)
+    private val namedBucketLimits = ConcurrentHashMap<String, RateLimitConfig>()
+
+    // Named bucket keys where rate limiting is bypassed entirely (bypass() in DSL)
+    // Stored separately because ConcurrentHashMap does not permit null values
+    private val bypassedBuckets: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     // Per-connector default limits for auto-created host buckets
     private val connectorDefaultLimits = ConcurrentHashMap<String, RateLimitConfig>()
@@ -77,12 +86,14 @@ class SiteRateLimiter {
 
         config.buckets.forEach { (bucketName, bucketConfig) ->
             val key = "$connectorName:$bucketName"
-            namedBucketConfigs[key] = bucketConfig.limits
-            logger.debug(
-                "Registered named bucket [{}]: {}",
-                key,
-                if (bucketConfig.limits == null) "unlimited" else bucketConfig.limits
-            )
+            val limits = bucketConfig.limits  // local val required for smart cast across module boundary
+            if (limits == null) {
+                bypassedBuckets.add(key)
+                logger.debug("Registered named bucket [{}]: bypassed (no rate limiting)", key)
+            } else {
+                namedBucketLimits[key] = limits
+                logger.debug("Registered named bucket [{}]: {}", key, limits)
+            }
         }
 
         logger.debug(
@@ -145,6 +156,38 @@ class SiteRateLimiter {
     }
 
     // ========================================================================
+    // Bucket Eviction
+    // ========================================================================
+
+    /**
+     * Remove buckets that have not been accessed within [maxIdleDuration].
+     *
+     * Call periodically to prevent unbounded growth of the bucket map when many
+     * different hosts are accessed over time.
+     *
+     * @return Number of buckets evicted.
+     */
+    fun evictStaleBuckets(maxIdleDuration: Duration = 10.minutes): Int {
+        val cutoff = timeSource() - maxIdleDuration.inWholeMilliseconds
+        var evicted = 0
+
+        val iterator = buckets.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.value.lastAccessedAt < cutoff) {
+                iterator.remove()
+                evicted++
+                logger.debug("Evicted stale bucket [{}]", entry.key)
+            }
+        }
+
+        if (evicted > 0) {
+            logger.info("Evicted {} stale rate limit buckets (idle > {})", evicted, maxIdleDuration)
+        }
+        return evicted
+    }
+
+    // ========================================================================
     // Bucket Resolution
     // ========================================================================
 
@@ -156,12 +199,11 @@ class SiteRateLimiter {
         // 1. Check for named bucket tag
         if (bucketTag != null && connectorName != null) {
             val configKey = "$connectorName:$bucketTag"
-            if (namedBucketConfigs.containsKey(configKey)) {
-                val limits = namedBucketConfigs[configKey]
-                if (limits == null) {
-                    // Unlimited bucket — bypass rate limiting
-                    return null
-                }
+            if (bypassedBuckets.contains(configKey)) {
+                return null // Bypassed bucket — skip rate limiting entirely
+            }
+            val limits = namedBucketLimits[configKey]
+            if (limits != null) {
                 return getOrCreateBucket("tag:$configKey", limits)
             }
             // Named bucket not found for this connector — fall through to host-based
@@ -185,21 +227,22 @@ class SiteRateLimiter {
     private fun getOrCreateBucket(key: String, config: RateLimitConfig): DomainBucket {
         return buckets.computeIfAbsent(key) {
             logger.debug("Creating rate limit bucket [{}]: {}", key, config)
-            DomainBucket(key, config)
+            DomainBucket(key, config, timeSource)
         }
     }
 
     suspend fun getStatus(): SiteRateLimiterStatus {
-        val configs = namedBucketConfigs.map { (key, config) ->
-            key to config?.let {
-                RateLimitConfigSnapshot(
-                    minDelayMs = it.minDelay.inWholeMilliseconds,
-                    maxConcurrent = it.maxConcurrent,
-                    maxRequestsPerWindow = it.maxRequestsPerWindow,
-                    windowDurationMs = it.windowDuration.inWholeMilliseconds
-                )
+        val configs = buildMap<String, RateLimitConfigSnapshot?> {
+            namedBucketLimits.forEach { (key, config) ->
+                put(key, RateLimitConfigSnapshot(
+                    minDelayMs = config.minDelay.inWholeMilliseconds,
+                    maxConcurrent = config.maxConcurrent,
+                    maxRequestsPerWindow = config.maxRequestsPerWindow,
+                    windowDurationMs = config.windowDuration.inWholeMilliseconds
+                ))
             }
-        }.toMap()
+            bypassedBuckets.forEach { key -> put(key, null) }
+        }
 
         val snapshots = buckets.values.map { it.snapshot() }
 
