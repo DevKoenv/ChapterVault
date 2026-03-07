@@ -9,14 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - TBD
 
+### Added
+
+- **Stable connector identity on series and chapters**: `connector` + `external_id` composite unique index on both `series` and `chapters` tables; all connectors now provide `externalId` on `SeriesSearchResult`, `SeriesMetadata`, and `ChapterMetadata`
+- **`chapter_index` column**: Connectors supply a numeric ordering value (typically `chapterNumber * 1000`); `findBySeriesId()` returns chapters sorted by `chapterIndex` ascending (nulls last)
+- **`auto_download` flag on series**: Persisted on the `series` table; `addToLibrary()` accepts `autoDownload: Boolean` and triggers a series download task when true
+- **`chapters_fetched_at` timestamp on series**: Stamped after every successful chapter list fetch via `stampChaptersFetchedAt(seriesId)`
+- **`connector` and `externalId` fields in API responses**: `SeriesDto` and `SeriesDetailResponse` now include `connector` and `externalId`; `ChapterDto` includes `chapterIndex`
+- **`targetType` / `targetId` fields on task responses**: `TaskStatusResponse` exposes `targetType` (e.g. `SERIES`, `CHAPTER`) and `targetId` (UUID string) instead of the previous `seriesId` field
+- **`idx_chapters_series_id` index**: Performance index on `chapters.series_id`
+- **ExamplePlanConnector and ExampleBrowserPlanConnector**: Registered in development mode (`CHAPTERVAULT_ENV=development`)
+
 ### Changed
 
 - **Unified repository models**: `CachedSeries` renamed to `Series`, `CachedChapter` renamed to `Chapter`; nullable fields naturally encode "not yet fetched" — no explicit partial/complete distinction
 - **Unified API DTOs**: `CatalogSeriesDto`, `LibrarySeriesDto`, `CatalogChapterDto`, `LibraryChapterDto` replaced by shared `SeriesDto`, `ChapterDto`, `SeriesDetailResponse` used across all endpoints
-- **Always-fresh detail endpoints**: `GET /api/v1/catalog/series/{id}`, `POST /api/v1/catalog/lookup` (URL), and `POST /api/v1/catalog/series/{id}/refresh` always fetch metadata from the source connector — no conditional based on `metadataFetchedAt`
+- **Always-fresh detail endpoints**: `GET /api/v1/catalog/series/{id}` and `POST /api/v1/library/series/{id}/refresh` always fetch metadata from the source connector
 - **Merge semantics on upsert**: `upsert()` and `upsertAllFromSearch()` never downgrade known fields to null — a subsequent search result cannot clear an `author` populated by a full metadata fetch
 - **Library series detail shows all chapters**: `GET /api/v1/library/series/{id}` now returns all chapters with `downloadStatus` field instead of only downloaded chapters
 - **`ChapterDto` includes download fields**: `downloadStatus`, `downloadedAt`, `filePath`, `fileSize` exposed on every chapter response
+- **Task identity decoupled from domain FKs**: `tasks` table stores `target_type VARCHAR(32)` and `target_id VARCHAR(36)` (UUID as string, no foreign key) instead of FK columns pointing at series/chapter rows
+- **Connector identity replaces `source_url` unique constraint**: Series and chapters are now keyed on `(connector, external_id)` — `source_url` retains its column but no longer carries a unique index
+- **`series_tag` table renamed to `tags`**: Kotlin types renamed to `TagTable` / `TagEntity`
+- **`publish_date` column widened**: Changed from `VARCHAR(32)` to `TEXT`
+- **Catalog search endpoint restructured**: `POST /api/v1/catalog/lookup` replaced by `GET /api/v1/catalog/search?q=&url=&connector=`; both keyword and URL lookup share a single endpoint with response type `CatalogSearchResponse`
+- **Pagination removed from list responses**: `ChapterListResponse`, `LibrarySeriesListResponse`, and `TaskListResponse` no longer include pagination metadata
+- **`bulkDownload` concurrency unified**: `maxConcurrency` parameter removed from `bulkDownload`; concurrency is now controlled entirely by rate-limit bucket configuration
 
 ### Removed
 
@@ -26,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`CatalogSeriesDto` / `CatalogSeriesDetailResponse` / `CatalogChapterDto`** — replaced by `SeriesDto` / `SeriesDetailResponse` / `ChapterDto`
 - **`LibrarySeriesDto` / `LibrarySeriesDetailResponse` / `LibraryChapterDto`** — replaced by shared catalog types
 - **`domain/Series.kt` / `domain/Chapter.kt`** lightweight url-only domain types — unused, removed to eliminate ambiguity
+- **`DownloadTaskRepositoryPort` / `DownloadTaskRepository` / `DownloadTaskTable` / `DownloadTaskEntity`** — replaced by `TaskRepositoryPort` / `TaskRepository` / `TaskTable` / `TaskEntity` in the renamed `tasks` table
+- **`SeriesTagTable` / `SeriesTagEntity`** — replaced by `TagTable` / `TagEntity`
+- **`seriesId` field on `TaskStatusResponse`** — replaced by `targetType` + `targetId`
 
 ## [0.3.0] - 2026-02-18
 
@@ -140,7 +161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | Highlights                                                    |
 |---------|------------|---------------------------------------------------------------|
-| 0.4.0   | TBD | Entity unification, unified DTOs, merge semantics             |
+| 0.4.0   | TBD        | Schema hardening, stable connector identity, task decoupling  |
 | 0.3.0   | 2026-02-18 | Domain-aware rate limiting, adaptive backoff, YAML overrides  |
 | 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                       |
 | 0.1.0   | 2026-01-31 | Initial public release                                        |
