@@ -6,8 +6,8 @@ import dev.koenv.chaptervault.api.models.task.TaskCreatedResponse
 import dev.koenv.chaptervault.api.models.task.TaskListResponse
 import dev.koenv.chaptervault.api.models.task.TaskProgressDto
 import dev.koenv.chaptervault.api.models.task.TaskStatusResponse
-import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
 import dev.koenv.chaptervault.core.repository.PersistedTask
+import dev.koenv.chaptervault.core.repository.TaskRepositoryPort
 import dev.koenv.chaptervault.core.repository.TaskStatus
 import io.ktor.http.*
 import io.ktor.server.response.*
@@ -17,7 +17,7 @@ import java.util.UUID
 /**
  * Task routes - manage background jobs (downloads, etc.).
  */
-fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
+fun Route.taskRoutes(taskRepository: TaskRepositoryPort) {
     route("/api/v1/tasks") {
 
         /**
@@ -34,7 +34,7 @@ fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
             }
             call.respond(
                 HttpStatusCode.OK,
-                TaskListResponse(tasks = downloadTaskRepository.findAll(statusFilter).map { it.toStatusResponse() })
+                TaskListResponse(tasks = taskRepository.findAll(statusFilter).map { it.toStatusResponse() })
             )
         }
 
@@ -61,7 +61,7 @@ fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
                 return@get
             }
 
-            val task = downloadTaskRepository.findById(taskId)
+            val task = taskRepository.findById(taskId)
             if (task == null) {
                 call.respond(
                     HttpStatusCode.NotFound,
@@ -102,7 +102,7 @@ fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
                 return@post
             }
 
-            val task = downloadTaskRepository.findById(taskId)
+            val task = taskRepository.findById(taskId)
             if (task == null) {
                 call.respond(
                     HttpStatusCode.NotFound,
@@ -131,7 +131,7 @@ fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
                 return@post
             }
 
-            downloadTaskRepository.markCancelled(taskId)
+            taskRepository.markCancelled(taskId)
             call.respond(
                 HttpStatusCode.OK,
                 TaskCreatedResponse(
@@ -165,7 +165,7 @@ fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
                 return@delete
             }
 
-            val task = downloadTaskRepository.findById(taskId)
+            val task = taskRepository.findById(taskId)
             if (task == null) {
                 call.respond(
                     HttpStatusCode.NotFound,
@@ -181,10 +181,10 @@ fun Route.taskRoutes(downloadTaskRepository: DownloadTaskRepositoryPort) {
             }
 
             if (task.status == TaskStatus.RUNNING || task.status == TaskStatus.PENDING) {
-                downloadTaskRepository.markCancelled(taskId)
+                taskRepository.markCancelled(taskId)
             }
 
-            downloadTaskRepository.delete(taskId)
+            taskRepository.delete(taskId)
             call.respond(HttpStatusCode.NoContent)
         }
     }
@@ -195,7 +195,8 @@ private fun PersistedTask.toStatusResponse(): TaskStatusResponse {
         id = id.toString(),
         taskType = taskType.name,
         targetUrl = targetUrl,
-        seriesId = seriesId?.toString(),
+        targetType = targetType.name,
+        targetId = targetId?.toString(),
         status = status.name,
         message = message,
         progress = TaskProgressDto(

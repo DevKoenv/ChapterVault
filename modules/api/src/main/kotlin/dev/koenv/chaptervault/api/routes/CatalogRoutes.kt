@@ -93,10 +93,11 @@ fun Route.catalogRoutes(
 
                 try {
                     val metadata = orchestrator.fetchSeriesMetadata(url)
-                    val series = seriesRepository.upsert(metadata, null)
+                    val series = seriesRepository.upsert(metadata, connector.config.id, null)
 
                     val chapters = orchestrator.fetchChapterList(url)
-                    chapterRepository.saveAll(chapters, series.id)
+                    chapterRepository.saveAll(chapters, series.id, connector.config.id)
+                    seriesRepository.stampChaptersFetchedAt(series.id)
 
                     call.respond(
                         HttpStatusCode.OK,
@@ -134,8 +135,10 @@ fun Route.catalogRoutes(
                 }
 
                 try {
+                    // Orchestrator caches results per-connector internally
                     val searchResults = orchestrator.searchSeries(query!!, connectorParam)
-                    val seriesList = seriesRepository.upsertAllFromSearch(searchResults)
+                    // Look up the now-persisted series by URL
+                    val seriesList = searchResults.mapNotNull { seriesRepository.findByUrl(it.url) }
 
                     call.respond(
                         HttpStatusCode.OK,
@@ -199,10 +202,11 @@ fun Route.catalogRoutes(
 
             val series = try {
                 val freshMetadata = orchestrator.fetchSeriesMetadata(existing.sourceUrl)
-                val updated = seriesRepository.upsert(freshMetadata, existing.language)
+                val updated = seriesRepository.upsert(freshMetadata, existing.connector, existing.language)
 
                 val chapters = orchestrator.fetchChapterList(existing.sourceUrl)
-                chapterRepository.saveAll(chapters, seriesId)
+                chapterRepository.saveAll(chapters, seriesId, existing.connector)
+                seriesRepository.stampChaptersFetchedAt(seriesId)
 
                 updated
             } catch (_: Exception) {

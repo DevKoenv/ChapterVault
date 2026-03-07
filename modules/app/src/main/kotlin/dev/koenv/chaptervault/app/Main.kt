@@ -10,7 +10,7 @@ import dev.koenv.chaptervault.connectors.registry.ConnectorRegistryImpl
 import dev.koenv.chaptervault.core.BuildConfig
 import dev.koenv.chaptervault.database.DatabaseConfig
 import dev.koenv.chaptervault.database.repository.ChapterRepository
-import dev.koenv.chaptervault.database.repository.DownloadTaskRepository
+import dev.koenv.chaptervault.database.repository.TaskRepository
 import dev.koenv.chaptervault.database.repository.SeriesRepository
 import dev.koenv.chaptervault.opds.OpdsConfiguration
 import dev.koenv.chaptervault.opds.configureOpds
@@ -61,7 +61,7 @@ fun main() {
     // Initialize repositories (order matters for foreign key constraints)
     val seriesRepository = SeriesRepository(database).also { it.initialize() }
     val chapterRepository = ChapterRepository(database).also { it.initialize() }
-    val downloadTaskRepository = DownloadTaskRepository(database).also { it.initialize() }
+    val taskRepository = TaskRepository(database).also { it.initialize() }
 
     // Run data migrations after all schemas are created
     seriesRepository.runMigrations(chapterRepository)
@@ -130,7 +130,7 @@ fun main() {
         rateLimiter = rateLimiter,
         seriesRepository = seriesRepository,
         chapterRepository = chapterRepository,
-        downloadTaskRepository = downloadTaskRepository
+        taskRepository = taskRepository
     )
     logger.info { "Orchestrator initialized" }
 
@@ -145,7 +145,7 @@ fun main() {
         connectorRegistry = connectorRegistry,
         seriesRepository = seriesRepository,
         chapterRepository = chapterRepository,
-        downloadTaskRepository = downloadTaskRepository,
+        taskRepository = taskRepository,
         storageDir = storageDir,
         cacheCleanupService = cacheCleanupService,
         siteRateLimiter = siteRateLimiter

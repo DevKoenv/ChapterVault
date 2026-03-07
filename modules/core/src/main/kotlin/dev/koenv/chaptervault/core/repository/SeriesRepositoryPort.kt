@@ -30,8 +30,9 @@ interface SeriesRepositoryPort {
      * Upsert series from full metadata using merge semantics.
      * Non-null values always win over null — existing non-null fields are never overwritten with null.
      * Preserves inLibrary status if already set.
+     * Identity is keyed on (connectorId, metadata.externalId).
      */
-    fun upsert(metadata: SeriesMetadata, language: String? = null): Series
+    fun upsert(metadata: SeriesMetadata, connectorId: String, language: String? = null): Series
 
     /**
      * Get all cached series
@@ -48,13 +49,15 @@ interface SeriesRepositoryPort {
     /**
      * Upsert a series from search results using merge semantics.
      * Non-null values always win — existing non-null fields are never overwritten with null.
+     * Identity is keyed on (connectorId, result.externalId).
      */
-    fun upsertFromSearch(result: SeriesSearchResult): Series
+    fun upsertFromSearch(result: SeriesSearchResult, connectorId: String): Series
 
     /**
      * Upsert multiple series from search results using merge semantics.
+     * Identity is keyed on (connectorId, result.externalId).
      */
-    fun upsertAllFromSearch(results: List<SeriesSearchResult>): List<Series>
+    fun upsertAllFromSearch(results: List<SeriesSearchResult>, connectorId: String): List<Series>
 
     /**
      * Find series with stale cache (not updated since the given time).
@@ -74,9 +77,10 @@ interface SeriesRepositoryPort {
 
     /**
      * Add a series to the user's library.
+     * @param autoDownload Whether new chapters should be downloaded automatically
      * @throws IllegalArgumentException if series not found
      */
-    fun addToLibrary(id: UUID): Series
+    fun addToLibrary(id: UUID, autoDownload: Boolean = false): Series
 
     /**
      * Remove a series from the user's library.
@@ -89,4 +93,9 @@ interface SeriesRepositoryPort {
      * Find all series that are in the user's library.
      */
     fun findAllInLibrary(): List<Series>
+
+    /**
+     * Stamp the chaptersFetchedAt timestamp on a series to now.
+     */
+    fun stampChaptersFetchedAt(seriesId: UUID)
 }

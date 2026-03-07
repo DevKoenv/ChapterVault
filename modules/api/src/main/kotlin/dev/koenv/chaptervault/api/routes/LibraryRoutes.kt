@@ -10,7 +10,8 @@ import dev.koenv.chaptervault.api.models.library.*
 import dev.koenv.chaptervault.api.models.task.TaskCreatedResponse
 import dev.koenv.chaptervault.core.repository.Chapter
 import dev.koenv.chaptervault.core.repository.ChapterRepositoryPort
-import dev.koenv.chaptervault.core.repository.DownloadTaskRepositoryPort
+import dev.koenv.chaptervault.core.repository.TaskRepositoryPort
+import dev.koenv.chaptervault.core.repository.TaskTargetType
 import dev.koenv.chaptervault.core.repository.Series
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.core.repository.TaskType
@@ -28,7 +29,7 @@ fun Route.libraryRoutes(
     seriesRepository: SeriesRepositoryPort,
     chapterRepository: ChapterRepositoryPort,
     orchestrator: Orchestrator,
-    downloadTaskRepository: DownloadTaskRepositoryPort
+    taskRepository: TaskRepositoryPort
 ) {
     route("/api/v1/library") {
 
@@ -109,14 +110,15 @@ fun Route.libraryRoutes(
             }
 
             try {
-                val series = seriesRepository.addToLibrary(seriesId)
+                val series = seriesRepository.addToLibrary(seriesId, request.autoDownload)
 
                 var taskId: String? = null
                 if (request.autoDownload) {
-                    val persistedTask = downloadTaskRepository.create(
-                        taskType = TaskType.DOWNLOAD_SERIES,
+                    val persistedTask = taskRepository.create(
+                        type = TaskType.DOWNLOAD_SERIES,
                         targetUrl = series.sourceUrl,
-                        seriesId = seriesId
+                        targetType = TaskTargetType.SERIES,
+                        targetId = seriesId
                     )
                     orchestrator.downloadSeries(series.sourceUrl, persistedTask.id)
                     taskId = persistedTask.id.toString()
@@ -350,10 +352,11 @@ fun Route.libraryRoutes(
 
             try {
                 val freshMetadata = orchestrator.fetchSeriesMetadata(existingSeries.sourceUrl)
-                val updatedSeries = seriesRepository.upsert(freshMetadata, existingSeries.language)
+                val updatedSeries = seriesRepository.upsert(freshMetadata, existingSeries.connector, existingSeries.language)
 
                 val chapters = orchestrator.fetchChapterList(existingSeries.sourceUrl)
-                chapterRepository.saveAll(chapters, seriesId)
+                chapterRepository.saveAll(chapters, seriesId, existingSeries.connector)
+                seriesRepository.stampChaptersFetchedAt(seriesId)
 
                 val allChapters = chapterRepository.findBySeriesId(seriesId)
                 val totalChapters = allChapters.size
@@ -430,10 +433,11 @@ fun Route.libraryRoutes(
             }
 
             try {
-                val persistedTask = downloadTaskRepository.create(
-                    taskType = TaskType.DOWNLOAD_SERIES,
+                val persistedTask = taskRepository.create(
+                    type = TaskType.DOWNLOAD_SERIES,
                     targetUrl = series.sourceUrl,
-                    seriesId = seriesId
+                    targetType = TaskTargetType.SERIES,
+                    targetId = seriesId
                 )
                 orchestrator.downloadSeries(series.sourceUrl, persistedTask.id)
 
@@ -530,11 +534,11 @@ fun Route.libraryRoutes(
             }
 
             try {
-                val persistedTask = downloadTaskRepository.create(
-                    taskType = TaskType.DOWNLOAD_CHAPTER,
+                val persistedTask = taskRepository.create(
+                    type = TaskType.DOWNLOAD_CHAPTER,
                     targetUrl = chapter.sourceUrl,
-                    seriesId = seriesId,
-                    chapterId = chapterId
+                    targetType = TaskTargetType.CHAPTER,
+                    targetId = chapterId
                 )
                 orchestrator.downloadChapters(seriesId, listOf(chapterId), persistedTask.id)
 

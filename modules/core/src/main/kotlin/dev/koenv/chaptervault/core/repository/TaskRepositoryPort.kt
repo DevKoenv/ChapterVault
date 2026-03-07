@@ -4,10 +4,10 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Port interface for download task repository.
+ * Port interface for task repository.
  * Implementations can use different database backends (H2, SQLite, PostgreSQL, etc.)
  */
-interface DownloadTaskRepositoryPort {
+interface TaskRepositoryPort {
 
     /**
      * Initialize the repository (create tables, etc.)
@@ -35,13 +35,15 @@ interface DownloadTaskRepositoryPort {
     fun findAll(status: TaskStatus? = null): List<PersistedTask>
 
     /**
-     * Create a new task
+     * Create a new task.
+     * @param targetType The type of entity this task targets
+     * @param targetId The ID of the target entity (no FK constraint)
      */
     fun create(
-        taskType: TaskType,
+        type: TaskType,
         targetUrl: String,
-        seriesId: UUID? = null,
-        chapterId: UUID? = null
+        targetType: TaskTargetType,
+        targetId: UUID? = null
     ): PersistedTask
 
     /**
