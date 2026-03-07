@@ -29,7 +29,7 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
 
     override fun initialize() {
         transaction(database) {
-            SchemaUtils.createMissingTablesAndColumns(SeriesTable, SeriesTagTable, SeriesTagsTable)
+            SchemaUtils.createMissingTablesAndColumns(SeriesTable, TagTable, SeriesTagsTable)
         }
     }
 
@@ -86,20 +86,27 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
     /**
      * Upsert series from full metadata using merge semantics.
      * Non-null values always win — existing non-null fields are never overwritten with null.
+     * Identity keyed on (connectorId, metadata.externalId).
      */
-    override fun upsert(metadata: SeriesMetadata, language: String?): Series {
+    override fun upsert(metadata: SeriesMetadata, connectorId: String, language: String?): Series {
         return transaction(database) {
             val now = Instant.now()
 
-            val existing = SeriesEntity.find { SeriesTable.sourceUrl eq metadata.url }.firstOrNull()
+            val existing = SeriesEntity.find {
+                (SeriesTable.connector eq connectorId) and (SeriesTable.externalId eq metadata.externalId)
+            }.firstOrNull()
             val entity = existing ?: SeriesEntity.new {
+                connector = connectorId
+                externalId = metadata.externalId
                 sourceUrl = metadata.url
                 createdAt = now
                 updatedAt = now
                 inLibrary = false
+                autoDownload = false
             }
 
             entity.apply {
+                sourceUrl = metadata.url
                 title = metadata.title
                 description = metadata.description ?: existing?.description
                 author = metadata.author ?: existing?.author
@@ -125,8 +132,8 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
             // Add new tags
             val tagsToAdd = newTagNames.filter { it !in existingTagNames }
             tagsToAdd.forEach { tagName ->
-                val tag = SeriesTagEntity.find { SeriesTagTable.name eq tagName }.firstOrNull()
-                    ?: SeriesTagEntity.new { name = tagName }
+                val tag = TagEntity.find { TagTable.name eq tagName }.firstOrNull()
+                    ?: TagEntity.new { name = tagName }
 
                 SeriesTagsTable.insert {
                     it[series] = entity.id
@@ -159,16 +166,19 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
     /**
      * Upsert a series from search results using merge semantics.
      * Non-null values always win — existing non-null fields are never overwritten with null.
+     * Identity keyed on (connectorId, result.externalId).
      */
-    override fun upsertFromSearch(result: SeriesSearchResult): Series {
+    override fun upsertFromSearch(result: SeriesSearchResult, connectorId: String): Series {
         return transaction(database) {
             val now = Instant.now()
 
-            val existing = SeriesEntity.find { SeriesTable.sourceUrl eq result.url }.firstOrNull()
+            val existing = SeriesEntity.find {
+                (SeriesTable.connector eq connectorId) and (SeriesTable.externalId eq result.externalId)
+            }.firstOrNull()
 
             if (existing != null) {
-                // Merge: only overwrite nullable fields if the new value is non-null
                 existing.apply {
+                    sourceUrl = result.url
                     title = result.title
                     description = result.description ?: existing.description
                     coverUrl = result.coverUrl ?: existing.coverUrl
@@ -178,6 +188,8 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
             }
 
             val entity = SeriesEntity.new {
+                connector = connectorId
+                externalId = result.externalId
                 sourceUrl = result.url
                 title = result.title
                 description = result.description
@@ -189,21 +201,25 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
                 updatedAt = now
                 inLibrary = false
                 addedToLibraryAt = null
+                autoDownload = false
             }
 
             entity.toSeries()
         }
     }
 
-    override fun upsertAllFromSearch(results: List<SeriesSearchResult>): List<Series> {
+    override fun upsertAllFromSearch(results: List<SeriesSearchResult>, connectorId: String): List<Series> {
         return transaction(database) {
             results.map { result ->
                 val now = Instant.now()
 
-                val existing = SeriesEntity.find { SeriesTable.sourceUrl eq result.url }.firstOrNull()
+                val existing = SeriesEntity.find {
+                    (SeriesTable.connector eq connectorId) and (SeriesTable.externalId eq result.externalId)
+                }.firstOrNull()
 
                 if (existing != null) {
                     existing.apply {
+                        sourceUrl = result.url
                         title = result.title
                         description = result.description ?: existing.description
                         coverUrl = result.coverUrl ?: existing.coverUrl
@@ -213,6 +229,8 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
                 }
 
                 val entity = SeriesEntity.new {
+                    connector = connectorId
+                    externalId = result.externalId
                     sourceUrl = result.url
                     title = result.title
                     description = result.description
@@ -224,6 +242,7 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
                     updatedAt = now
                     inLibrary = false
                     addedToLibraryAt = null
+                    autoDownload = false
                 }
 
                 entity.toSeries()
@@ -262,7 +281,7 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
         }
     }
 
-    override fun addToLibrary(id: UUID): Series {
+    override fun addToLibrary(id: UUID, autoDownload: Boolean): Series {
         return transaction(database) {
             val entity = SeriesEntity.findById(id)
                 ?: throw IllegalArgumentException("Series not found: $id")
@@ -270,6 +289,7 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
             val now = Instant.now()
             entity.inLibrary = true
             entity.addedToLibraryAt = now
+            entity.autoDownload = autoDownload
             entity.updatedAt = now
 
             entity.toSeries()
@@ -296,9 +316,18 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
         }
     }
 
+    override fun stampChaptersFetchedAt(seriesId: UUID) {
+        transaction(database) {
+            val entity = SeriesEntity.findById(seriesId) ?: return@transaction
+            entity.chaptersFetchedAt = Instant.now()
+        }
+    }
+
     private fun SeriesEntity.toSeries(): Series {
         return Series(
             id = id.value,
+            connector = connector,
+            externalId = externalId,
             sourceUrl = sourceUrl,
             title = title,
             description = description,
@@ -309,6 +338,8 @@ class SeriesRepository(private val database: Database) : SeriesRepositoryPort {
             tags = tags.map { it.name },
             inLibrary = inLibrary,
             addedToLibraryAt = addedToLibraryAt,
+            autoDownload = autoDownload,
+            chaptersFetchedAt = chaptersFetchedAt,
             createdAt = createdAt,
             updatedAt = updatedAt
         )

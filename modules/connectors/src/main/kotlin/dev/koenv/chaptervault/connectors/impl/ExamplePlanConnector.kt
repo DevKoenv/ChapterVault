@@ -117,6 +117,7 @@ class ExamplePlanConnector(
             SeriesSearchResult(
                 url = url,
                 title = item["title"] as? String ?: "Unknown",
+                externalId = url.substringAfterLast("/"),
                 description = item["description"] as? String,
                 coverUrl = item["coverUrl"] as? String
             )
@@ -154,6 +155,7 @@ class ExamplePlanConnector(
         return SeriesMetadata(
             url = seriesUrl,
             title = extracted.getString("title") ?: "Unknown",
+            externalId = seriesUrl.substringAfterLast("/"),
             description = extracted.getString("description"),
             author = extracted.getString("author"),
             coverUrl = extracted.getString("coverUrl"),
@@ -201,6 +203,8 @@ class ExamplePlanConnector(
                 seriesUrl = seriesUrl,
                 title = title,
                 chapterNumber = number,
+                externalId = chapterUrl.substringAfterLast("/"),
+                chapterIndex = number.toFloatOrNull()?.times(1000)?.toInt(),
                 publishDate = dateText,
                 pageCount = null
             )

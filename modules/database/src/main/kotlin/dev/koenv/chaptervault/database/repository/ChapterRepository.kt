@@ -43,6 +43,7 @@ class ChapterRepository(private val database: Database) : ChapterRepositoryPort 
         return transaction(database) {
             ChapterEntity.find { ChapterTable.seriesId eq seriesId }
                 .map { it.toChapter() }
+                .sortedWith(compareBy(nullsLast()) { it.chapterIndex })
         }
     }
 
@@ -64,23 +65,29 @@ class ChapterRepository(private val database: Database) : ChapterRepositoryPort 
         }
     }
 
-    override fun save(metadata: ChapterMetadata, seriesId: UUID): Chapter {
+    override fun save(metadata: ChapterMetadata, seriesId: UUID, connectorId: String): Chapter {
         return transaction(database) {
             val now = Instant.now()
             val series = SeriesEntity.findById(seriesId)
                 ?: throw IllegalArgumentException("Series not found: $seriesId")
 
-            val entity = ChapterEntity.find { ChapterTable.sourceUrl eq metadata.url }.firstOrNull()
+            val entity = ChapterEntity.find {
+                (ChapterTable.connector eq connectorId) and (ChapterTable.externalId eq metadata.externalId)
+            }.firstOrNull()
                 ?: ChapterEntity.new {
                     this.series = series
+                    connector = connectorId
+                    externalId = metadata.externalId
                     sourceUrl = metadata.url
                     downloadStatus = DownloadStatus.NOT_DOWNLOADED.name
                     createdAt = now
                 }
 
             entity.apply {
+                sourceUrl = metadata.url
                 title = metadata.title
                 chapterNumber = metadata.chapterNumber
+                chapterIndex = metadata.chapterIndex
                 publishDate = metadata.publishDate
                 pageCount = metadata.pageCount
                 updatedAt = now
@@ -90,24 +97,30 @@ class ChapterRepository(private val database: Database) : ChapterRepositoryPort 
         }
     }
 
-    override fun saveAll(chapters: List<ChapterMetadata>, seriesId: UUID): List<Chapter> {
+    override fun saveAll(chapters: List<ChapterMetadata>, seriesId: UUID, connectorId: String): List<Chapter> {
         return transaction(database) {
             chapters.map { metadata ->
                 val now = Instant.now()
                 val series = SeriesEntity.findById(seriesId)
                     ?: throw IllegalArgumentException("Series not found: $seriesId")
 
-                val entity = ChapterEntity.find { ChapterTable.sourceUrl eq metadata.url }.firstOrNull()
+                val entity = ChapterEntity.find {
+                    (ChapterTable.connector eq connectorId) and (ChapterTable.externalId eq metadata.externalId)
+                }.firstOrNull()
                     ?: ChapterEntity.new {
                         this.series = series
+                        connector = connectorId
+                        externalId = metadata.externalId
                         sourceUrl = metadata.url
                         downloadStatus = DownloadStatus.NOT_DOWNLOADED.name
                         createdAt = now
                     }
 
                 entity.apply {
+                    sourceUrl = metadata.url
                     title = metadata.title
                     chapterNumber = metadata.chapterNumber
+                    chapterIndex = metadata.chapterIndex
                     publishDate = metadata.publishDate
                     pageCount = metadata.pageCount
                     updatedAt = now
@@ -193,9 +206,12 @@ class ChapterRepository(private val database: Database) : ChapterRepositoryPort 
         return Chapter(
             id = id.value,
             seriesId = series.id.value,
+            connector = connector,
+            externalId = externalId,
             sourceUrl = sourceUrl,
             title = title,
             chapterNumber = chapterNumber,
+            chapterIndex = chapterIndex,
             publishDate = publishDate,
             pageCount = pageCount,
             downloadStatus = DownloadStatus.valueOf(downloadStatus),

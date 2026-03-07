@@ -105,6 +105,7 @@ class ExampleBrowserPlanConnector(
             SeriesSearchResult(
                 url = resolveUrl(url),
                 title = element.textContent?.trim() ?: "Unknown",
+                externalId = resolveUrl(url).substringAfterLast("/"),
                 description = element.dataAttr("description"),
                 coverUrl = element.src()?.let { resolveUrl(it) }
                     ?: element.dataAttr("cover")?.let { resolveUrl(it) }
@@ -167,6 +168,7 @@ class ExampleBrowserPlanConnector(
         return SeriesMetadata(
             url = seriesUrl,
             title = titleResult?.element?.textContent?.trim() ?: "Unknown",
+            externalId = seriesUrl.substringAfterLast("/"),
             description = descResult?.element?.textContent?.trim(),
             author = authorResult?.element?.textContent?.trim(),
             coverUrl = coverResult?.element?.src()?.let { resolveUrl(it) },
@@ -215,6 +217,8 @@ class ExampleBrowserPlanConnector(
                 seriesUrl = seriesUrl,
                 title = title,
                 chapterNumber = number,
+                externalId = resolveUrl(chapterUrl).substringAfterLast("/"),
+                chapterIndex = number.toFloatOrNull()?.times(1000)?.toInt(),
                 publishDate = element.dataAttr("date"),
                 pageCount = element.dataAttr("pages")?.toIntOrNull()
             )

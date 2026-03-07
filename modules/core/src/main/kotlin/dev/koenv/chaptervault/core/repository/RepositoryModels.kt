@@ -14,12 +14,18 @@ import java.util.UUID
  * Nullable fields encode "not yet fetched" — null simply means the value is unknown.
  *
  * @property id Internal database UUID
+ * @property connector Connector ID that owns this series
+ * @property externalId Connector-assigned stable identifier
  * @property sourceUrl Original URL from the content source
  * @property inLibrary Whether this series is in the user's library
  * @property addedToLibraryAt When the series was added to library (null if not in library)
+ * @property autoDownload Whether new chapters should be downloaded automatically
+ * @property chaptersFetchedAt When the chapter list was last fetched from source
  */
 data class Series(
     val id: UUID,
+    val connector: String,
+    val externalId: String,
     val sourceUrl: String,
     val title: String,
     val description: String?,
@@ -30,6 +36,8 @@ data class Series(
     val tags: List<String>,
     val inLibrary: Boolean = false,
     val addedToLibraryAt: Instant? = null,
+    val autoDownload: Boolean = false,
+    val chaptersFetchedAt: Instant? = null,
     val createdAt: Instant,
     val updatedAt: Instant
 )
@@ -51,9 +59,12 @@ enum class DownloadStatus {
 data class Chapter(
     val id: UUID,
     val seriesId: UUID,
+    val connector: String,
+    val externalId: String,
     val sourceUrl: String,
     val title: String,
     val chapterNumber: String,
+    val chapterIndex: Int?,
     val publishDate: String?,
     val pageCount: Int?,
     val downloadStatus: DownloadStatus,
@@ -86,14 +97,22 @@ enum class TaskStatus {
 }
 
 /**
+ * Target entity type for tasks — decoupled from FK references.
+ */
+enum class TaskTargetType {
+    SERIES,
+    CHAPTER
+}
+
+/**
  * Persisted task model for download tracking.
  */
 data class PersistedTask(
     val id: UUID,
     val taskType: TaskType,
     val targetUrl: String,
-    val seriesId: UUID?,
-    val chapterId: UUID?,
+    val targetType: TaskTargetType,
+    val targetId: UUID?,
     val status: TaskStatus,
     val message: String?,
     val currentProgress: Int,

@@ -7,7 +7,7 @@ import org.jetbrains.exposed.v1.core.Table
  */
 object SeriesTagsTable : Table("series_tags") {
     val series = reference("series_id", SeriesTable)
-    val tag = reference("tag_id", SeriesTagTable)
-    
+    val tag = reference("tag_id", TagTable)
+
     override val primaryKey = PrimaryKey(series, tag)
 }
