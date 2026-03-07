@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.api.routes
 
 import dev.koenv.chaptervault.api.models.ErrorTypes
+import dev.koenv.chaptervault.api.models.Pagination
 import dev.koenv.chaptervault.api.models.ProblemDetail
 import dev.koenv.chaptervault.api.models.catalog.*
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
@@ -10,7 +11,6 @@ import dev.koenv.chaptervault.core.repository.Series
 import dev.koenv.chaptervault.core.repository.SeriesRepositoryPort
 import dev.koenv.chaptervault.orchestration.engine.Orchestrator
 import io.ktor.http.*
-import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.util.UUID
@@ -49,38 +49,17 @@ fun Route.catalogRoutes(
         }
 
         /**
-         * POST /api/v1/catalog/lookup
-         * Lookup series by URL or search by query.
+         * GET /api/v1/catalog/search?q=&url=&connector=
+         * Search for series by keyword or URL.
          *
-         * Request body fields:
-         * - `url`: Direct URL to a series page (connector auto-detected)
-         * - `query` + `source`: Search term with connector ID
-         *
-         * At least one of `url` or `query` must be provided.
-         * When using `query`, the `source` parameter is required.
-         *
-         * Returns [SeriesDetailResponse] for URL lookups.
-         * Returns [CatalogLookupResponse] for search queries.
+         * At least one of `q` or `url` must be provided.
+         * `connector` is optional; for `q`, scopes search to one connector.
+         * For `url`, the connector is resolved automatically.
          */
-        post("/lookup") {
-            val request = try {
-                call.receive<CatalogLookupRequest>()
-            } catch (e: Exception) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    ProblemDetail(
-                        type = ErrorTypes.VALIDATION,
-                        title = "Invalid Request",
-                        status = 400,
-                        detail = "Invalid request body: ${e.message}",
-                        instance = call.request.local.uri
-                    )
-                )
-                return@post
-            }
-
-            val url = request.url?.trim()?.takeIf { it.isNotBlank() }
-            val query = request.query?.trim()?.takeIf { it.isNotBlank() }
+        get("/search") {
+            val url = call.request.queryParameters["url"]?.trim()?.takeIf { it.isNotBlank() }
+            val query = call.request.queryParameters["q"]?.trim()?.takeIf { it.isNotBlank() }
+            val connectorParam = call.request.queryParameters["connector"]?.trim()?.takeIf { it.isNotBlank() }
 
             if (url == null && query == null) {
                 call.respond(
@@ -89,15 +68,30 @@ fun Route.catalogRoutes(
                         type = ErrorTypes.VALIDATION,
                         title = "Missing Parameter",
                         status = 400,
-                        detail = "At least one of 'url' or 'query' must be provided",
+                        detail = "At least one of 'q' or 'url' must be provided",
                         instance = call.request.local.uri
                     )
                 )
-                return@post
+                return@get
             }
 
             if (url != null) {
-                // URL lookup - always fetch fresh metadata and chapter list from connector
+                // URL lookup — connector resolved from URL
+                val connector = connectorRegistry.findConnector(url)
+                if (connector == null) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ProblemDetail(
+                            type = ErrorTypes.VALIDATION,
+                            title = "Unsupported URL",
+                            status = 400,
+                            detail = "No connector can handle the provided URL",
+                            instance = call.request.local.uri
+                        )
+                    )
+                    return@get
+                }
+
                 try {
                     val metadata = orchestrator.fetchSeriesMetadata(url)
                     val series = seriesRepository.upsert(metadata, null)
@@ -105,37 +99,11 @@ fun Route.catalogRoutes(
                     val chapters = orchestrator.fetchChapterList(url)
                     chapterRepository.saveAll(chapters, series.id)
 
-                    val allChapters = chapterRepository.findBySeriesId(series.id)
-                    val totalChapters = allChapters.size
-                    val downloadedChapters = chapterRepository.countDownloaded(series.id).toInt()
-
                     call.respond(
                         HttpStatusCode.OK,
-                        SeriesDetailResponse(
-                            id = series.id.toString(),
-                            sourceUrl = series.sourceUrl,
-                            title = series.title,
-                            description = series.description,
-                            author = series.author,
-                            coverUrl = series.coverUrl,
-                            tags = series.tags,
-                            status = series.status.name,
-                            totalChapters = totalChapters,
-                            downloadedChapters = downloadedChapters,
-                            inLibrary = series.inLibrary,
-                            addedToLibraryAt = series.addedToLibraryAt?.toString(),
-                            chapters = allChapters.map { it.toChapterDto() }
-                        )
-                    )
-                } catch (e: IllegalArgumentException) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ProblemDetail(
-                            type = ErrorTypes.VALIDATION,
-                            title = "Unsupported URL",
-                            status = 400,
-                            detail = e.message ?: "No connector supports this URL",
-                            instance = call.request.local.uri
+                        CatalogSearchResponse(
+                            series = listOf(series.toSeriesDto(chapterRepository)),
+                            connector = connector.config.id
                         )
                     )
                 } catch (e: Exception) {
@@ -151,49 +119,30 @@ fun Route.catalogRoutes(
                     )
                 }
             } else {
-                // Search query - requires source parameter
-                val source = request.source?.trim()?.takeIf { it.isNotBlank() }
-                if (source == null) {
+                // Keyword search
+                if (connectorParam != null && connectorRegistry.findById(connectorParam) == null) {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ProblemDetail(
                             type = ErrorTypes.VALIDATION,
-                            title = "Source Required",
+                            title = "Invalid Connector",
                             status = 400,
-                            detail = "Search queries require a 'source' parameter to specify which connector to search",
+                            detail = "Unknown connector: $connectorParam",
                             instance = call.request.local.uri
                         )
                     )
-                    return@post
-                }
-
-                if (connectorRegistry.findById(source) == null) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ProblemDetail(
-                            type = ErrorTypes.VALIDATION,
-                            title = "Invalid Source",
-                            status = 400,
-                            detail = "Unknown connector: $source",
-                            instance = call.request.local.uri
-                        )
-                    )
-                    return@post
+                    return@get
                 }
 
                 try {
-                    val searchResults = orchestrator.searchSeries(query!!, source)
+                    val searchResults = orchestrator.searchSeries(query!!, connectorParam)
                     val seriesList = seriesRepository.upsertAllFromSearch(searchResults)
-
-                    val results = seriesList.map { series ->
-                        series.toSeriesDto(chapterRepository)
-                    }
 
                     call.respond(
                         HttpStatusCode.OK,
-                        CatalogLookupResponse(
-                            series = results,
-                            source = source
+                        CatalogSearchResponse(
+                            series = seriesList.map { it.toSeriesDto(chapterRepository) },
+                            connector = connectorParam
                         )
                     )
                 } catch (e: Exception) {
@@ -213,8 +162,7 @@ fun Route.catalogRoutes(
 
         /**
          * GET /api/v1/catalog/series/{seriesId}
-         * Get series detail with all chapters.
-         * Always fetches fresh metadata from the source connector.
+         * Get series detail. Always fetches fresh metadata from the source connector.
          */
         get("/series/{seriesId}") {
             val seriesIdParam = call.parameters["seriesId"]
@@ -250,7 +198,6 @@ fun Route.catalogRoutes(
                 return@get
             }
 
-            // Always fetch fresh metadata and chapter list from connector
             val series = try {
                 val freshMetadata = orchestrator.fetchSeriesMetadata(existing.sourceUrl)
                 val updated = seriesRepository.upsert(freshMetadata, existing.language)
@@ -288,10 +235,10 @@ fun Route.catalogRoutes(
         }
 
         /**
-         * POST /api/v1/catalog/series/{seriesId}/refresh
-         * Force refresh metadata for a series from the source.
+         * GET /api/v1/catalog/series/{seriesId}/chapters?page=1&pageSize=100
+         * Paginated chapter list for a series.
          */
-        post("/series/{seriesId}/refresh") {
+        get("/series/{seriesId}/chapters") {
             val seriesIdParam = call.parameters["seriesId"]
 
             val seriesId = try {
@@ -307,11 +254,10 @@ fun Route.catalogRoutes(
                         instance = call.request.local.uri
                     )
                 )
-                return@post
+                return@get
             }
 
-            val existingSeries = seriesRepository.findById(seriesId)
-            if (existingSeries == null) {
+            if (seriesRepository.findById(seriesId) == null) {
                 call.respond(
                     HttpStatusCode.NotFound,
                     ProblemDetail(
@@ -322,50 +268,29 @@ fun Route.catalogRoutes(
                         instance = call.request.local.uri
                     )
                 )
-                return@post
+                return@get
             }
 
-            try {
-                val freshMetadata = orchestrator.fetchSeriesMetadata(existingSeries.sourceUrl)
-                val updatedSeries = seriesRepository.upsert(freshMetadata, existingSeries.language)
+            val page = call.request.queryParameters["page"]?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+            val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull()?.coerceIn(1, 500) ?: 100
+            val offset = (page - 1) * pageSize
 
-                val chapters = orchestrator.fetchChapterList(existingSeries.sourceUrl)
-                chapterRepository.saveAll(chapters, seriesId)
+            val allChapters = chapterRepository.findBySeriesId(seriesId)
+            val total = allChapters.size.toLong()
+            val pageChapters = allChapters.drop(offset).take(pageSize)
 
-                val allChapters = chapterRepository.findBySeriesId(seriesId)
-                val totalChapters = allChapters.size
-                val downloadedChapters = chapterRepository.countDownloaded(seriesId).toInt()
-
-                call.respond(
-                    HttpStatusCode.OK,
-                    SeriesDetailResponse(
-                        id = updatedSeries.id.toString(),
-                        sourceUrl = updatedSeries.sourceUrl,
-                        title = updatedSeries.title,
-                        description = updatedSeries.description,
-                        author = updatedSeries.author,
-                        coverUrl = updatedSeries.coverUrl,
-                        tags = updatedSeries.tags,
-                        status = updatedSeries.status.name,
-                        totalChapters = totalChapters,
-                        downloadedChapters = downloadedChapters,
-                        inLibrary = updatedSeries.inLibrary,
-                        addedToLibraryAt = updatedSeries.addedToLibraryAt?.toString(),
-                        chapters = allChapters.map { it.toChapterDto() }
+            call.respond(
+                HttpStatusCode.OK,
+                ChapterListResponse(
+                    chapters = pageChapters.map { it.toChapterDto() },
+                    pagination = Pagination(
+                        offset = offset,
+                        limit = pageSize,
+                        total = total,
+                        hasMore = offset + pageChapters.size < total
                     )
                 )
-            } catch (e: Exception) {
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ProblemDetail(
-                        type = ErrorTypes.INTERNAL_ERROR,
-                        title = "Metadata Refresh Failed",
-                        status = 500,
-                        detail = e.message ?: "Unknown error",
-                        instance = call.request.local.uri
-                    )
-                )
-            }
+            )
         }
     }
 }

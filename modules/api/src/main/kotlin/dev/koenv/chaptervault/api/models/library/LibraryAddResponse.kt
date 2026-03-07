@@ -10,5 +10,6 @@ data class LibraryAddResponse(
     val id: String,
     val title: String,
     val inLibrary: Boolean,
-    val addedToLibraryAt: String?
+    val addedToLibraryAt: String?,
+    val taskId: String? = null
 )
