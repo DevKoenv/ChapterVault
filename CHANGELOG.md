@@ -2,12 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on \[Keep a Changelog\]\(https://keepachangelog.com/en/1.1.0/),
+and this project adheres to \[Semantic Versioning\]\(https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.4.0] - TBD
+## [0.4.1] - 2026-03-08
+
+> Release note: Identical to `0.4.0`. An existing immutable `v0.4.0` tag prevented creating a release for that tag, so this release is published as `0.4.1`.
+
+## [0.4.0] - 2026-03-07
 
 ### Added
 
@@ -83,8 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Series Caching**: Lookup results are now cached in the database, giving all series a stable ID
 - **Library Separation**: New `inLibrary` flag distinguishes user's collection from cached metadata
 - **Unified Lookup Endpoint**: `POST /api/v1/catalog/lookup` handles both URL lookups and searches
-  - URL lookup: `{"url": "https://..."}` - auto-detects connector
-  - Search: `{"query": "term", "source": "connector-id"}` - requires source to prevent concurrent load
+    - URL lookup: `{"url": "https://..."}` - auto-detects connector
+    - Search: `{"query": "term", "source": "connector-id"}` - requires source to prevent concurrent load
 - **Library Management API**: Add/remove series from library via `POST/DELETE /api/v1/library/series/{id}`
 - **Metadata Refresh**: Force refresh metadata from source via `POST /api/v1/catalog/series/{id}/refresh`
 - **Auto-fetch on Detail**: `GET /api/v1/catalog/series/{id}` auto-fetches full metadata if only search data exists
@@ -161,13 +165,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | Highlights                                                    |
 |---------|------------|---------------------------------------------------------------|
-| 0.4.0   | TBD        | Schema hardening, stable connector identity, task decoupling  |
+| 0.4.1   | 2026-03-08 | Schema hardening, stable connector identity, task decoupling  |
 | 0.3.0   | 2026-02-18 | Domain-aware rate limiting, adaptive backoff, YAML overrides  |
 | 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                       |
 | 0.1.0   | 2026-01-31 | Initial public release                                        |
 
-[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/DevKoenv/ChapterVault/releases/tag/v0.1.0
+\[Unreleased\]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.1...HEAD
+\[0.4.1\]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...v0.4.1
+\[0.3.0\]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...v0.3.0
+\[0.2.0\]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0
+\[0.1.0\]: https://github.com/DevKoenv/ChapterVault/releases/tag/v0.1.0
