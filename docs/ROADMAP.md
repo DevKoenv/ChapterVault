@@ -41,7 +41,11 @@ This document outlines features, improvements, and items that need attention for
 
 | Feature                  | Status          | Notes                                                  |
 | ------------------------ | --------------- | ------------------------------------------------------ |
-| Entity unification       | In Progress     | Unified `Series`/`Chapter` models, merged DTOs, v0.4.0 |
+| Schema hardening         | Complete        | Stable connector identity, task decoupling, v0.4.0     |
+| Entity unification       | Complete        | Unified `Series`/`Chapter` models, merged DTOs, v0.4.0 |
+| Connector identity       | Complete        | `connector` + `externalId` on all series/chapters, v0.4.0 |
+| Chapter ordering         | Complete        | `chapterIndex` column, sorted `findBySeriesId()`, v0.4.0  |
+| Auto-download flag       | Complete        | `autoDownload` persisted on series, v0.4.0             |
 | OPDS page streaming      | Stubbed         | Returns 501 Not Implemented                            |
 | Authentication           | Framework only  | Config structures exist, not wired to requests         |
 | Proxy support            | Not integrated  | Configuration parsed, never applied                    |
@@ -168,7 +172,8 @@ This document outlines features, improvements, and items that need attention for
 #### 14. Scheduling
 
 - [ ] Scheduled series refresh
-- [ ] Auto-download new chapters
+- [x] Auto-download flag on library add — `autoDownload` persisted on series, triggers download task on add, v0.4.0
+- [ ] Auto-download new chapters (on refresh)
 - [ ] Download queue priorities
 - [ ] Bandwidth throttling
 
@@ -353,7 +358,7 @@ class MyConnector(override val executor: Executor) : Connector {
 | v0.1.0  | Released    | 2026-01-31 |
 | v0.2.0  | Released    | 2026-02-05 |
 | v0.3.0  | Released    | 2026-02-18 |
-| v0.4.0  | In Progress | TBD        |
+| v0.4.0  | Released    | TBD        |
 | v1.0.0  | Planned     | TBD        |
 | v1.1.0  | Planned     | TBD        |
 | v2.0.0  | Future      | TBD        |
