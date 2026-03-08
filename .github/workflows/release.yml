@@ -67,7 +67,7 @@ jobs:
         with:
           name: ChapterVault v${{ steps.gradle_version.outputs.version }}
           tag_name: v${{ steps.gradle_version.outputs.version }}
-          draft: false
+          draft: true
           prerelease: ${{ contains(steps.gradle_version.outputs.version, '-') }}
           generate_release_notes: true
           files: |
