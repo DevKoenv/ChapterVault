@@ -119,6 +119,9 @@ class ConfigurationServiceImpl(
         val dataPath = raw["dataPath"]?.toString()
             ?: raw["data_path"]?.toString()
             ?: defaults.dataPath
+        val modulesPath = raw["modulesPath"]?.toString()
+            ?: raw["modules_path"]?.toString()
+            ?: defaults.modulesPath
         val server = (raw["server"] as? Map<String, Any>)?.let { parseServer(it) } ?: ServerConfig()
         val storage = (raw["storage"] as? Map<String, Any>)?.let { parseStorage(it) } ?: StorageAppConfig()
         val database = (raw["database"] as? Map<String, Any>)?.let { parseDatabase(it) } ?: DatabaseAppConfig()
@@ -129,6 +132,7 @@ class ConfigurationServiceImpl(
 
         return AppConfig(
             dataPath = dataPath,
+            modulesPath = modulesPath,
             server = server,
             storage = storage,
             database = database,
@@ -378,6 +382,11 @@ class ConfigurationServiceImpl(
         // Data path override
         System.getenv("CHAPTERVAULT_DATA_PATH")?.let {
             result = result.copy(dataPath = it)
+        }
+
+        // Modules path override
+        System.getenv("CHAPTERVAULT_MODULES_PATH")?.let {
+            result = result.copy(modulesPath = it)
         }
 
         // Server overrides

@@ -1,0 +1,6 @@
+name: My Module
+version: 1.0.0
+description: Adds a connector for example.com
+author: Your Name
+apiVersion: 1
+main: com.example.mymodule.MyModule

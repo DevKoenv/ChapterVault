@@ -98,6 +98,17 @@ fun main() {
     // Example:
     // connectorRegistry.register(MyLegalConnector(executor))
 
+    // Load external modules from the modules directory
+    val modulesDir = File(appConfig.modulesPath)
+    modulesDir.mkdirs()
+    logger.info { "Modules directory: ${modulesDir.absolutePath}" }
+    val moduleLoader = ModuleLoader(modulesDir, executor)
+    val externalConnectors = moduleLoader.load()
+    externalConnectors.forEach { connectorRegistry.register(it) }
+    if (externalConnectors.isNotEmpty()) {
+        logger.info { "Loaded ${externalConnectors.size} connector(s) from external modules" }
+    }
+
     // Apply YAML configuration overrides and register connectors with both rate limiters
     val rateLimiter = RateLimiter()
     for (connector in connectorRegistry.getAllConnectors()) {
@@ -176,6 +187,7 @@ fun main() {
     // Add shutdown hook
     Runtime.getRuntime().addShutdownHook(Thread {
         logger.info { "${BuildConfig.APP_NAME} shutting down..." }
+        moduleLoader.shutdown()
         cacheCleanupService.stop()
         orchestrator.shutdown()
         server.stop(1000, 2000)
