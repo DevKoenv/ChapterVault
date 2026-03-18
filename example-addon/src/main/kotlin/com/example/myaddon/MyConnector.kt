@@ -1,4 +1,4 @@
-package com.example.mymodule
+package com.example.myaddon
 
 import dev.koenv.chaptervault.core.connector.Connector
 import dev.koenv.chaptervault.core.connector.ConnectorConfig
@@ -26,13 +26,13 @@ private val logger = KotlinLogging.logger {}
 /**
  * Main connector for example.com.
  *
- * Receives its configuration from [MyModule] via [moduleConfig], so the module
+ * Receives its configuration from [MyAddon] via [addonConfig], so the addon
  * acts as the single point of configuration for all connectors it registers.
- * Use [moduleConfig.executor] for all network requests — never create your own HTTP client.
+ * Use [addonConfig.executor] for all network requests — never create your own HTTP client.
  */
 open class MyConnector(
     override val executor: Executor,
-    protected val moduleConfig: ModuleConfig,
+    protected val addonConfig: AddonConfig,
 ) : Connector {
 
     override val config = ConnectorConfig(
@@ -47,7 +47,7 @@ open class MyConnector(
         ),
         features = ConnectorFeatures(
             supportsSearch = true,
-            requiresAuth = moduleConfig.apiKey != null,
+            requiresAuth = addonConfig.apiKey != null,
             supportsBatchDownload = true,
             supportsPageCount = false,
             maxConcurrentDownloads = 3
@@ -57,13 +57,13 @@ open class MyConnector(
     override val baseUrls = listOf("example.com", "www.example.com")
 
     /**
-     * Inject module-level headers (e.g. API key) into every request made by this connector.
+     * Inject addon-level headers (e.g. API key) into every request made by this connector.
      * Override this in subclasses to add additional context.
      */
     override fun getExecutionContext(): ExecutionContext {
         val base = super.getExecutionContext()
-        return if (moduleConfig.apiKey != null) {
-            base.copy(defaultHeaders = base.defaultHeaders + mapOf("X-API-Key" to moduleConfig.apiKey))
+        return if (addonConfig.apiKey != null) {
+            base.copy(defaultHeaders = base.defaultHeaders + mapOf("X-API-Key" to addonConfig.apiKey))
         } else {
             base
         }
@@ -76,7 +76,7 @@ open class MyConnector(
     override suspend fun searchSeries(query: String): List<SeriesSearchResult> {
         val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
         val plan = executionPlan {
-            extractData(url = "${moduleConfig.baseUrl}/search?q=$encodedQuery", id = "search") {
+            extractData(url = "${addonConfig.baseUrl}/search?q=$encodedQuery", id = "search") {
                 nestedList("results", ".manga-card") {
                     href("url", "a")
                     text("title", ".title")

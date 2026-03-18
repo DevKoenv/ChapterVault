@@ -1,6 +1,7 @@
-name: My Module
+id: my-addon
+name: My Addon
 version: 1.0.0
 description: Adds a connector for example.com
 author: Your Name
 apiVersion: 1
-main: com.example.mymodule.MyModule
+main: com.example.myaddon.MyAddon

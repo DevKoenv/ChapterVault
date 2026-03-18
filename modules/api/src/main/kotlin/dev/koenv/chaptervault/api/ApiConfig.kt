@@ -2,10 +2,12 @@ package dev.koenv.chaptervault.api
 
 import dev.koenv.chaptervault.api.models.ErrorTypes
 import dev.koenv.chaptervault.api.models.ProblemDetail
+import dev.koenv.chaptervault.api.routes.addonRoutes
 import dev.koenv.chaptervault.api.routes.adminRoutes
 import dev.koenv.chaptervault.api.routes.catalogRoutes
 import dev.koenv.chaptervault.api.routes.libraryRoutes
 import dev.koenv.chaptervault.api.routes.taskRoutes
+import dev.koenv.chaptervault.core.addon.AddonRegistry
 import dev.koenv.chaptervault.orchestration.cache.CacheCleanupService
 import dev.koenv.chaptervault.orchestration.ratelimit.SiteRateLimiter
 import dev.koenv.chaptervault.core.BuildConfig
@@ -42,7 +44,8 @@ data class ApiConfiguration(
     val taskRepository: TaskRepositoryPort,
     val storageDir: File,
     val cacheCleanupService: CacheCleanupService? = null,
-    val siteRateLimiter: SiteRateLimiter? = null
+    val siteRateLimiter: SiteRateLimiter? = null,
+    val addonRegistry: AddonRegistry? = null
 )
 
 fun Application.configureApi(config: ApiConfiguration) {
@@ -123,5 +126,6 @@ fun Application.configureApi(config: ApiConfiguration) {
         taskRoutes(config.taskRepository)
         libraryRoutes(config.seriesRepository, config.chapterRepository, config.orchestrator, config.taskRepository)
         adminRoutes(config.cacheCleanupService, config.siteRateLimiter, config.orchestrator)
+        config.addonRegistry?.let { addonRoutes(it) }
     }
 }

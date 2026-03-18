@@ -98,18 +98,16 @@ fun main() {
     // Example:
     // connectorRegistry.register(MyLegalConnector(executor))
 
-    // Load external modules from the modules directory
-    val modulesDir = File(appConfig.modulesPath)
-    modulesDir.mkdirs()
-    logger.info { "Modules directory: ${modulesDir.absolutePath}" }
-    val moduleLoader = ModuleLoader(modulesDir, executor)
-    val externalConnectors = moduleLoader.load()
-    externalConnectors.forEach { connectorRegistry.register(it) }
-    if (externalConnectors.isNotEmpty()) {
-        logger.info { "Loaded ${externalConnectors.size} connector(s) from external modules" }
-    }
+    // Load external addons from the addons directory
+    val addonsDir = File(appConfig.addonsPath)
+    addonsDir.mkdirs()
+    logger.info { "Addons directory: ${addonsDir.absolutePath}" }
+    val addonRegistry = AddonRegistryImpl(addonsDir, appConfig.addonsPath, executor, connectorRegistry)
+    addonRegistry.load()
 
-    // Apply YAML configuration overrides and register connectors with both rate limiters
+    // Apply YAML configuration overrides and register connectors with both rate limiters.
+    // This loop runs after addonRegistry.load() so that addon connectors are already in the
+    // registry and receive the same rate limit configuration as built-in connectors.
     val rateLimiter = RateLimiter()
     for (connector in connectorRegistry.getAllConnectors()) {
         val connConfig = connector.config
@@ -159,7 +157,8 @@ fun main() {
         taskRepository = taskRepository,
         storageDir = storageDir,
         cacheCleanupService = cacheCleanupService,
-        siteRateLimiter = siteRateLimiter
+        siteRateLimiter = siteRateLimiter,
+        addonRegistry = addonRegistry
     )
 
     // Server configuration
@@ -187,7 +186,7 @@ fun main() {
     // Add shutdown hook
     Runtime.getRuntime().addShutdownHook(Thread {
         logger.info { "${BuildConfig.APP_NAME} shutting down..." }
-        moduleLoader.shutdown()
+        addonRegistry.shutdown()
         cacheCleanupService.stop()
         orchestrator.shutdown()
         server.stop(1000, 2000)

@@ -15,4 +15,5 @@ dependencies {
     implementation(libs.playwright)
     implementation(libs.jsoup)
     implementation(libs.slf4j.api)
+    implementation(libs.kotlin.logging)
 }

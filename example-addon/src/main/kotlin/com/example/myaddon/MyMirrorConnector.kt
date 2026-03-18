@@ -1,4 +1,4 @@
-package com.example.mymodule
+package com.example.myaddon
 
 import dev.koenv.chaptervault.core.connector.Connector
 import dev.koenv.chaptervault.core.connector.ConnectorConfig
@@ -16,17 +16,17 @@ import kotlin.time.Duration.Companion.seconds
  * Mirror connector for mirror.example.com.
  *
  * Targets a different domain but shares all scraping logic with [MyConnector]
- * by delegating to it with [ModuleConfig.mirrorUrl] as the base URL.
+ * by delegating to it with [AddonConfig.mirrorUrl] as the base URL.
  * This is a common pattern when a site has regional mirrors or fallback domains.
  */
 class MyMirrorConnector(
     executor: Executor,
-    moduleConfig: ModuleConfig,
+    addonConfig: AddonConfig,
 ) : Connector {
 
     // Delegate all scraping to MyConnector, re-configured with the mirror URL.
     // Any change to MyConnector's extraction logic automatically applies here too.
-    private val delegate = MyConnector(executor, moduleConfig.copy(baseUrl = moduleConfig.mirrorUrl))
+    private val delegate = MyConnector(executor, addonConfig.copy(baseUrl = addonConfig.mirrorUrl))
 
     override val executor: Executor get() = delegate.executor
 
@@ -42,7 +42,7 @@ class MyMirrorConnector(
         ),
         features = ConnectorFeatures(
             supportsSearch = true,
-            requiresAuth = moduleConfig.apiKey != null,
+            requiresAuth = addonConfig.apiKey != null,
             supportsBatchDownload = true,
             supportsPageCount = false,
             maxConcurrentDownloads = 3

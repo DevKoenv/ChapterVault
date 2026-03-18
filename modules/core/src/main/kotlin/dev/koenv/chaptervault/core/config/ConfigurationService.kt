@@ -61,7 +61,7 @@ interface ConfigurationService {
  */
 data class AppConfig(
     val dataPath: String = "${System.getProperty("user.home")}/ChapterVault/data",
-    val modulesPath: String = "${System.getProperty("user.home")}/ChapterVault/modules",
+    val addonsPath: String = "${System.getProperty("user.home")}/ChapterVault/addons",
     val server: ServerConfig = ServerConfig(),
     val storage: StorageAppConfig = StorageAppConfig(),
     val database: DatabaseAppConfig = DatabaseAppConfig(),

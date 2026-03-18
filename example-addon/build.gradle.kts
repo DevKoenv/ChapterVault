@@ -19,7 +19,7 @@ dependencies {
     // ChapterVault core — compileOnly, provided by the host at runtime.
     // Requires a local Maven install. Run once in the ChapterVault repo:
     //   ./gradlew :core:publishToMavenLocal
-    compileOnly("dev.koenv.chaptervault.core:core:0.4.1")
+    compileOnly("dev.koenv.ChapterVault:core:0.4.1")
 
     // JitPack alternative — comment out the line above and uncomment this instead.
     // Replace <version> with a git tag (e.g. "v0.4.1") or a commit hash.

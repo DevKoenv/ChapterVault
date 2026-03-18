@@ -2,6 +2,9 @@ package dev.koenv.chaptervault.connectors.registry
 
 import dev.koenv.chaptervault.core.connector.Connector
 import dev.koenv.chaptervault.core.connector.ConnectorRegistry
+import io.github.oshai.kotlinlogging.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Default implementation of ConnectorRegistry.
@@ -10,13 +13,22 @@ import dev.koenv.chaptervault.core.connector.ConnectorRegistry
 class ConnectorRegistryImpl : ConnectorRegistry {
 
     private val connectors = mutableListOf<Connector>()
+    private val ownership = mutableMapOf<String, String>() // connectorId -> addonId
 
     /**
-     * Register a connector. Connectors are sorted by priority (descending).
+     * Register a connector. Rejects duplicate IDs with a log error.
+     * Connectors are sorted by priority (descending) after registration.
      */
-    override fun register(connector: Connector) {
+    override fun register(connector: Connector, addonId: String?) {
+        val id = connector.config.id
+        if (connectors.any { it.config.id == id }) {
+            logger.error { "Connector with id '$id' is already registered — skipping duplicate" }
+            return
+        }
         connectors.add(connector)
-        // Keep sorted by priority (descending) for efficient lookup
+        if (addonId != null) {
+            ownership[id] = addonId
+        }
         connectors.sortByDescending { it.config.priority }
     }
 
@@ -25,7 +37,6 @@ class ConnectorRegistryImpl : ConnectorRegistry {
      * Returns the highest-priority connector that can handle the URL.
      */
     override fun findConnector(url: String): Connector? {
-        // Already sorted by priority, so first match is highest priority
         return connectors.firstOrNull { it.canHandle(url) }
     }
 
@@ -45,6 +56,22 @@ class ConnectorRegistryImpl : ConnectorRegistry {
 
     override fun getAllConnectors(): List<Connector> {
         return connectors.toList()
+    }
+
+    override fun unregister(connectorId: String): Boolean {
+        val removed = connectors.removeIf { it.config.id == connectorId }
+        if (removed) ownership.remove(connectorId)
+        return removed
+    }
+
+    override fun unregisterByAddon(addonId: String): List<String> {
+        val ownedIds = ownership.entries.filter { it.value == addonId }.map { it.key }
+        ownedIds.forEach { unregister(it) }
+        return ownedIds
+    }
+
+    override fun getAddonId(connectorId: String): String? {
+        return ownership[connectorId]
     }
 
     /**

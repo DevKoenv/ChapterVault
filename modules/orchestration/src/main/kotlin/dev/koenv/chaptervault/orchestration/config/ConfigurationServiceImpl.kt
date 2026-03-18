@@ -119,9 +119,9 @@ class ConfigurationServiceImpl(
         val dataPath = raw["dataPath"]?.toString()
             ?: raw["data_path"]?.toString()
             ?: defaults.dataPath
-        val modulesPath = raw["modulesPath"]?.toString()
-            ?: raw["modules_path"]?.toString()
-            ?: defaults.modulesPath
+        val addonsPath = raw["addonsPath"]?.toString()
+            ?: raw["addons_path"]?.toString()
+            ?: defaults.addonsPath
         val server = (raw["server"] as? Map<String, Any>)?.let { parseServer(it) } ?: ServerConfig()
         val storage = (raw["storage"] as? Map<String, Any>)?.let { parseStorage(it) } ?: StorageAppConfig()
         val database = (raw["database"] as? Map<String, Any>)?.let { parseDatabase(it) } ?: DatabaseAppConfig()
@@ -132,7 +132,7 @@ class ConfigurationServiceImpl(
 
         return AppConfig(
             dataPath = dataPath,
-            modulesPath = modulesPath,
+            addonsPath = addonsPath,
             server = server,
             storage = storage,
             database = database,
@@ -384,9 +384,9 @@ class ConfigurationServiceImpl(
             result = result.copy(dataPath = it)
         }
 
-        // Modules path override
-        System.getenv("CHAPTERVAULT_MODULES_PATH")?.let {
-            result = result.copy(modulesPath = it)
+        // Addons path override
+        System.getenv("CHAPTERVAULT_ADDONS_PATH")?.let {
+            result = result.copy(addonsPath = it)
         }
 
         // Server overrides

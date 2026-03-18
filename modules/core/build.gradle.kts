@@ -1,6 +1,3 @@
-group = "${rootProject.group}.core"
-version = rootProject.version
-
 plugins {
     alias(libs.plugins.kotlin.jvm)
     `maven-publish`
@@ -14,6 +11,9 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+            groupId = "dev.koenv.chaptervault"
+            artifactId = "core"
+            version = project.version.toString()
         }
     }
 }
