@@ -23,17 +23,14 @@ val infrastructureModule = module {
 }
 
 val kernelModule = module {
-    // EventBus and ExtensionRegistry implementations will be bound here
-    // TODO: bind in-memory implementations once kernel internals are implemented
+    // TODO: EventBus, ExtensionRegistry, SystemApi, AuthApi
 }
 
 val extensionModule = module {
-    // Extensions registered here once implemented
 }
 
 val interfacesModule = module {
-    // NOTE: EventBus must be bound in kernelModule before this resolves
-    single { EventProjectionService(get()) }
+    single { EventProjectionService(get()) } // requires EventBus from kernelModule
 }
 
 val allModules = listOf(configModule, infrastructureModule, kernelModule, extensionModule, interfacesModule)

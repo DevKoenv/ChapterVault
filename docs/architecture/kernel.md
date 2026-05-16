@@ -12,9 +12,9 @@ The kernel is the system core. It owns all domain state and exposes stable APIs.
 
 ## Key contracts
 
-- `kernel.api` — the sole public surface; all external callers use only these interfaces
-- `kernel.extension` — extension context and lifecycle contracts
-- `kernel.event` — domain event bus
+- `kernel.api`: the sole public surface; all external callers use only these interfaces
+- `kernel.extension`: extension context and lifecycle contracts
+- `kernel.event`: domain event bus
 
 ## Dependency rule
 

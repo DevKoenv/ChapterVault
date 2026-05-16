@@ -26,13 +26,10 @@ import io.ktor.server.websocket.WebSockets
 import org.koin.ktor.ext.inject
 
 fun Application.bootstrap() {
-    // Install plugins
     install(ContentNegotiation) { json() }
     install(WebSockets)
 
-    // Resolve dependencies from Koin
-    // NOTE: system, auth, registry have no implementation bound yet (skeleton phase).
-    // Server will throw NoBeanDefFoundException at startup until kernelModule bindings are added.
+    // TODO: bind SystemApi, AuthApi, ExtensionRegistry in kernelModule
     val config by inject<AppConfig>()
     val libraryRead by inject<LibraryReadApi>()
     val libraryCommand by inject<LibraryCommandApi>()
@@ -41,7 +38,6 @@ fun Application.bootstrap() {
     val registry by inject<ExtensionRegistry>()
     val projectionService by inject<EventProjectionService>()
 
-    // Mount routes: core REST → WebSocket → extension-contributed → health (always last)
     libraryRoutes(libraryRead, libraryCommand)
     taskRoutes(system)
     authRoutes(auth)
@@ -49,7 +45,7 @@ fun Application.bootstrap() {
     adminRoutes(registry)
     opdsRoutes(registry)
 
-    // Health endpoint — always last, always responds
+    // /health must be last
     routing {
         get("/health") {
             call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))

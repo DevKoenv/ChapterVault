@@ -6,7 +6,6 @@ interface EventBus {
     fun <T : DomainEvent> subscribe(eventClass: Class<T>, handler: suspend (T) -> Unit)
 }
 
-// Convenience inline extension
 inline fun <reified T : DomainEvent> EventBus.on(noinline handler: suspend (T) -> Unit) {
     subscribe(T::class.java, handler)
 }

@@ -7,6 +7,65 @@ and this project adheres to \[Semantic Versioning\]\(https://semver.org/spec/v2.
 
 ## [Unreleased]
 
+### Architectural rewrite (targeting 0.5.0)
+
+Complete rebuild from scratch with strict layered architecture and a kernel-based extension model. Nothing from 0.4.x was carried forward at the code level; the two lines of history will be joined via a merge commit when 0.5.0 is released.
+
+#### Added
+
+- **Six-module Gradle project** with enforced one-way dependency graph: `:shared` → `:kernel` → `:extensions` / `:infrastructure` / `:interfaces` → `:apps:server`
+- **`:shared`**: `Result<T>` / `AppError` sealed hierarchy, `Pagination<T>` / `PageRequest`, `Id` (UUID value class), `Time`, `ChapterFormat` sealed class (`Cbz`, `Folder`)
+- **`:kernel` contracts**: all domain models (`Series`, `Chapter`, `SeriesStatus`, `ChapterStatus`), runtime types (`Task`, `TaskType`, `TaskStatus`, `TaskQueue`, `TaskExecutor`, `TaskScheduler`, `TaskEvents`), auth types (`UserPrincipal`, `Role`, `Permission`), event system (`DomainEvent`, `EventBus`), extension contracts (`Extension`, `ExtensionLifecycle`, `ExtensionContext`, `ExtensionRegistry`, `Capability`)
+- **`kernel.api` as sole public surface**: `LibraryReadApi`, `LibraryCommandApi`, `ProgressApi`, `BookmarkApi`, `SystemApi`, `AuthApi`; no duplication with internal service interfaces
+- **`:extensions` stubs**: `ExtensionBase`, `CapabilityDsl`, `Connector` interface, `ConnectorRegistry`, `MockConnector`, `MangaDexConnector` stub, `OpdsExtension` stub, `MetadataProvider`, `AniListProvider` stub, `AdminExtension` stub
+- **`:infrastructure` stubs**: `AppConfig` / `ConfigLoader`, `DatabaseFactory` with `SchemaUtils.create` on boot, Exposed table definitions (`SeriesTable`, `ChapterTable`, `UserTable`, `TaskTable`), `SeriesRepository` (stub), `ChapterArchiveWriter` interface, `CbzWriter` / `FolderWriter` / `ArchiveWriterSelector`, `HttpClientFactory`, `RateLimiter`, `BrowserPool` stub
+- **`:interfaces` stubs**: DTOs v1 (`SeriesDto`, `ChapterDto`, `TaskDto`, `UserDto`), mappers v1, REST routes returning 501, `EventProjectionService` + `/events` WebSocket endpoint, OPDS routes
+- **`:apps:server`**: Koin module definitions, `DependencyInjection`, `ServerBootstrap`, `Main`; `fatJar` Gradle task produces `server-fat.jar` for Docker
+- **`Dockerfile`** + **`docker-compose.yml`**: JRE 21 Alpine image; volume mounts for `data/`, `downloads/`, `config/`
+- **CI workflow**: GitHub Actions build on push/PR
+- **Package root** `dev.koenv.chaptervault.*`
+
+#### Technical details
+
+- Kotlin 2.2.0, Gradle 9.5.1, JVM target 21 (JDK 26 runtime)
+- Ktor 3.0.3 (server + client), Koin 4.0.0, Exposed 0.57.0 + SQLite JDBC 3.47.0.0
+- kotlinx-coroutines 1.9.0, kotlinx-serialization 1.7.3, Logback 1.5.12
+
+### Planned: kernel internals
+
+- `InMemoryEventBus`: coroutine-based fan-out, typed handler subscriptions
+- `DefaultExtensionRegistry`: map-backed registry with capability index
+- Bind both in `kernelModule`; server will boot for the first time after this phase
+
+### Planned: system and auth stubs
+
+- `SystemApiImpl`: delegates task queries to `TaskQueue`; reports extension list via registry
+- `AuthApiImpl`: in-memory credential store for development; JWT session tokens
+- `InMemoryTaskQueue`: coroutine channel-backed queue with `enqueue` / `dequeue` / `cancel`
+
+### Planned: infrastructure repositories
+
+- `SeriesRepository`: full Exposed implementation: `getSeries`, `listSeries`, `searchLibrary`, `addToLibrary`, `removeSeries`, `updateSeries`; `java.time.Instant` / `kotlinx.datetime.Instant` conversion at boundary
+- `ChapterRepository`: `getChapter`, `listChapters`; extracted from `SeriesRepository`
+- `TaskRepository`: persists task lifecycle; implements `TaskQueue` over the `tasks` table
+- `UserRepository`: user lookup and password verification
+
+### Planned: config and connector wiring
+
+- `ConfigLoader`: parse `config/application.yaml` via Ktor's built-in YAML config support (`ktor-server-config-yaml` already a dependency); env-var override layer
+- `ConnectorContext`: pass `HttpClient` and `RateLimiter` through to connector implementations
+- `MangaDexConnector`: first real connector: search, series metadata, chapter list, page download
+
+### Planned — first runnable release (0.5.0)
+
+- Server boots to `/health` with all Koin bindings satisfied
+- Library CRUD via `GET/POST /library/series` and `GET /library/series/{id}/chapters`
+- Task creation on `addToLibrary` with `autoDownload = true`
+- MangaDex series discovery and chapter download
+- OPDS feed from library via `OpdsExtension`
+
+---
+
 ## [0.4.1] - 2026-03-08
 
 > Release note: Identical to `0.4.0`. An existing immutable `v0.4.0` tag prevented creating a release for that tag, so this release is published as `0.4.1`.
@@ -163,12 +222,12 @@ and this project adheres to \[Semantic Versioning\]\(https://semver.org/spec/v2.
 
 ## Version History Summary
 
-| Version | Date       | Highlights                                                    |
-|---------|------------|---------------------------------------------------------------|
-| 0.4.1   | 2026-03-08 | Schema hardening, stable connector identity, task decoupling  |
-| 0.3.0   | 2026-02-18 | Domain-aware rate limiting, adaptive backoff, YAML overrides  |
-| 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                       |
-| 0.1.0   | 2026-01-31 | Initial public release                                        |
+| Version | Date       | Highlights                                                   |
+|---------|------------|--------------------------------------------------------------|
+| 0.4.1   | 2026-03-08 | Schema hardening, stable connector identity, task decoupling |
+| 0.3.0   | 2026-02-18 | Domain-aware rate limiting, adaptive backoff, YAML overrides |
+| 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                      |
+| 0.1.0   | 2026-01-31 | Initial public release                                       |
 
 \[Unreleased\]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.1...HEAD
 \[0.4.1\]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...v0.4.1

@@ -4,9 +4,9 @@ ChapterVault uses an in-process domain event bus for decoupled communication bet
 
 ## Design
 
-- `DomainEvent` — sealed base class for all events
-- `EventBus` — publish/subscribe interface
-- `EventBus.on<T>()` — inline typed subscription helper
+- `DomainEvent`: sealed base class for all events
+- `EventBus`: publish/subscribe interface
+- `EventBus.on<T>()`: inline typed subscription helper
 
 ## Usage
 
@@ -14,4 +14,4 @@ Extensions subscribe to events via `ExtensionContext.eventBus`. The `:interfaces
 
 ## Current events
 
-- `TaskEvents` — task lifecycle (enqueued, started, completed, failed, cancelled)
+- `TaskEvents`: task lifecycle (enqueued, started, completed, failed, cancelled)
