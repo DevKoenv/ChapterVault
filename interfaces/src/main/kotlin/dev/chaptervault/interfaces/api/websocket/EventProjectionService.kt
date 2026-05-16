@@ -3,13 +3,13 @@ package dev.chaptervault.interfaces.api.websocket
 import dev.chaptervault.kernel.event.DomainEvent
 import dev.chaptervault.kernel.event.EventBus
 import io.ktor.server.websocket.WebSocketServerSession
-import kotlinx.coroutines.CoroutineScope
+import java.util.concurrent.CopyOnWriteArrayList
 
 class EventProjectionService(
     private val eventBus: EventBus,
-    private val scope: CoroutineScope,
 ) {
-    private val sessions = mutableListOf<WebSocketServerSession>()
+    // CopyOnWriteArrayList: sessions are added/removed concurrently from WebSocket handlers
+    private val sessions = CopyOnWriteArrayList<WebSocketServerSession>()
 
     fun addSession(session: WebSocketServerSession) {
         sessions.add(session)
