@@ -5,14 +5,8 @@ import dev.chaptervault.infrastructure.config.ConfigLoader
 import dev.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.chaptervault.infrastructure.network.RateLimiter
 import dev.chaptervault.infrastructure.network.createHttpClient
-import dev.chaptervault.kernel.api.AuthApi
-import dev.chaptervault.kernel.api.BookmarkApi
 import dev.chaptervault.kernel.api.LibraryCommandApi
 import dev.chaptervault.kernel.api.LibraryReadApi
-import dev.chaptervault.kernel.api.ProgressApi
-import dev.chaptervault.kernel.api.SystemApi
-import dev.chaptervault.kernel.event.EventBus
-import dev.chaptervault.kernel.extension.ExtensionRegistry
 import org.koin.dsl.module
 
 val configModule = module {

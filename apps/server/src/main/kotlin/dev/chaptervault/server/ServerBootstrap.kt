@@ -29,6 +29,8 @@ fun Application.bootstrap() {
     install(WebSockets)
 
     // Resolve dependencies from Koin
+    // NOTE: system, auth, registry have no implementation bound yet (skeleton phase).
+    // Server will throw NoBeanDefFoundException at startup until kernelModule bindings are added.
     val config by inject<AppConfig>()
     val libraryRead by inject<LibraryReadApi>()
     val libraryCommand by inject<LibraryCommandApi>()
