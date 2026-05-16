@@ -2,6 +2,21 @@ plugins {
     application
 }
 
+val fatJar by tasks.registering(Jar::class) {
+    archiveBaseName.set("server")
+    archiveClassifier.set("fat")
+    archiveVersion.set("")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes("Main-Class" to "dev.chaptervault.server.MainKt")
+    }
+    from(sourceSets.main.get().output)
+    dependsOn(configurations.runtimeClasspath)
+    from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+}
+
+tasks.build { dependsOn(fatJar) }
+
 application {
     mainClass.set("dev.chaptervault.server.MainKt")
 }

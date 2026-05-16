@@ -12,6 +12,8 @@ import dev.chaptervault.interfaces.api.rest.adminRoutes
 import dev.chaptervault.interfaces.api.rest.authRoutes
 import dev.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.chaptervault.interfaces.api.rest.taskRoutes
+import dev.chaptervault.interfaces.api.websocket.EventProjectionService
+import dev.chaptervault.interfaces.api.websocket.eventSocket
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -37,11 +39,13 @@ fun Application.bootstrap() {
     val system by inject<SystemApi>()
     val auth by inject<AuthApi>()
     val registry by inject<ExtensionRegistry>()
+    val projectionService by inject<EventProjectionService>()
 
-    // Mount routes: core REST → extension-contributed → health (always last)
+    // Mount routes: core REST → WebSocket → extension-contributed → health (always last)
     libraryRoutes(libraryRead, libraryCommand)
     taskRoutes(system)
     authRoutes(auth)
+    eventSocket(projectionService)
     adminRoutes(registry)
     opdsRoutes(registry)
 

@@ -2,7 +2,7 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-COPY apps/server/build/libs/server.jar app.jar
+COPY apps/server/build/libs/server-fat.jar app.jar
 COPY config/ config/
 
 RUN mkdir -p data downloads

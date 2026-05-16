@@ -5,6 +5,7 @@ import dev.chaptervault.infrastructure.config.ConfigLoader
 import dev.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.chaptervault.infrastructure.network.RateLimiter
 import dev.chaptervault.infrastructure.network.createHttpClient
+import dev.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.chaptervault.kernel.api.LibraryCommandApi
 import dev.chaptervault.kernel.api.LibraryReadApi
 import org.koin.dsl.module
@@ -31,7 +32,8 @@ val extensionModule = module {
 }
 
 val interfacesModule = module {
-    // Route-level services (e.g. EventProjectionService) bound here
+    // NOTE: EventBus must be bound in kernelModule before this resolves
+    single { EventProjectionService(get()) }
 }
 
 val allModules = listOf(configModule, infrastructureModule, kernelModule, extensionModule, interfacesModule)
