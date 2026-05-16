@@ -1,4 +1,5 @@
 dependencies {
+    implementation(project(":shared"))
     implementation(project(":kernel"))
     implementation(libs.bundles.exposed)
     implementation(libs.sqlite.jdbc)
