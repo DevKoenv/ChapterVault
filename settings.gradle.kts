@@ -21,5 +21,3 @@ include(
     ":interfaces",
     ":apps:server"
 )
-
-project(":apps:server").projectDir = file("apps/server")

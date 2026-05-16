@@ -45,8 +45,14 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 
 # Testing
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+
+[bundles]
+ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-content-negotiation", "ktor-server-auth", "ktor-server-websockets", "ktor-server-config-yaml", "ktor-serialization-kotlinx-json"]
+exposed = ["exposed-core", "exposed-dao", "exposed-jdbc", "exposed-kotlin-datetime"]
+koin = ["koin-core", "koin-ktor"]
+testing = ["junit-jupiter", "kotlin-test"]
