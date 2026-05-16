@@ -1,1 +1,6 @@
-// :kernel module — dependencies added in a later phase
+dependencies {
+    implementation(project(":shared"))
+    implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.bundles.testing)
+}

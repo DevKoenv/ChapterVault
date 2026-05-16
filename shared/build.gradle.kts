@@ -1,1 +1,6 @@
-// :shared module — dependencies added in a later phase
+dependencies {
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(libs.bundles.testing)
+}

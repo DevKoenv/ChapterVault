@@ -1,1 +1,6 @@
-// :extensions module — dependencies added in a later phase
+dependencies {
+    implementation(project(":kernel"))
+    implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.bundles.testing)
+}
