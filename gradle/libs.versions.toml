@@ -1,117 +1,52 @@
-# gradle/libs.versions.toml
-
 [versions]
-# =====================================
-# Kotlin
-# =====================================
-kotlin = "2.3.0"
-kotlinx-coroutines = "1.10.1"
-kotlinx-serialization = "1.8.0"
-kotlinx-datetime = "0.6.1"
-
-# =====================================
-# Ktor
-# =====================================
-ktor = "3.4.0"
-
-# =====================================
-# Playwright
-# =====================================
-playwright = "1.49.0"
-
-# =====================================
-# HTML Parsing
-# =====================================
-jsoup = "1.18.3"
-
-# =====================================
-# Configuration
-# =====================================
-snakeyaml = "2.3"
-
-# =====================================
-# Database
-# =====================================
-exposed = "1.0.0"
-h2 = "2.3.232"
-sqlite = "3.47.2.0"
-postgresql = "42.7.4"
-
-# =====================================
-# Logging
-# =====================================
-logback = "1.5.16"
-kotlin-logging = "7.0.3"
-slf4j = "2.0.16"
-
+kotlin = "2.1.0"
+ktor = "3.0.3"
+koin = "4.0.0"
+exposed = "0.57.0"
+sqlite-jdbc = "3.47.0.0"
+kotlinx-coroutines = "1.9.0"
+kotlinx-serialization = "1.7.3"
+logback = "1.5.12"
+junit5 = "5.11.3"
 
 [libraries]
-# =====================================
-# Kotlin
-# =====================================
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
-kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlinx-coroutines" }
-kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
-kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
-
-# =====================================
-# Ktor Server
-# =====================================
+# Ktor server
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+ktor-server-config-yaml = { module = "io.ktor:ktor-server-config-yaml", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
-ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
-ktor-server-resources = { module = "io.ktor:ktor-server-resources", version.ref = "ktor" }
-ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
-ktor-server-openapi-routing = { module = "io.ktor:ktor-server-routing-openapi" , version.ref = "ktor" }
-ktor-server-openapi = { module = "io.ktor:ktor-server-openapi", version.ref = "ktor" }
 
-# =====================================
-# Ktor Client
-# =====================================
+# Ktor client
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
-ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 
-# =====================================
-# Playwright
-# =====================================
-playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
+# Koin
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-ktor = { module = "io.insert-koin:koin-ktor", version.ref = "koin" }
 
-# =====================================
-# HTML Parsing
-# =====================================
-jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
-
-# =====================================
-# Configuration
-# =====================================
-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
-
-# =====================================
-# Database - Exposed
-# =====================================
+# Exposed (ORM)
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
-exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
 exposed-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed" }
+exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
 exposed-kotlin-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", version.ref = "exposed" }
-exposed-java-time = { module = "org.jetbrains.exposed:exposed-java-time", version.ref = "exposed" }
-h2-database = { module = "com.h2database:h2", version.ref = "h2" }
-sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
-postgresql-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 
-# =====================================
+# Database
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+
+# Kotlin extensions
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
 # Logging
-# =====================================
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
-kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+
+# Testing
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test" }
 
 [plugins]
-# =====================================
-# Kotlin
-# =====================================
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-ktor-plugin = { id = "io.ktor.plugin", version.ref = "ktor" }
