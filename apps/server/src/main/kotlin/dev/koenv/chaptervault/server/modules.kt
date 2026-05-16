@@ -6,8 +6,18 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesReposit
 import dev.koenv.chaptervault.infrastructure.network.RateLimiter
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
+import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.SystemApi
+import dev.koenv.chaptervault.kernel.api.impl.AuthApiImpl
+import dev.koenv.chaptervault.kernel.api.impl.SystemApiImpl
+import dev.koenv.chaptervault.kernel.event.EventBus
+import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
+import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
+import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
+import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
+import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import org.koin.dsl.module
 
 val configModule = module {
@@ -23,7 +33,11 @@ val infrastructureModule = module {
 }
 
 val kernelModule = module {
-    // TODO: EventBus, ExtensionRegistry, SystemApi, AuthApi
+    single<EventBus> { InMemoryEventBus() }
+    single<ExtensionRegistry> { DefaultExtensionRegistry() }
+    single<TaskQueue> { InMemoryTaskQueue() }
+    single<SystemApi> { SystemApiImpl(get(), get()) }
+    single<AuthApi> { AuthApiImpl() }
 }
 
 val extensionModule = module {
