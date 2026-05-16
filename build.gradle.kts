@@ -7,8 +7,9 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
-        jvmToolchain(17)
+        jvmToolchain(26)
         compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
             freeCompilerArgs.addAll(
                 "-opt-in=kotlin.RequiresOptIn",
                 "-Xjsr305=strict"
