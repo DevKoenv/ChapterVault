@@ -8,7 +8,7 @@ val fatJar by tasks.registering(Jar::class) {
     archiveVersion.set("")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
-        attributes("Main-Class" to "dev.chaptervault.server.MainKt")
+        attributes("Main-Class" to "dev.koenv.chaptervault.server.MainKt")
     }
     from(sourceSets.main.get().output)
     dependsOn(configurations.runtimeClasspath)
@@ -18,7 +18,7 @@ val fatJar by tasks.registering(Jar::class) {
 tasks.build { dependsOn(fatJar) }
 
 application {
-    mainClass.set("dev.chaptervault.server.MainKt")
+    mainClass.set("dev.koenv.chaptervault.server.MainKt")
 }
 
 dependencies {

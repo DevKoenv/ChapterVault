@@ -1,0 +1,17 @@
+package dev.koenv.chaptervault.extensions.connectors
+
+import dev.koenv.chaptervault.kernel.library.Chapter
+import dev.koenv.chaptervault.shared.format.ChapterFormat
+import dev.koenv.chaptervault.shared.paging.PageRequest
+import dev.koenv.chaptervault.shared.paging.Pagination
+import dev.koenv.chaptervault.shared.result.Result
+
+interface Connector {
+    val id: String
+    val name: String
+
+    suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>>
+    suspend fun fetchSeries(externalId: String): Result<SeriesMetadata>
+    suspend fun fetchChapters(externalId: String): Result<List<ChapterMetadata>>
+    suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult>
+}

@@ -1,0 +1,11 @@
+package dev.koenv.chaptervault.infrastructure.storage
+
+import dev.koenv.chaptervault.shared.format.ChapterFormat
+import java.nio.file.Path
+
+data class Page(val index: Int, val data: ByteArray)
+
+interface ChapterArchiveWriter {
+    val supportedFormat: ChapterFormat
+    suspend fun write(pages: List<Page>, destination: Path)
+}
