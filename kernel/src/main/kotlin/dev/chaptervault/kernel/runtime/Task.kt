@@ -14,16 +14,3 @@ data class Task(
     val updatedAt: Instant,
     val errorMessage: String? = null,
 )
-
-enum class TaskStatus {
-    PENDING,
-    RUNNING,
-    COMPLETED,
-    FAILED,
-    CANCELLED,
-}
-
-enum class TargetType {
-    SERIES,
-    CHAPTER,
-}
