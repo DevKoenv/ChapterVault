@@ -7,5 +7,5 @@ fun ExtensionRegistry.registerWithCapabilities(
     extension: dev.chaptervault.kernel.extension.Extension,
     vararg capabilities: Capability,
 ) {
-    register(extension)
+    TODO("registerWithCapabilities not yet implemented")
 }

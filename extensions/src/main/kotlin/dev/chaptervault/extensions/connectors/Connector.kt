@@ -1,7 +1,6 @@
 package dev.chaptervault.extensions.connectors
 
 import dev.chaptervault.kernel.library.Chapter
-import dev.chaptervault.kernel.library.Series
 import dev.chaptervault.shared.format.ChapterFormat
 import dev.chaptervault.shared.paging.PageRequest
 import dev.chaptervault.shared.paging.Pagination
