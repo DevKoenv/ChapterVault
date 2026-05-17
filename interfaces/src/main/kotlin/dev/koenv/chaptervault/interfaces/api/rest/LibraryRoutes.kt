@@ -26,27 +26,28 @@ fun Route.libraryRoutes(
     libraryRead: LibraryReadApi,
     libraryCommand: LibraryCommandApi,
 ) {
+    // GET routes are accessible to any authenticated user
     get("/library/series") {
-            val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
-            val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
-            when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
-                is Result.Success -> call.respond(
-                    HttpStatusCode.OK,
-                    PaginatedResponse(
-                        items = result.value.items.map { it.toDto() },
-                        page = result.value.page,
-                        size = result.value.size,
-                        totalItems = result.value.totalItems,
-                        totalPages = result.value.totalPages,
-                        hasNext = result.value.hasNext,
-                        hasPrevious = result.value.hasPrevious,
-                    )
+        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
+        val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+        when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
+            is Result.Success -> call.respond(
+                HttpStatusCode.OK,
+                PaginatedResponse(
+                    items = result.value.items.map { it.toDto() },
+                    page = result.value.page,
+                    size = result.value.size,
+                    totalItems = result.value.totalItems,
+                    totalPages = result.value.totalPages,
+                    hasNext = result.value.hasNext,
+                    hasPrevious = result.value.hasPrevious,
                 )
-                is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            )
+            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
         }
+    }
 
-        get("/library/series/{id}") {
+    get("/library/series/{id}") {
             val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
                 call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
             }
