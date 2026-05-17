@@ -2,6 +2,8 @@ package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
@@ -17,6 +19,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.*
@@ -55,122 +58,288 @@ class LibraryRoutesTest {
     ) = testApplication {
         application {
             install(ContentNegotiation) { json() }
+            install(Authentication) {
+                bearer("auth-bearer") {
+                    authenticate { cred ->
+                        when (cred.token) {
+                            "admin-token" -> KtorPrincipal(UserPrincipal(Id.generate(), "admin", setOf(Role.ADMIN)))
+                            "user-token" -> KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                            else -> null
+                        }
+                    }
+                }
+            }
             routing {
-                libraryRoutes(readApi, commandApi)
+                authenticate("auth-bearer") {
+                    libraryRoutes(readApi, commandApi)
+                }
             }
         }
         block()
     }
 
     @Test
-    fun `GET library series returns 200 with paginated list`() = testApp(
-        readApi = object : LibraryReadApi {
-            override suspend fun getSeries(id: Id) = Result.Failure(AppError.NotFound("Series", id.toString()))
-            override suspend fun listSeries(request: PageRequest) =
-                Result.Success(Pagination(listOf(fakeSeries), 0, 20, 1L))
-            override suspend fun searchLibrary(query: String, request: PageRequest) =
-                Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
-            override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
-            override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
-        },
-        commandApi = NoOpCommandApi(),
-    ) {
-        val response = client.get("/library/series")
-        assertEquals(HttpStatusCode.OK, response.status)
-        val body = response.bodyAsText()
-        assertContains(body, "One Piece")
-        assertContains(body, "totalItems")
-    }
-
-    @Test
-    fun `GET library series by id returns 200`() = testApp(
-        readApi = object : LibraryReadApi {
-            override suspend fun getSeries(id: Id) = Result.Success(fakeSeries)
-            override suspend fun listSeries(request: PageRequest) =
-                Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
-            override suspend fun searchLibrary(query: String, request: PageRequest) =
-                Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
-            override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
-            override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
-        },
-        commandApi = NoOpCommandApi(),
-    ) {
-        val response = client.get("/library/series/00000000-0000-0000-0000-000000000001")
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertContains(response.bodyAsText(), "One Piece")
-    }
-
-    @Test
-    fun `GET library series by id returns 404 when not found`() = testApp(
-        readApi = object : LibraryReadApi {
-            override suspend fun getSeries(id: Id) =
-                Result.Failure(AppError.NotFound("Series", id.toString()))
-            override suspend fun listSeries(request: PageRequest) =
-                Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
-            override suspend fun searchLibrary(query: String, request: PageRequest) =
-                Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
-            override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
-            override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
-        },
-        commandApi = NoOpCommandApi(),
-    ) {
-        val response = client.get("/library/series/00000000-0000-0000-0000-000000000099")
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
-
-    @Test
-    fun `POST library series returns 201 with created series`() = testApp(
-        readApi = NoOpReadApi(),
-        commandApi = object : LibraryCommandApi {
-            override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
-                Result.Success(fakeSeries)
-            override suspend fun removeSeries(id: Id) = Result.Success(Unit)
-            override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
-                Result.Success(fakeSeries)
-        },
-    ) {
-        val response = client.post("/library/series") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"connectorId":"mangadex","externalId":"ext-001"}""")
+    fun `GET library series returns 200 with paginated list`() {
+        testApp(
+            readApi = object : LibraryReadApi {
+                override suspend fun getSeries(id: Id) = Result.Failure(AppError.NotFound("Series", id.toString()))
+                override suspend fun listSeries(request: PageRequest) =
+                    Result.Success(Pagination(listOf(fakeSeries), 0, 20, 1L))
+                override suspend fun searchLibrary(query: String, request: PageRequest) =
+                    Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
+                override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+                override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/series") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertContains(body, "One Piece")
+            assertContains(body, "totalItems")
         }
-        assertEquals(HttpStatusCode.Created, response.status)
-        assertContains(response.bodyAsText(), "One Piece")
     }
 
     @Test
-    fun `POST library series returns 409 on conflict`() = testApp(
-        readApi = NoOpReadApi(),
-        commandApi = object : LibraryCommandApi {
-            override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
-                Result.Failure(AppError.Conflict("Already in library"))
-            override suspend fun removeSeries(id: Id) = Result.Success(Unit)
-            override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
-                Result.Success(fakeSeries)
-        },
-    ) {
-        val response = client.post("/library/series") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"connectorId":"mangadex","externalId":"ext-001"}""")
+    fun `GET library series by id returns 200`() {
+        testApp(
+            readApi = object : LibraryReadApi {
+                override suspend fun getSeries(id: Id) = Result.Success(fakeSeries)
+                override suspend fun listSeries(request: PageRequest) =
+                    Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
+                override suspend fun searchLibrary(query: String, request: PageRequest) =
+                    Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
+                override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+                override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/series/00000000-0000-0000-0000-000000000001") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(response.bodyAsText(), "One Piece")
         }
-        assertEquals(HttpStatusCode.Conflict, response.status)
     }
 
     @Test
-    fun `GET library series chapters returns 200 with chapter list`() = testApp(
-        readApi = object : LibraryReadApi {
-            override suspend fun getSeries(id: Id) = Result.Success(fakeSeries)
-            override suspend fun listSeries(request: PageRequest) =
-                Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
-            override suspend fun searchLibrary(query: String, request: PageRequest) =
-                Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
-            override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
-            override suspend fun listChapters(seriesId: Id) = Result.Success(listOf(fakeChapter))
-        },
-        commandApi = NoOpCommandApi(),
-    ) {
-        val response = client.get("/library/series/00000000-0000-0000-0000-000000000001/chapters")
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertContains(response.bodyAsText(), "Chapter 1")
+    fun `GET library series by id returns 404 when not found`() {
+        testApp(
+            readApi = object : LibraryReadApi {
+                override suspend fun getSeries(id: Id) =
+                    Result.Failure(AppError.NotFound("Series", id.toString()))
+                override suspend fun listSeries(request: PageRequest) =
+                    Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
+                override suspend fun searchLibrary(query: String, request: PageRequest) =
+                    Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
+                override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+                override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/series/00000000-0000-0000-0000-000000000099") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    @Test
+    fun `POST library series returns 201 with created series`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                    Result.Success(fakeSeries)
+                override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Success(fakeSeries)
+            },
+        ) {
+            val response = client.post("/library/series") {
+                bearerAuth("admin-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"connectorId":"mangadex","externalId":"ext-001"}""")
+            }
+            assertEquals(HttpStatusCode.Created, response.status)
+            assertContains(response.bodyAsText(), "One Piece")
+        }
+    }
+
+    @Test
+    fun `POST library series returns 409 on conflict`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                    Result.Failure(AppError.Conflict("Already in library"))
+                override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Success(fakeSeries)
+            },
+        ) {
+            val response = client.post("/library/series") {
+                bearerAuth("admin-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"connectorId":"mangadex","externalId":"ext-001"}""")
+            }
+            assertEquals(HttpStatusCode.Conflict, response.status)
+        }
+    }
+
+    @Test
+    fun `GET library series chapters returns 200 with chapter list`() {
+        testApp(
+            readApi = object : LibraryReadApi {
+                override suspend fun getSeries(id: Id) = Result.Success(fakeSeries)
+                override suspend fun listSeries(request: PageRequest) =
+                    Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
+                override suspend fun searchLibrary(query: String, request: PageRequest) =
+                    Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
+                override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+                override suspend fun listChapters(seriesId: Id) = Result.Success(listOf(fakeChapter))
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/series/00000000-0000-0000-0000-000000000001/chapters") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(response.bodyAsText(), "Chapter 1")
+        }
+    }
+
+    // RBAC tests — USER role should get 403 on write endpoints
+
+    @Test
+    fun `POST library series returns 403 for USER role`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.post("/library/series") {
+                bearerAuth("user-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"connectorId":"mangadex","externalId":"ext-001"}""")
+            }
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+        }
+    }
+
+    @Test
+    fun `DELETE library series returns 403 for USER role`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.delete("/library/series/00000000-0000-0000-0000-000000000001") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+        }
+    }
+
+    @Test
+    fun `PATCH library series returns 403 for USER role`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.patch("/library/series/00000000-0000-0000-0000-000000000001") {
+                bearerAuth("user-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"autoDownload":true}""")
+            }
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+        }
+    }
+
+    // DELETE tests
+
+    @Test
+    fun `DELETE library series returns 204 when ADMIN deletes existing series`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+            },
+        ) {
+            val response = client.delete("/library/series/00000000-0000-0000-0000-000000000001") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.NoContent, response.status)
+        }
+    }
+
+    @Test
+    fun `DELETE library series returns 404 when series not found`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun removeSeries(id: Id) =
+                    Result.Failure(AppError.NotFound("Series", id.toString()))
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+            },
+        ) {
+            val response = client.delete("/library/series/00000000-0000-0000-0000-000000000099") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    // PATCH tests
+
+    @Test
+    fun `PATCH library series returns 200 when ADMIN patches existing series`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Success(fakeSeries)
+            },
+        ) {
+            val response = client.patch("/library/series/00000000-0000-0000-0000-000000000001") {
+                bearerAuth("admin-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"autoDownload":true}""")
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(response.bodyAsText(), "One Piece")
+        }
+    }
+
+    @Test
+    fun `PATCH library series returns 404 when series not found`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Failure(AppError.NotFound("Series", id.toString()))
+            },
+        ) {
+            val response = client.patch("/library/series/00000000-0000-0000-0000-000000000099") {
+                bearerAuth("admin-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"autoDownload":true}""")
+            }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
     }
 }
 

@@ -2,18 +2,24 @@ package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.AddSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
+import dev.koenv.chaptervault.interfaces.serialization.dto.v1.UpdateSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.mappers.v1.toDto
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
+import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 
 fun Route.libraryRoutes(
@@ -67,6 +73,10 @@ fun Route.libraryRoutes(
         }
 
         post("/library/series") {
+            val principal = call.principal<KtorPrincipal>()
+            if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+                call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+            }
             val request = try { call.receive<AddSeriesRequest>() } catch (e: Exception) {
                 call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@post
             }
@@ -75,6 +85,48 @@ fun Route.libraryRoutes(
                 is Result.Failure -> when (result.error) {
                     is AppError.Conflict -> call.respond(HttpStatusCode.Conflict, result.error.message)
                     is AppError.ValidationError -> call.respond(HttpStatusCode.BadRequest, result.error.message)
+                    else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+                }
+            }
+        }
+
+        delete("/library/series/{id}") {
+            val principal = call.principal<KtorPrincipal>()
+            if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+                call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@delete
+            }
+            val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@delete
+            }
+            when (val result = libraryCommand.removeSeries(id)) {
+                is Result.Success -> call.respond(HttpStatusCode.NoContent)
+                is Result.Failure -> when (result.error) {
+                    is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
+                    else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+                }
+            }
+        }
+
+        patch("/library/series/{id}") {
+            val principal = call.principal<KtorPrincipal>()
+            if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+                call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@patch
+            }
+            val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@patch
+            }
+            val request = try { call.receive<UpdateSeriesRequest>() } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@patch
+            }
+            val defaultFormat = try {
+                request.defaultFormat?.let { ChapterFormat.fromString(it) }
+            } catch (e: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid defaultFormat value"); return@patch
+            }
+            when (val result = libraryCommand.updateSeries(id, request.autoDownload, defaultFormat)) {
+                is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
+                is Result.Failure -> when (result.error) {
+                    is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
                     else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
                 }
             }
