@@ -20,8 +20,15 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Build
+      - name: Build and test
         run: ./gradlew build
 
-      - name: Test
-        run: ./gradlew test
+      - name: Check extension isolation
+        run: |
+          result=$(./gradlew :extensions:dependencies --configuration runtimeClasspath 2>/dev/null | grep infrastructure || true)
+          if [ -n "$result" ]; then
+            echo "FAIL: :extensions depends on :infrastructure"
+            echo "$result"
+            exit 1
+          fi
+          echo "OK: extension isolation intact"

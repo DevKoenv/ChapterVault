@@ -1,0 +1,68 @@
+name: Bug report
+description: Something is not working as expected
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report. Please be as specific as possible.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version or commit hash are you running?
+      placeholder: "e.g. master @ abc1234"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear description of what the bug is and what you expected to happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the server with config ...
+        2. Call endpoint ...
+        3. Observe error
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or output
+      description: Paste any relevant log output. This will be formatted as code automatically.
+      render: shell
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Docker (docker compose)
+        - Bare JVM
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - SQLite (default)
+        - PostgreSQL
+
+  - type: input
+    id: java_version
+    attributes:
+      label: Java version
+      placeholder: "e.g. JDK 21.0.3"

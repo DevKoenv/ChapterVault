@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/DevKoenv/ChapterVault/security/advisories/new
+    about: Please report security vulnerabilities via a private advisory, not a public issue.

@@ -2,8 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on \[Keep a Changelog\]\(https://keepachangelog.com/en/1.1.0/),
-and this project adheres to \[Semantic Versioning\]\(https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
@@ -13,7 +13,7 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 
 #### Added
 
-- **Six-module Gradle project** with enforced one-way dependency graph: `:shared` → `:kernel` → `:extensions` / `:infrastructure` / `:interfaces` → `:apps:server`
+- **Six-module Gradle project** with enforced one-way dependency graph: `:shared` -> `:kernel` -> `:extensions` / `:infrastructure` / `:interfaces` -> `:apps:server`
 - **`:shared`**: `Result<T>` / `AppError` sealed hierarchy, `Pagination<T>` / `PageRequest`, `Id` (UUID value class), `Time`, `ChapterFormat` sealed class (`Cbz`, `Folder`)
 - **`:kernel` contracts**: all domain models (`Series`, `Chapter`, `SeriesStatus`, `ChapterStatus`), runtime types (`Task`, `TaskType`, `TaskStatus`, `TaskQueue`, `TaskExecutor`, `TaskScheduler`, `TaskEvents`), auth types (`UserPrincipal`, `Role`, `Permission`), event system (`DomainEvent`, `EventBus`), extension contracts (`Extension`, `ExtensionLifecycle`, `ExtensionContext`, `ExtensionRegistry`, `Capability`)
 - **`kernel.api` as sole public surface**: `LibraryReadApi`, `LibraryCommandApi`, `ProgressApi`, `BookmarkApi`, `SystemApi`, `AuthApi`; no duplication with internal service interfaces
@@ -82,14 +82,14 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 
 ### Changed
 
-- **Unified repository models**: `CachedSeries` renamed to `Series`, `CachedChapter` renamed to `Chapter`; nullable fields naturally encode "not yet fetched" — no explicit partial/complete distinction
+- **Unified repository models**: `CachedSeries` renamed to `Series`, `CachedChapter` renamed to `Chapter`; nullable fields naturally encode "not yet fetched" - no explicit partial/complete distinction
 - **Unified API DTOs**: `CatalogSeriesDto`, `LibrarySeriesDto`, `CatalogChapterDto`, `LibraryChapterDto` replaced by shared `SeriesDto`, `ChapterDto`, `SeriesDetailResponse` used across all endpoints
 - **Always-fresh detail endpoints**: `GET /api/v1/catalog/series/{id}` and `POST /api/v1/library/series/{id}/refresh` always fetch metadata from the source connector
-- **Merge semantics on upsert**: `upsert()` and `upsertAllFromSearch()` never downgrade known fields to null — a subsequent search result cannot clear an `author` populated by a full metadata fetch
+- **Merge semantics on upsert**: `upsert()` and `upsertAllFromSearch()` never downgrade known fields to null - a subsequent search result cannot clear an `author` populated by a full metadata fetch
 - **Library series detail shows all chapters**: `GET /api/v1/library/series/{id}` now returns all chapters with `downloadStatus` field instead of only downloaded chapters
 - **`ChapterDto` includes download fields**: `downloadStatus`, `downloadedAt`, `filePath`, `fileSize` exposed on every chapter response
 - **Task identity decoupled from domain FKs**: `tasks` table stores `target_type VARCHAR(32)` and `target_id VARCHAR(36)` (UUID as string, no foreign key) instead of FK columns pointing at series/chapter rows
-- **Connector identity replaces `source_url` unique constraint**: Series and chapters are now keyed on `(connector, external_id)` — `source_url` retains its column but no longer carries a unique index
+- **Connector identity replaces `source_url` unique constraint**: Series and chapters are now keyed on `(connector, external_id)` - `source_url` retains its column but no longer carries a unique index
 - **`series_tag` table renamed to `tags`**: Kotlin types renamed to `TagTable` / `TagEntity`
 - **`publish_date` column widened**: Changed from `VARCHAR(32)` to `TEXT`
 - **Catalog search endpoint restructured**: `POST /api/v1/catalog/lookup` replaced by `GET /api/v1/catalog/search?q=&url=&connector=`; both keyword and URL lookup share a single endpoint with response type `CatalogSearchResponse`
@@ -98,15 +98,15 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 
 ### Removed
 
-- **`metadataFetchedAt` field** from `Series` model and repository — field nullability encodes data quality, not an explicit timestamp
-- **`CachedSeries` / `CachedChapter` types** — replaced by `Series` / `Chapter`
-- **`save()` / `saveFromSearch()` / `saveAllFromSearch()` methods** on `SeriesRepositoryPort` — replaced by `upsert()` / `upsertFromSearch()` / `upsertAllFromSearch()` with merge semantics
-- **`CatalogSeriesDto` / `CatalogSeriesDetailResponse` / `CatalogChapterDto`** — replaced by `SeriesDto` / `SeriesDetailResponse` / `ChapterDto`
-- **`LibrarySeriesDto` / `LibrarySeriesDetailResponse` / `LibraryChapterDto`** — replaced by shared catalog types
-- **`domain/Series.kt` / `domain/Chapter.kt`** lightweight url-only domain types — unused, removed to eliminate ambiguity
-- **`DownloadTaskRepositoryPort` / `DownloadTaskRepository` / `DownloadTaskTable` / `DownloadTaskEntity`** — replaced by `TaskRepositoryPort` / `TaskRepository` / `TaskTable` / `TaskEntity` in the renamed `tasks` table
-- **`SeriesTagTable` / `SeriesTagEntity`** — replaced by `TagTable` / `TagEntity`
-- **`seriesId` field on `TaskStatusResponse`** — replaced by `targetType` + `targetId`
+- **`metadataFetchedAt` field** from `Series` model and repository - field nullability encodes data quality, not an explicit timestamp
+- **`CachedSeries` / `CachedChapter` types** - replaced by `Series` / `Chapter`
+- **`save()` / `saveFromSearch()` / `saveAllFromSearch()` methods** on `SeriesRepositoryPort` - replaced by `upsert()` / `upsertFromSearch()` / `upsertAllFromSearch()` with merge semantics
+- **`CatalogSeriesDto` / `CatalogSeriesDetailResponse` / `CatalogChapterDto`** - replaced by `SeriesDto` / `SeriesDetailResponse` / `ChapterDto`
+- **`LibrarySeriesDto` / `LibrarySeriesDetailResponse` / `LibraryChapterDto`** - replaced by shared catalog types
+- **`domain/Series.kt` / `domain/Chapter.kt`** lightweight url-only domain types - unused, removed to eliminate ambiguity
+- **`DownloadTaskRepositoryPort` / `DownloadTaskRepository` / `DownloadTaskTable` / `DownloadTaskEntity`** - replaced by `TaskRepositoryPort` / `TaskRepository` / `TaskTable` / `TaskEntity` in the renamed `tasks` table
+- **`SeriesTagTable` / `SeriesTagEntity`** - replaced by `TagTable` / `TagEntity`
+- **`seriesId` field on `TaskStatusResponse`** - replaced by `targetType` + `targetId`
 
 ## [0.3.0] - 2026-02-18
 
@@ -226,8 +226,8 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 | 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                      |
 | 0.1.0   | 2026-01-31 | Initial public release                                       |
 
-\[Unreleased\]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.1...HEAD
-\[0.4.1\]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...v0.4.1
-\[0.3.0\]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...v0.3.0
-\[0.2.0\]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0
-\[0.1.0\]: https://github.com/DevKoenv/ChapterVault/releases/tag/v0.1.0
+[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...v0.4.1
+[0.3.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/DevKoenv/ChapterVault/releases/tag/v0.1.0
