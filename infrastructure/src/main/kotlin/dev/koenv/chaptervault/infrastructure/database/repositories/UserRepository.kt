@@ -34,12 +34,16 @@ class UserRepository : AuthApi {
         }
         val id = Id.generate()
         val hash = BCrypt.hashpw(credentials.password, BCrypt.gensalt())
-        UserTable.insert {
-            it[UserTable.id] = id.toString()
-            it[UserTable.username] = credentials.username
-            it[UserTable.passwordHash] = hash
-            it[UserTable.roles] = role.name
-            it[UserTable.createdAt] = Instant.now().toKotlinInstant()
+        try {
+            UserTable.insert {
+                it[UserTable.id] = id.toString()
+                it[UserTable.username] = credentials.username
+                it[UserTable.passwordHash] = hash
+                it[UserTable.roles] = role.name
+                it[UserTable.createdAt] = Instant.now().toKotlinInstant()
+            }
+        } catch (e: org.jetbrains.exposed.exceptions.ExposedSQLException) {
+            return@dbQuery Result.Failure(AppError.Conflict("Username '${credentials.username}' already taken"))
         }
         Result.Success(UserPrincipal(id = id, username = credentials.username, roles = setOf(role)))
     }
@@ -99,7 +103,7 @@ class UserRepository : AuthApi {
 
     private fun generateToken(): String {
         val bytes = ByteArray(48)
-        SecureRandom().nextBytes(bytes)
+        secureRandom.nextBytes(bytes)
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
@@ -116,5 +120,6 @@ class UserRepository : AuthApi {
 
     companion object {
         private const val SESSION_TTL_SECONDS = 30L * 24 * 3600  // 30 days
+        private val secureRandom = SecureRandom()
     }
 }

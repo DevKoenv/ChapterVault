@@ -6,8 +6,11 @@ import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
@@ -141,6 +144,31 @@ class UserRepositoryTest {
             repo.invalidateSession(token)
             val result = repo.validateSession(token)
             assertIs<Result.Failure>(result)
+        }
+    }
+
+    @Test
+    fun `validateSession returns Unauthorized for expired token`() {
+        runBlocking {
+            repo.register(Credentials("grace", "pass"))
+            val userId = transaction {
+                dev.koenv.chaptervault.infrastructure.database.entities.UserTable.selectAll()
+                    .where { dev.koenv.chaptervault.infrastructure.database.entities.UserTable.username eq "grace" }
+                    .single()[dev.koenv.chaptervault.infrastructure.database.entities.UserTable.id]
+            }
+            val pastExpiry = java.time.Instant.now().minusSeconds(3600).toKotlinInstant()
+            transaction {
+                dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.insert {
+                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.id] = dev.koenv.chaptervault.shared.utils.Id.generate().toString()
+                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.userId] = userId
+                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.token] = "expired-token-xyz"
+                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.expiresAt] = pastExpiry
+                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.createdAt] = pastExpiry
+                }
+            }
+            val result = repo.validateSession("expired-token-xyz")
+            assertIs<Result.Failure>(result)
+            assertIs<AppError.Unauthorized>((result as Result.Failure).error)
         }
     }
 }
