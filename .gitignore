@@ -318,3 +318,30 @@ jacoco/
 
 # IDE run configurations with local paths
 .idea/runConfigurations/local*.xml
+
+### AI Tools ###
+# Claude
+.claude/
+
+# Cursor
+.cursor/
+.cursorignore
+.cursorindexingignore
+
+# GitHub Copilot
+.github/copilot-instructions.md
+
+# Windsurf
+.windsurf/
+
+# Codeium
+.codeium/
+
+# Aider
+.aider*
+
+# Continue
+.continue/
+
+# JetBrains AI
+.jetbrains/
