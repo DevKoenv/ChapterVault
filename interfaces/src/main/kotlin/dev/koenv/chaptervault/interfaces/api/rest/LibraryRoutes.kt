@@ -48,88 +48,88 @@ fun Route.libraryRoutes(
     }
 
     get("/library/series/{id}") {
-            val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
-            }
-            when (val result = libraryRead.getSeries(id)) {
-                is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
-                is Result.Failure -> when (result.error) {
-                    is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                    else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-                }
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
+        }
+        when (val result = libraryRead.getSeries(id)) {
+            is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
+            is Result.Failure -> when (result.error) {
+                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
+                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
             }
         }
+    }
 
-        get("/library/series/{id}/chapters") {
-            val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
-            }
-            when (val result = libraryRead.listChapters(id)) {
-                is Result.Success -> call.respond(HttpStatusCode.OK, result.value.map { it.toDto() })
-                is Result.Failure -> when (result.error) {
-                    is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                    else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-                }
+    get("/library/series/{id}/chapters") {
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
+        }
+        when (val result = libraryRead.listChapters(id)) {
+            is Result.Success -> call.respond(HttpStatusCode.OK, result.value.map { it.toDto() })
+            is Result.Failure -> when (result.error) {
+                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
+                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
             }
         }
+    }
 
-        post("/library/series") {
-            val principal = call.principal<KtorPrincipal>()
-            if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-                call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
-            }
-            val request = try { call.receive<AddSeriesRequest>() } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@post
-            }
-            when (val result = libraryCommand.addToLibrary(request.connectorId, request.externalId, request.autoDownload)) {
-                is Result.Success -> call.respond(HttpStatusCode.Created, result.value.toDto())
-                is Result.Failure -> when (result.error) {
-                    is AppError.Conflict -> call.respond(HttpStatusCode.Conflict, result.error.message)
-                    is AppError.ValidationError -> call.respond(HttpStatusCode.BadRequest, result.error.message)
-                    else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-                }
+    post("/library/series") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+        }
+        val request = try { call.receive<AddSeriesRequest>() } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@post
+        }
+        when (val result = libraryCommand.addToLibrary(request.connectorId, request.externalId, request.autoDownload)) {
+            is Result.Success -> call.respond(HttpStatusCode.Created, result.value.toDto())
+            is Result.Failure -> when (result.error) {
+                is AppError.Conflict -> call.respond(HttpStatusCode.Conflict, result.error.message)
+                is AppError.ValidationError -> call.respond(HttpStatusCode.BadRequest, result.error.message)
+                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
             }
         }
+    }
 
-        delete("/library/series/{id}") {
-            val principal = call.principal<KtorPrincipal>()
-            if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-                call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@delete
-            }
-            val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@delete
-            }
-            when (val result = libraryCommand.removeSeries(id)) {
-                is Result.Success -> call.respond(HttpStatusCode.NoContent)
-                is Result.Failure -> when (result.error) {
-                    is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                    else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-                }
+    delete("/library/series/{id}") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@delete
+        }
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@delete
+        }
+        when (val result = libraryCommand.removeSeries(id)) {
+            is Result.Success -> call.respond(HttpStatusCode.NoContent)
+            is Result.Failure -> when (result.error) {
+                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
+                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
             }
         }
+    }
 
-        patch("/library/series/{id}") {
-            val principal = call.principal<KtorPrincipal>()
-            if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-                call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@patch
-            }
-            val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@patch
-            }
-            val request = try { call.receive<UpdateSeriesRequest>() } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@patch
-            }
-            val defaultFormat = try {
-                request.defaultFormat?.let { ChapterFormat.fromString(it) }
-            } catch (e: IllegalArgumentException) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid defaultFormat value"); return@patch
-            }
-            when (val result = libraryCommand.updateSeries(id, request.autoDownload, defaultFormat)) {
-                is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
-                is Result.Failure -> when (result.error) {
-                    is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                    else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-                }
+    patch("/library/series/{id}") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@patch
+        }
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@patch
+        }
+        val request = try { call.receive<UpdateSeriesRequest>() } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@patch
+        }
+        val defaultFormat = try {
+            request.defaultFormat?.let { ChapterFormat.fromString(it) }
+        } catch (e: IllegalArgumentException) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid defaultFormat value"); return@patch
+        }
+        when (val result = libraryCommand.updateSeries(id, request.autoDownload, defaultFormat)) {
+            is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
+            is Result.Failure -> when (result.error) {
+                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
+                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
             }
         }
+    }
 }
