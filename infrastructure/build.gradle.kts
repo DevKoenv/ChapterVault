@@ -8,6 +8,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.logback.classic)
     implementation(libs.snakeyaml)
+    implementation(libs.jbcrypt)
 
     testImplementation(libs.bundles.testing)
 }
