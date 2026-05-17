@@ -21,7 +21,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class AuthRoutesTest {
 

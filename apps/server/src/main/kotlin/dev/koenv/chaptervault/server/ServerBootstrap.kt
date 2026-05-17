@@ -1,6 +1,5 @@
 package dev.koenv.chaptervault.server
 
-import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
@@ -33,7 +32,6 @@ fun Application.bootstrap() {
     install(ContentNegotiation) { json() }
     install(WebSockets)
 
-    val config by inject<AppConfig>()
     val libraryRead by inject<LibraryReadApi>()
     val libraryCommand by inject<LibraryCommandApi>()
     val system by inject<SystemApi>()

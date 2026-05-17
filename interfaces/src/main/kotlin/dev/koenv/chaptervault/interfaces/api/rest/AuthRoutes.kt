@@ -2,7 +2,6 @@ package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
-import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.http.HttpStatusCode
