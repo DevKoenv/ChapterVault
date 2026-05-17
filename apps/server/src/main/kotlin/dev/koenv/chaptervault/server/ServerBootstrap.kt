@@ -29,7 +29,6 @@ fun Application.bootstrap() {
     install(ContentNegotiation) { json() }
     install(WebSockets)
 
-    // TODO: bind SystemApi, AuthApi, ExtensionRegistry in kernelModule
     val config by inject<AppConfig>()
     val libraryRead by inject<LibraryReadApi>()
     val libraryCommand by inject<LibraryCommandApi>()

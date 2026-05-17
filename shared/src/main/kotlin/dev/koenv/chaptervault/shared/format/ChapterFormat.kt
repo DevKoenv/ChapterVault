@@ -1,12 +1,11 @@
 package dev.koenv.chaptervault.shared.format
 
 sealed class ChapterFormat {
-    data object Cbz : ChapterFormat()
-    data object Folder : ChapterFormat()
-
-    override fun toString(): String = when (this) {
-        is Cbz -> "CBZ"
-        is Folder -> "FOLDER"
+    data object Cbz : ChapterFormat() {
+        override fun toString() = "CBZ"
+    }
+    data object Folder : ChapterFormat() {
+        override fun toString() = "FOLDER"
     }
 
     companion object {

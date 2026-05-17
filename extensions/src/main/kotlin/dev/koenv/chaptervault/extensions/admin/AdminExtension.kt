@@ -15,7 +15,7 @@ class AdminExtension : ExtensionBase() {
     override val name: String = "Admin Panel"
     override val version: String = "1.0.0"
 
-    val capability: Capability = Capability.CanServeAdmin
+    override val capabilities: Set<Capability> = setOf(Capability.CanServeAdmin)
 
     private var context: ExtensionContext? = null
 

@@ -7,6 +7,7 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.logback.classic)
+    implementation(libs.snakeyaml)
 
     testImplementation(libs.bundles.testing)
 }

@@ -17,7 +17,7 @@ class OpdsExtension : ExtensionBase() {
         libraryRead = context.libraryRead
     }
 
-    val capability: Capability = Capability.CanServeOpds
+    override val capabilities: Set<Capability> = setOf(Capability.CanServeOpds)
 
     suspend fun buildFeed(request: PageRequest): OpdsFeed {
         TODO("OpdsExtension not yet implemented")
