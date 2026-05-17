@@ -31,17 +31,14 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - Ktor 3.0.3 (server + client), Koin 4.0.0, Exposed 0.57.0 + SQLite JDBC 3.47.0.0
 - kotlinx-coroutines 1.9.0, kotlinx-serialization 1.7.3, Logback 1.5.12
 
-### Planned: kernel internals
+#### Kernel internals
 
-- `InMemoryEventBus`: coroutine-based fan-out, typed handler subscriptions
-- `DefaultExtensionRegistry`: map-backed registry with capability index
-- Bind both in `kernelModule`; server will boot for the first time after this phase
-
-### Planned: system and auth stubs
-
-- `SystemApiImpl`: delegates task queries to `TaskQueue`; reports extension list via registry
-- `AuthApiImpl`: in-memory credential store for development; JWT session tokens
-- `InMemoryTaskQueue`: coroutine channel-backed queue with `enqueue` / `dequeue` / `cancel`
+- `InMemoryEventBus`: coroutine fan-out with typed and untyped handler subscriptions
+- `DefaultExtensionRegistry`: map-backed registry; capability index built from `extension.capabilities`
+- `InMemoryTaskQueue`: channel-backed queue with `enqueue` / `dequeue` / `cancel`
+- `SystemApiImpl`: delegates task queries to `TaskQueue`, extension list to `ExtensionRegistry`
+- `AuthApiImpl`: stub returning `Unauthorized`; placeholder until real credential store is wired
+- All five bound in `kernelModule`; server now boots to `/health`
 
 ### Planned: infrastructure repositories
 
@@ -56,9 +53,9 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - `ConnectorContext`: pass `HttpClient` and `RateLimiter` through to connector implementations
 - `MangaDexConnector`: first real connector: search, series metadata, chapter list, page download
 
-### Planned — first runnable release (0.5.0)
+### Planned: first runnable release (0.5.0)
 
-- Server boots to `/health` with all Koin bindings satisfied
+- ~~Server boots to `/health`~~ ✓ done
 - Library CRUD via `GET/POST /library/series` and `GET /library/series/{id}/chapters`
 - Task creation on `addToLibrary` with `autoDownload = true`
 - MangaDex series discovery and chapter download
