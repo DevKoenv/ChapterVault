@@ -22,6 +22,7 @@ application {
 }
 
 dependencies {
+    implementation(project(":shared"))
     implementation(project(":kernel"))
     implementation(project(":extensions"))
     implementation(project(":infrastructure"))
