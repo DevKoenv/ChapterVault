@@ -3,7 +3,7 @@ package dev.koenv.chaptervault.interfaces.api.rest
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.library.Chapter
-import dev.koenv.chaptervault.kernel.library.ChapterStatus
+import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
 import dev.koenv.chaptervault.shared.format.ChapterFormat
@@ -42,7 +42,7 @@ class LibraryRoutesTest {
         title = "Chapter 1",
         chapterIndex = 1.0,
         externalId = "ch-001",
-        status = ChapterStatus.UNREAD,
+        downloadStatus = DownloadStatus.PENDING,
         addedAt = Instant.EPOCH,
         updatedAt = Instant.EPOCH,
     )

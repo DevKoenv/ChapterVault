@@ -8,7 +8,7 @@ data class ChapterDto(
     val seriesId: String,
     val title: String,
     val chapterIndex: Double,
-    val status: String,
+    val downloadStatus: String,
     val format: String? = null,
     val pageCount: Int? = null,
 )

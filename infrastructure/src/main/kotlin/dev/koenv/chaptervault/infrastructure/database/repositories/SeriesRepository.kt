@@ -5,7 +5,7 @@ import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.library.Chapter
-import dev.koenv.chaptervault.kernel.library.ChapterStatus
+import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
 import dev.koenv.chaptervault.shared.format.ChapterFormat
@@ -136,7 +136,7 @@ class SeriesRepository : LibraryReadApi, LibraryCommandApi {
         title = this[ChapterTable.title],
         chapterIndex = this[ChapterTable.chapterIndex],
         externalId = this[ChapterTable.externalId],
-        status = ChapterStatus.valueOf(this[ChapterTable.status]),
+        downloadStatus = DownloadStatus.valueOf(this[ChapterTable.downloadStatus]),
         format = this[ChapterTable.format]?.let { ChapterFormat.fromString(it) },
         pageCount = this[ChapterTable.pageCount],
         addedAt = this[ChapterTable.addedAt].toJavaInstant(),

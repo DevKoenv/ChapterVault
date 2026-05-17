@@ -10,7 +10,7 @@ data class Chapter(
     val title: String,
     val chapterIndex: Double,
     val externalId: String,
-    val status: ChapterStatus,
+    val downloadStatus: DownloadStatus,
     val format: ChapterFormat? = null,
     val pageCount: Int? = null,
     val addedAt: Instant,

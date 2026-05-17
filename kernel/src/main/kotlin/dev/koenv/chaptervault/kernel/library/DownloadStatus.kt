@@ -1,8 +1,7 @@
 package dev.koenv.chaptervault.kernel.library
 
-enum class ChapterStatus {
-    UNREAD,
-    READ,
+enum class DownloadStatus {
+    PENDING,
     DOWNLOADING,
     DOWNLOADED,
     FAILED,

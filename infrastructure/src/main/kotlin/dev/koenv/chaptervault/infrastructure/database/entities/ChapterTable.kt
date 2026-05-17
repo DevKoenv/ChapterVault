@@ -9,7 +9,7 @@ object ChapterTable : Table("chapters") {
     val title = varchar("title", 500)
     val chapterIndex = double("chapter_index")
     val externalId = varchar("external_id", 200)
-    val status = varchar("status", 50)
+    val downloadStatus = varchar("download_status", 50)
     val format = varchar("format", 20).nullable()
     val pageCount = integer("page_count").nullable()
     val addedAt = timestamp("added_at")

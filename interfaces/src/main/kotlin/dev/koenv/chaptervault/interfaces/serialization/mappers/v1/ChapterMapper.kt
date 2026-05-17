@@ -8,7 +8,7 @@ fun Chapter.toDto(): ChapterDto = ChapterDto(
     seriesId = seriesId.toString(),
     title = title,
     chapterIndex = chapterIndex,
-    status = status.name,
+    downloadStatus = downloadStatus.name,
     format = format?.toString(),
     pageCount = pageCount,
 )
