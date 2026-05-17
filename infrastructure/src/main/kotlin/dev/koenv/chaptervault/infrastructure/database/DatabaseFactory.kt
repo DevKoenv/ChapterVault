@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.infrastructure.database
 import dev.koenv.chaptervault.infrastructure.config.DatabaseConfig
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
+import dev.koenv.chaptervault.infrastructure.database.entities.SessionTable
 import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
 import org.jetbrains.exposed.sql.Database
@@ -16,7 +17,7 @@ object DatabaseFactory {
             driver = config.driver,
         )
         transaction {
-            SchemaUtils.create(SeriesTable, ChapterTable, UserTable, TaskTable)
+            SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, TaskTable)
         }
     }
 }
