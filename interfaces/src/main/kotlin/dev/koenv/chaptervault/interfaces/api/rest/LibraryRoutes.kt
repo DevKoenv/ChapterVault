@@ -10,19 +10,17 @@ import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.Application
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
-import io.ktor.server.routing.routing
 
-fun Application.libraryRoutes(
+fun Route.libraryRoutes(
     libraryRead: LibraryReadApi,
     libraryCommand: LibraryCommandApi,
 ) {
-    routing {
-        get("/library/series") {
+    get("/library/series") {
             val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
             val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
             when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
@@ -81,5 +79,4 @@ fun Application.libraryRoutes(
                 }
             }
         }
-    }
 }
