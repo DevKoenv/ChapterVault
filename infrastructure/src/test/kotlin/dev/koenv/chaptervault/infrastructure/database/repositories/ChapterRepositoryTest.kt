@@ -155,4 +155,33 @@ class ChapterRepositoryTest {
             assertEquals(3.0, chapters[2].chapterIndex)
         }
     }
+
+    @Test
+    fun `getChapter returns NotFound for unknown id`() {
+        runBlocking {
+            val result = repo.getChapter(Id.generate())
+            assertIs<Result.Failure>(result)
+            assertIs<AppError.NotFound>((result as Result.Failure).error)
+        }
+    }
+
+    @Test
+    fun `getChapter returns chapter after insert`() {
+        runBlocking {
+            val seriesId = insertSeries()
+            val inserted = (repo.insertChapter(
+                seriesId = seriesId,
+                title = "Chapter 5",
+                chapterIndex = 5.0,
+                externalId = "ext-ch-005",
+            ) as Result.Success).value
+
+            val result = repo.getChapter(inserted.id)
+            assertIs<Result.Success<*>>(result)
+            val chapter = (result as Result.Success).value
+            assertEquals(inserted.id, chapter.id)
+            assertEquals("Chapter 5", chapter.title)
+            assertEquals(5.0, chapter.chapterIndex)
+        }
+    }
 }

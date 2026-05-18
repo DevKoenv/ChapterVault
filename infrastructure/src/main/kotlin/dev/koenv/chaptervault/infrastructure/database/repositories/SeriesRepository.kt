@@ -103,6 +103,17 @@ class SeriesRepository : LibraryReadApi, LibraryCommandApi {
         else Result.Success(Unit)
     }
 
+    suspend fun updateMetadata(id: Id, title: String, coverUrl: String?, description: String?): Result<Unit> = dbQuery {
+        val updated = SeriesTable.update({ SeriesTable.id eq id.toString() }) {
+            it[SeriesTable.title] = title
+            it[SeriesTable.coverUrl] = coverUrl
+            it[SeriesTable.description] = description
+            it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
+        }
+        if (updated == 0) Result.Failure(AppError.NotFound("Series", id.toString()))
+        else Result.Success(Unit)
+    }
+
     override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?): Result<Series> = dbQuery {
         val count = SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.count()
         if (count == 0L) return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))

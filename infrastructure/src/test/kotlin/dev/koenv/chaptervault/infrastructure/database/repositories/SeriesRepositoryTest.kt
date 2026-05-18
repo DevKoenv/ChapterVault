@@ -181,4 +181,28 @@ class SeriesRepositoryTest {
             assertIs<AppError.NotFound>((result as Result.Failure).error)
         }
     }
+
+    @Test
+    fun `updateMetadata updates title, coverUrl, and description`() {
+        runBlocking {
+            val series = (repo.addToLibrary("mangadex", "ext-meta", false) as Result.Success).value
+
+            val result = repo.updateMetadata(series.id, "New Title", "https://cover.url/img.jpg", "A description")
+            assertIs<Result.Success<*>>(result)
+
+            val fetched = (repo.getSeries(series.id) as Result.Success).value
+            assertEquals("New Title", fetched.title)
+            assertEquals("https://cover.url/img.jpg", fetched.coverUrl)
+            assertEquals("A description", fetched.description)
+        }
+    }
+
+    @Test
+    fun `updateMetadata returns NotFound for unknown id`() {
+        runBlocking {
+            val result = repo.updateMetadata(Id.generate(), "Title", null, null)
+            assertIs<Result.Failure>(result)
+            assertIs<AppError.NotFound>((result as Result.Failure).error)
+        }
+    }
 }

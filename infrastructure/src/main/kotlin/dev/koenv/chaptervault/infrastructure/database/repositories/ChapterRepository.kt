@@ -74,6 +74,15 @@ class ChapterRepository {
         Result.Success(chapter)
     }
 
+    suspend fun getChapter(id: Id): Result<Chapter> = dbQuery {
+        ChapterTable.selectAll()
+            .where { ChapterTable.id eq id.toString() }
+            .singleOrNull()
+            ?.toChapter()
+            ?.let { Result.Success(it) }
+            ?: Result.Failure(AppError.NotFound("Chapter", id.toString()))
+    }
+
     suspend fun listChapters(seriesId: Id): Result<List<Chapter>> = dbQuery {
         val chapters = ChapterTable.selectAll()
             .where { ChapterTable.seriesId eq seriesId.toString() }

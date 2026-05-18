@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
@@ -21,6 +22,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import kotlinx.coroutines.launch
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.bearer
@@ -43,6 +45,7 @@ fun Application.bootstrap() {
     val registry by inject<ExtensionRegistry>()
     val connectorRegistry by inject<ConnectorRegistry>()
     val projectionService by inject<EventProjectionService>()
+    val executor by inject<TaskExecutorService>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -70,6 +73,8 @@ fun Application.bootstrap() {
     }
 
     opdsRoutes(registry)
+
+    launch { executor.start() }
 
     // /health must be last
     routing {

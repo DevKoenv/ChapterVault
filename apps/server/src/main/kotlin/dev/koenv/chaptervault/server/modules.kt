@@ -1,7 +1,9 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.config.ConfigLoader
+import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
@@ -42,12 +44,23 @@ val infrastructureModule = module {
     single<AuthApi> { get<UserRepository>() }
     single { TaskRepository() }
     single<TaskReadStore> { get<TaskRepository>() }
+    single { ChapterRepository() }
     single { createHttpClient() }
     single { RateLimiter(requestsPerSecond = 2.0) }
     single { CbzWriter() }
     single { FolderWriter() }
     single { ArchiveWriterSelector(listOf(get<CbzWriter>(), get<FolderWriter>())) }
     single { FileStorage(Paths.get(get<AppConfig>().storage.basePath), get()) }
+    single {
+        TaskExecutorService(
+            taskQueue = get(),
+            taskRepository = get(),
+            connectorRegistry = get(),
+            seriesRepository = get(),
+            chapterRepository = get(),
+            fileStorage = get(),
+        )
+    }
 }
 
 val kernelModule = module {
