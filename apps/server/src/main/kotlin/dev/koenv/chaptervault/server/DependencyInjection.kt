@@ -1,5 +1,7 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.extensions.connectors.MockConnector
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
 import dev.koenv.chaptervault.kernel.api.AuthApi
@@ -17,6 +19,10 @@ object DependencyInjection {
 
         val config = GlobalContext.get().get<AppConfig>()
         DatabaseFactory.init(config.database)
+
+        // Register connectors post-boot (after all Koin bindings are resolved)
+        val connectorRegistry = GlobalContext.get().get<ConnectorRegistry>()
+        connectorRegistry.register(GlobalContext.get().get<MockConnector>())
 
         // Register default admin on first boot; silently ignored if admin already exists
         val authApi = GlobalContext.get().get<AuthApi>()

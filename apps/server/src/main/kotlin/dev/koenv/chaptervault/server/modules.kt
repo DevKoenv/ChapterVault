@@ -4,8 +4,11 @@ import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.config.ConfigLoader
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
-import dev.koenv.chaptervault.infrastructure.network.RateLimiter
+import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
+import dev.koenv.chaptervault.extensions.connectors.MockConnector
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
+import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
@@ -31,7 +34,7 @@ val infrastructureModule = module {
     single { UserRepository() }
     single<AuthApi> { get<UserRepository>() }
     single { createHttpClient() }
-    single { RateLimiter() }
+    single { RateLimiter(requestsPerSecond = 2.0) }
 }
 
 val kernelModule = module {
@@ -42,6 +45,8 @@ val kernelModule = module {
 }
 
 val extensionModule = module {
+    single<ConnectorRegistry> { DefaultConnectorRegistry() }
+    single { MockConnector() }
 }
 
 val interfacesModule = module {

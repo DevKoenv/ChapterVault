@@ -1,0 +1,49 @@
+package dev.koenv.chaptervault.extensions.connectors
+
+import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
+import dev.koenv.chaptervault.shared.result.AppError
+import dev.koenv.chaptervault.shared.result.Result
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.parameter
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.readRawBytes
+
+class DefaultConnectorContext(
+    override val httpClient: HttpClient,
+    private val buckets: Map<String, RateLimiter>,
+) : ConnectorContext {
+
+    private suspend fun bucket(name: String): RateLimiter? =
+        buckets[name] ?: buckets["default"]
+
+    override suspend fun get(
+        url: String,
+        params: Map<String, String>,
+        bucket: String,
+    ): Result<HttpResponse> {
+        val limiter = bucket(bucket)
+            ?: return Result.Failure(AppError.InternalError("No rate limiter found for bucket '$bucket' and no 'default' bucket configured"))
+        limiter.acquire()
+        return try {
+            val response = httpClient.get(url) {
+                params.forEach { (k, v) -> parameter(k, v) }
+            }
+            Result.Success(response)
+        } catch (e: Exception) {
+            Result.Failure(AppError.InternalError("HTTP GET failed: ${e.message}", e))
+        }
+    }
+
+    override suspend fun download(url: String, bucket: String): Result<ByteArray> {
+        val limiter = bucket(bucket)
+            ?: return Result.Failure(AppError.InternalError("No rate limiter found for bucket '$bucket' and no 'default' bucket configured"))
+        limiter.acquire()
+        return try {
+            val response = httpClient.get(url)
+            Result.Success(response.readRawBytes())
+        } catch (e: Exception) {
+            Result.Failure(AppError.InternalError("HTTP download failed: ${e.message}", e))
+        }
+    }
+}
