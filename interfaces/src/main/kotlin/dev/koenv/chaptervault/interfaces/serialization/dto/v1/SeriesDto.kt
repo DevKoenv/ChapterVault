@@ -8,6 +8,7 @@ data class SeriesDto(
     val title: String,
     val connectorId: String,
     val externalId: String,
+    val language: String,
     val status: String,
     val autoDownload: Boolean,
     val coverUrl: String? = null,

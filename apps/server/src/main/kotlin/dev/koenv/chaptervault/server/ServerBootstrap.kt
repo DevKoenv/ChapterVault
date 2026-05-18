@@ -1,9 +1,13 @@
 package dev.koenv.chaptervault.server
 
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
+import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.api.AuthApi
+import dev.koenv.chaptervault.kernel.api.BookmarkApi
+import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
@@ -13,28 +17,47 @@ import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.adminRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.interfaces.api.websocket.eventSocket
 import dev.koenv.chaptervault.shared.result.Result
+import dev.koenv.chaptervault.shared.utils.Id
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.plugins.swagger.swaggerUI
-import kotlinx.coroutines.launch
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.basic
 import io.ktor.server.auth.bearer
+import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.swagger.swaggerUI
+import io.ktor.server.request.httpMethod
+import io.ktor.server.request.uri
+import org.slf4j.event.Level
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
+import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
 
 fun Application.bootstrap() {
+    install(CallLogging) {
+        level = Level.INFO
+        format { call ->
+            val status = call.response.status()
+            val method = call.request.httpMethod.value
+            val uri = call.request.uri
+            "$method $uri -> $status"
+        }
+    }
     install(ContentNegotiation) { json() }
     install(WebSockets)
 
@@ -47,6 +70,9 @@ fun Application.bootstrap() {
     val connectorRegistry by inject<ConnectorRegistry>()
     val projectionService by inject<EventProjectionService>()
     val executor by inject<TaskExecutorService>()
+    val progressApi by inject<ProgressApi>()
+    val bookmarkApi by inject<BookmarkApi>()
+    val fileStorage by inject<FileStorage>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -57,23 +83,57 @@ fun Application.bootstrap() {
                 }
             }
         }
+        basic("auth-basic") {
+            realm = "ChapterVault"
+            validate { credential ->
+                when (val result = auth.authenticate(Credentials(credential.name, credential.password))) {
+                    is Result.Success -> KtorPrincipal(result.value.first)
+                    is Result.Failure -> null
+                }
+            }
+        }
     }
 
     // Public routes (no auth required)
     authRoutes(auth)
 
-    // Protected routes
+    // Bearer-protected routes
     routing {
         authenticate("auth-bearer") {
             libraryRoutes(libraryRead, libraryCommand, taskQueue)
             taskRoutes(system)
             adminRoutes(registry)
             connectorRoutes(connectorRegistry)
+            progressRoutes(progressApi)
+            bookmarkRoutes(bookmarkApi)
             eventSocket(projectionService)
         }
     }
 
-    opdsRoutes(registry)
+    // OPDS feeds (Basic Auth)
+    opdsRoutes(libraryRead)
+
+    // OPDS chapter download (Basic Auth — in server module to access FileStorage)
+    routing {
+        authenticate("auth-basic") {
+            get("/opds/download/{chapterId}") {
+                val chapterId = try { Id.from(call.parameters["chapterId"]!!) } catch (e: Exception) {
+                    call.respond(HttpStatusCode.BadRequest); return@get
+                }
+                when (val chapterResult = libraryRead.getChapter(chapterId)) {
+                    is Result.Failure -> { call.respond(HttpStatusCode.NotFound); return@get }
+                    is Result.Success -> {
+                        val chapter = chapterResult.value
+                        val path = fileStorage.resolvePath(chapter.seriesId.toString(), chapter.id.toString())
+                        val file = path.toFile()
+                        if (!file.exists()) { call.respond(HttpStatusCode.NotFound); return@get }
+                        val bytes = file.readBytes()
+                        call.respondBytes(bytes, ContentType.parse("application/x-cbz"))
+                    }
+                }
+            }
+        }
+    }
 
     launch { executor.recoverOnBoot(); executor.start() }
 

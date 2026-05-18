@@ -1,5 +1,10 @@
-package dev.koenv.chaptervault.extensions.connectors
+package dev.koenv.chaptervault.extensions.connectors.sources
 
+import dev.koenv.chaptervault.extensions.connectors.Connector
+import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
+import dev.koenv.chaptervault.extensions.connectors.DownloadResult
+import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
+import dev.koenv.chaptervault.extensions.connectors.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -45,7 +50,7 @@ class MockConnector : Connector {
     override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> =
         Result.Success(SeriesMetadata(externalId = externalId, title = "Mock: $externalId", description = "Auto-generated mock series"))
 
-    override suspend fun fetchChapters(externalId: String): Result<List<ChapterMetadata>> =
+    override suspend fun fetchChapters(externalId: String, language: String): Result<List<ChapterMetadata>> =
         Result.Success(
             listOf(
                 ChapterMetadata("$externalId-ch1", "Chapter 1", 1.0, 12),

@@ -348,3 +348,6 @@ jacoco/
 
 # JetBrains AI
 .jetbrains/
+### Scratch / manual test files (never commit) ###
+**/*Scratch*.kt
+**/*Manual*.kt

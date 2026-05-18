@@ -16,4 +16,8 @@ object ChapterTable : Table("chapters") {
     val updatedAt = timestamp("updated_at")
 
     override val primaryKey = PrimaryKey(id)
+
+    init {
+        uniqueIndex("chapters_series_external_uq", seriesId, externalId)
+    }
 }

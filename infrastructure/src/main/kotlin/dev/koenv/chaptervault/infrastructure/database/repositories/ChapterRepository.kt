@@ -32,6 +32,11 @@ class ChapterRepository {
             .count()
         if (seriesCount == 0L) return@dbQuery Result.Failure(AppError.NotFound("Series", seriesId.toString()))
 
+        val existing = ChapterTable.selectAll()
+            .where { (ChapterTable.seriesId eq seriesId.toString()) and (ChapterTable.externalId eq externalId) }
+            .singleOrNull()
+        if (existing != null) return@dbQuery Result.Failure(AppError.Conflict("Chapter '$externalId' already exists"))
+
         val id = Id.generate()
         val now = Instant.now().toKotlinInstant()
         ChapterTable.insert {

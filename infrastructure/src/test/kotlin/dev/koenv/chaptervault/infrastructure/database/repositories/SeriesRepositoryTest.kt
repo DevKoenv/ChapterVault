@@ -53,7 +53,7 @@ class SeriesRepositoryTest {
 
     @Test
     fun `addToLibrary creates and returns series`() = runBlocking {
-        val result = repo.addToLibrary("mangadex", "ext-123", false)
+        val result = repo.addToLibrary("mangadex", "ext-123", autoDownload = false)
         assertIs<Result.Success<*>>(result)
         val series = (result as Result.Success).value
         assertEquals("mangadex", series.connectorId)
@@ -63,7 +63,7 @@ class SeriesRepositoryTest {
 
     @Test
     fun `getSeries returns series after it is added`() = runBlocking {
-        val added = (repo.addToLibrary("mangadex", "ext-456", true) as Result.Success).value
+        val added = (repo.addToLibrary("mangadex", "ext-456", autoDownload = true) as Result.Success).value
 
         val result = repo.getSeries(added.id)
         assertIs<Result.Success<*>>(result)
@@ -84,8 +84,8 @@ class SeriesRepositoryTest {
 
     @Test
     fun `listSeries returns pagination with items`() = runBlocking {
-        repo.addToLibrary("mangadex", "ext-1", false)
-        repo.addToLibrary("mangadex", "ext-2", false)
+        repo.addToLibrary("mangadex", "ext-1", autoDownload = false)
+        repo.addToLibrary("mangadex", "ext-2", autoDownload = false)
 
         val result = repo.listSeries(PageRequest())
         assertIs<Result.Success<*>>(result)
@@ -97,17 +97,30 @@ class SeriesRepositoryTest {
     @Test
     fun `addToLibrary returns Conflict when series already exists`() {
         runBlocking {
-            repo.addToLibrary("mangadex", "ext-dup", false)
-            val result = repo.addToLibrary("mangadex", "ext-dup", false)
+            repo.addToLibrary("mangadex", "ext-dup", autoDownload = false)
+            val result = repo.addToLibrary("mangadex", "ext-dup", autoDownload = false)
             assertIs<Result.Failure>(result)
             assertIs<AppError.Conflict>((result as Result.Failure).error)
         }
     }
 
     @Test
+    fun `addToLibrary allows same externalId with different language`() {
+        runBlocking {
+            val en = repo.addToLibrary("mangadex", "ext-lang", language = "en", autoDownload = false)
+            val fr = repo.addToLibrary("mangadex", "ext-lang", language = "fr", autoDownload = false)
+            assertIs<Result.Success<*>>(en)
+            assertIs<Result.Success<*>>(fr)
+            val dup = repo.addToLibrary("mangadex", "ext-lang", language = "en", autoDownload = false)
+            assertIs<Result.Failure>(dup)
+            assertIs<AppError.Conflict>((dup as Result.Failure).error)
+        }
+    }
+
+    @Test
     fun `removeSeries removes the series`() {
         runBlocking {
-            val series = (repo.addToLibrary("mangadex", "ext-rm", false) as Result.Success).value
+            val series = (repo.addToLibrary("mangadex", "ext-rm", autoDownload = false) as Result.Success).value
 
             val removeResult = repo.removeSeries(series.id)
             assertIs<Result.Success<*>>(removeResult)
@@ -129,7 +142,7 @@ class SeriesRepositoryTest {
 
     @Test
     fun `updateSeries updates autoDownload`() = runBlocking {
-        val series = (repo.addToLibrary("mangadex", "ext-upd", false) as Result.Success).value
+        val series = (repo.addToLibrary("mangadex", "ext-upd", autoDownload = false) as Result.Success).value
 
         val result = repo.updateSeries(series.id, autoDownload = true)
         assertIs<Result.Success<*>>(result)
@@ -147,8 +160,8 @@ class SeriesRepositoryTest {
 
     @Test
     fun `searchLibrary returns matching series by title`() = runBlocking {
-        repo.addToLibrary("mangadex", "one-piece", false)
-        repo.addToLibrary("mangadex", "naruto", false)
+        repo.addToLibrary("mangadex", "one-piece", autoDownload = false)
+        repo.addToLibrary("mangadex", "naruto", autoDownload = false)
 
         val result = repo.searchLibrary("piece", PageRequest())
         assertIs<Result.Success<*>>(result)
@@ -159,7 +172,7 @@ class SeriesRepositoryTest {
 
     @Test
     fun `listChapters returns empty list when no chapters for series`() = runBlocking {
-        val series = (repo.addToLibrary("mangadex", "ext-ch", false) as Result.Success).value
+        val series = (repo.addToLibrary("mangadex", "ext-ch", autoDownload = false) as Result.Success).value
 
         val result = repo.listChapters(series.id)
         assertIs<Result.Success<*>>(result)
@@ -185,7 +198,7 @@ class SeriesRepositoryTest {
     @Test
     fun `updateMetadata updates title, coverUrl, and description`() {
         runBlocking {
-            val series = (repo.addToLibrary("mangadex", "ext-meta", false) as Result.Success).value
+            val series = (repo.addToLibrary("mangadex", "ext-meta", autoDownload = false) as Result.Success).value
 
             val result = repo.updateMetadata(series.id, "New Title", "https://cover.url/img.jpg", "A description")
             assertIs<Result.Success<*>>(result)

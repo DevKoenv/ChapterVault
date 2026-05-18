@@ -1,0 +1,28 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} — %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ChapterVault application code: INFO and above -->
+    <logger name="dev.koenv.chaptervault" level="INFO"/>
+
+    <!-- MangaFire connector: DEBUG for scraper diagnostics -->
+    <logger name="dev.koenv.chaptervault.extensions.connectors.sources.MangaFireConnector" level="DEBUG"/>
+
+    <!-- Ktor startup/lifecycle: INFO so we see "Listening on ..." -->
+    <logger name="io.ktor.server.Application" level="INFO"/>
+
+    <!-- Ktor request log from CallLogging plugin -->
+    <logger name="io.ktor.server.plugins.calllogging" level="INFO"/>
+
+    <!-- Everything else in Ktor: WARN only, very noisy at INFO -->
+    <logger name="io.ktor" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="org.jetbrains.exposed" level="WARN"/>
+
+    <root level="WARN">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

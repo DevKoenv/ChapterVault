@@ -12,6 +12,7 @@ import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
+import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
@@ -88,7 +89,7 @@ fun Route.libraryRoutes(
         val request = try { call.receive<AddSeriesRequest>() } catch (e: Exception) {
             call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@post
         }
-        when (val result = libraryCommand.addToLibrary(request.connectorId, request.externalId, request.autoDownload)) {
+        when (val result = libraryCommand.addToLibrary(request.connectorId, request.externalId, request.language, request.autoDownload)) {
             is Result.Success -> {
                 val series = result.value
                 val now = Instant.now()
@@ -98,7 +99,7 @@ fun Route.libraryRoutes(
                     status = TaskStatus.PENDING,
                     targetType = TargetType.SERIES,
                     targetId = series.id,
-                    payload = mapOf("connectorId" to series.connectorId, "externalId" to series.externalId),
+                    payload = mapOf("connectorId" to series.connectorId, "externalId" to series.externalId, "language" to series.language),
                     createdAt = now,
                     updatedAt = now,
                 )
@@ -128,6 +129,87 @@ fun Route.libraryRoutes(
                 else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
             }
         }
+    }
+
+    post("/library/series/{id}/download") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+        }
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@post
+        }
+        val series = when (val r = libraryRead.getSeries(id)) {
+            is Result.Success -> r.value
+            is Result.Failure -> when (r.error) {
+                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@post }
+                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+            }
+        }
+        val chapters = when (val r = libraryRead.listChapters(id)) {
+            is Result.Success -> r.value
+            is Result.Failure -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+        }
+        val format = series.defaultFormat ?: ChapterFormat.Cbz
+        val now = Instant.now()
+        val toDownload = chapters.filter {
+            it.downloadStatus == DownloadStatus.PENDING || it.downloadStatus == DownloadStatus.FAILED
+        }
+        for (chapter in toDownload) {
+            taskQueue.enqueue(Task(
+                id = Id.generate(),
+                type = TaskType.DOWNLOAD_CHAPTER,
+                status = TaskStatus.PENDING,
+                targetType = TargetType.CHAPTER,
+                targetId = chapter.id,
+                payload = mapOf(
+                    "connectorId" to series.connectorId,
+                    "chapterId" to chapter.id.toString(),
+                    "format" to format.toString(),
+                ),
+                createdAt = now,
+                updatedAt = now,
+            ))
+        }
+        call.respond(HttpStatusCode.Accepted, mapOf("queued" to toDownload.size))
+    }
+
+    post("/library/chapters/{id}/download") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+        }
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@post
+        }
+        val chapter = when (val r = libraryRead.getChapter(id)) {
+            is Result.Success -> r.value
+            is Result.Failure -> when (r.error) {
+                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@post }
+                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+            }
+        }
+        val series = when (val r = libraryRead.getSeries(chapter.seriesId)) {
+            is Result.Success -> r.value
+            is Result.Failure -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+        }
+        val format = series.defaultFormat ?: ChapterFormat.Cbz
+        val now = Instant.now()
+        taskQueue.enqueue(Task(
+            id = Id.generate(),
+            type = TaskType.DOWNLOAD_CHAPTER,
+            status = TaskStatus.PENDING,
+            targetType = TargetType.CHAPTER,
+            targetId = chapter.id,
+            payload = mapOf(
+                "connectorId" to series.connectorId,
+                "chapterId" to chapter.id.toString(),
+                "format" to format.toString(),
+            ),
+            createdAt = now,
+            updatedAt = now,
+        ))
+        call.respond(HttpStatusCode.Accepted, mapOf("queued" to 1))
     }
 
     patch("/library/series/{id}") {

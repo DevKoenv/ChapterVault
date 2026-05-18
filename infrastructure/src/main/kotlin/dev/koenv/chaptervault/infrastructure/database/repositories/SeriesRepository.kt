@@ -69,13 +69,13 @@ class SeriesRepository : LibraryReadApi, LibraryCommandApi {
         Result.Success(chapters)
     }
 
-    override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean): Result<Series> = dbQuery {
+    override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean): Result<Series> = dbQuery {
         val existing = SeriesTable.selectAll()
-            .where { (SeriesTable.connectorId eq connectorId) and (SeriesTable.externalId eq externalId) }
+            .where { (SeriesTable.connectorId eq connectorId) and (SeriesTable.externalId eq externalId) and (SeriesTable.language eq language) }
             .singleOrNull()
 
         if (existing != null) {
-            return@dbQuery Result.Failure(AppError.Conflict("Series '$externalId' already in library"))
+            return@dbQuery Result.Failure(AppError.Conflict("Series '$externalId' (language='$language') already in library"))
         }
 
         val id = Id.generate()
@@ -85,6 +85,7 @@ class SeriesRepository : LibraryReadApi, LibraryCommandApi {
             it[SeriesTable.title] = externalId
             it[SeriesTable.connectorId] = connectorId
             it[SeriesTable.externalId] = externalId
+            it[SeriesTable.language] = language
             it[SeriesTable.status] = SeriesStatus.IN_LIBRARY.name
             it[SeriesTable.autoDownload] = autoDownload
             it[SeriesTable.defaultFormat] = null
@@ -132,6 +133,7 @@ class SeriesRepository : LibraryReadApi, LibraryCommandApi {
         title = this[SeriesTable.title],
         connectorId = this[SeriesTable.connectorId],
         externalId = this[SeriesTable.externalId],
+        language = this[SeriesTable.language],
         status = SeriesStatus.valueOf(this[SeriesTable.status]),
         autoDownload = this[SeriesTable.autoDownload],
         defaultFormat = this[SeriesTable.defaultFormat]?.let { ChapterFormat.fromString(it) },

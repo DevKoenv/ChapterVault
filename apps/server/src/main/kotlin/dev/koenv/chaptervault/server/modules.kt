@@ -3,13 +3,17 @@ package dev.koenv.chaptervault.server
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.config.ConfigLoader
+import dev.koenv.chaptervault.infrastructure.database.repositories.BookmarkRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorContext
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
-import dev.koenv.chaptervault.extensions.connectors.MockConnector
+import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
+import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
 import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
 import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
@@ -18,8 +22,10 @@ import dev.koenv.chaptervault.infrastructure.storage.FolderWriter
 import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.kernel.api.AuthApi
+import dev.koenv.chaptervault.kernel.api.BookmarkApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.api.impl.SystemApiImpl
 import dev.koenv.chaptervault.kernel.event.EventBus
@@ -45,8 +51,11 @@ val infrastructureModule = module {
     single { TaskRepository() }
     single<TaskReadStore> { get<TaskRepository>() }
     single { ChapterRepository() }
+    single { ProgressRepository() }
+    single<ProgressApi> { get<ProgressRepository>() }
+    single { BookmarkRepository() }
+    single<BookmarkApi> { get<BookmarkRepository>() }
     single { createHttpClient() }
-    single { RateLimiter(requestsPerSecond = 2.0) }
     single { CbzWriter() }
     single { FolderWriter() }
     single { ArchiveWriterSelector(listOf(get<CbzWriter>(), get<FolderWriter>())) }
@@ -73,6 +82,14 @@ val kernelModule = module {
 val extensionModule = module {
     single<ConnectorRegistry> { DefaultConnectorRegistry() }
     single { MockConnector() }
+    single {
+        val httpClient = get<io.ktor.client.HttpClient>()
+        val context = DefaultConnectorContext(
+            httpClient,
+            mapOf("api" to RateLimiter(requestsPerSecond = 2.0), "cdn" to RateLimiter(requestsPerSecond = 5.0)),
+        )
+        CustomConnector(context)
+    }
 }
 
 val interfacesModule = module {

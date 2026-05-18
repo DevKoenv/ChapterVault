@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 data class AddSeriesRequest(
     val connectorId: String,
     val externalId: String,
+    val language: String = "",
     val autoDownload: Boolean = false,
 )

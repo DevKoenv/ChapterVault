@@ -8,6 +8,7 @@ fun Series.toDto(): SeriesDto = SeriesDto(
     title = title,
     connectorId = connectorId,
     externalId = externalId,
+    language = language,
     status = status.name,
     autoDownload = autoDownload,
     coverUrl = coverUrl,

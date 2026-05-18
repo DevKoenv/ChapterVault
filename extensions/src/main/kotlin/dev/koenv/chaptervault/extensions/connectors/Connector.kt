@@ -12,6 +12,6 @@ interface Connector {
 
     suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>>
     suspend fun fetchSeries(externalId: String): Result<SeriesMetadata>
-    suspend fun fetchChapters(externalId: String): Result<List<ChapterMetadata>>
+    suspend fun fetchChapters(externalId: String, language: String = ""): Result<List<ChapterMetadata>>
     suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult>
 }

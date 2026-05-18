@@ -143,7 +143,7 @@ class LibraryRoutesTest {
         testApp(
             readApi = NoOpReadApi(),
             commandApi = object : LibraryCommandApi {
-                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Success(fakeSeries)
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
@@ -165,7 +165,7 @@ class LibraryRoutesTest {
         testApp(
             readApi = NoOpReadApi(),
             commandApi = object : LibraryCommandApi {
-                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.Conflict("Already in library"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
@@ -187,7 +187,7 @@ class LibraryRoutesTest {
         testApp(
             readApi = NoOpReadApi(),
             commandApi = object : LibraryCommandApi {
-                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Success(fakeSeries)
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
@@ -277,7 +277,7 @@ class LibraryRoutesTest {
         testApp(
             readApi = NoOpReadApi(),
             commandApi = object : LibraryCommandApi {
-                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
@@ -296,7 +296,7 @@ class LibraryRoutesTest {
         testApp(
             readApi = NoOpReadApi(),
             commandApi = object : LibraryCommandApi {
-                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) =
                     Result.Failure(AppError.NotFound("Series", id.toString()))
@@ -318,7 +318,7 @@ class LibraryRoutesTest {
         testApp(
             readApi = NoOpReadApi(),
             commandApi = object : LibraryCommandApi {
-                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
@@ -340,7 +340,7 @@ class LibraryRoutesTest {
         testApp(
             readApi = NoOpReadApi(),
             commandApi = object : LibraryCommandApi {
-                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
@@ -368,7 +368,7 @@ private open class NoOpReadApi : LibraryReadApi {
 }
 
 private class NoOpCommandApi : LibraryCommandApi {
-    override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+    override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
         Result.Failure(AppError.InternalError("not implemented"))
     override suspend fun removeSeries(id: Id): Result<Unit> =
         Result.Failure(AppError.InternalError("not implemented"))

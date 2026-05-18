@@ -17,6 +17,7 @@ import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.delay
+import org.slf4j.LoggerFactory
 import java.time.Instant
 
 class TaskExecutorService(
@@ -27,6 +28,7 @@ class TaskExecutorService(
     private val chapterRepository: ChapterRepository,
     private val fileStorage: FileStorage,
 ) {
+    private val log = LoggerFactory.getLogger(TaskExecutorService::class.java)
 
     suspend fun recoverOnBoot() {
         val running = taskRepository.listAllByStatus(TaskStatus.RUNNING)
@@ -45,12 +47,20 @@ class TaskExecutorService(
             if (task == null) { delay(500); continue }
             taskRepository.insert(task)
             taskRepository.updateStatus(task.id, TaskStatus.RUNNING)
+            log.info("Task ${task.id} [${task.type}] started — target=${task.targetId}")
             val result = runCatching { dispatch(task) }.getOrElse { e ->
+                log.error("Task ${task.id} [${task.type}] threw uncaught exception", e)
                 Result.Failure(AppError.InternalError(e.message ?: "Executor error"))
             }
             when (result) {
-                is Result.Success -> taskRepository.updateStatus(task.id, TaskStatus.COMPLETED)
-                is Result.Failure -> taskRepository.updateStatus(task.id, TaskStatus.FAILED, result.error.message)
+                is Result.Success -> {
+                    taskRepository.updateStatus(task.id, TaskStatus.COMPLETED)
+                    log.info("Task ${task.id} [${task.type}] completed")
+                }
+                is Result.Failure -> {
+                    taskRepository.updateStatus(task.id, TaskStatus.FAILED, result.error.message)
+                    log.error("Task ${task.id} [${task.type}] failed: ${result.error.message}")
+                }
             }
         }
     }
@@ -65,6 +75,7 @@ class TaskExecutorService(
     private suspend fun handleFetchSeriesMetadata(task: Task): Result<Unit> {
         val connectorId = task.payload["connectorId"] ?: ""
         val externalId = task.payload["externalId"] ?: ""
+        val language = task.payload["language"] ?: ""
 
         val connector = connectorRegistry.findById(connectorId)
             ?: return Result.Failure(AppError.InternalError("Connector not found: $connectorId"))
@@ -89,6 +100,7 @@ class TaskExecutorService(
                 payload = mapOf(
                     "connectorId" to connectorId,
                     "externalId" to externalId,
+                    "language" to language,
                 ),
                 createdAt = Instant.now(),
                 updatedAt = Instant.now(),
@@ -101,11 +113,12 @@ class TaskExecutorService(
     private suspend fun handleFetchChapters(task: Task): Result<Unit> {
         val connectorId = task.payload["connectorId"] ?: ""
         val externalId = task.payload["externalId"] ?: ""
+        val language = task.payload["language"] ?: ""
 
         val connector = connectorRegistry.findById(connectorId)
             ?: return Result.Failure(AppError.InternalError("Connector not found: $connectorId"))
 
-        val chapters = when (val r = connector.fetchChapters(externalId)) {
+        val chapters = when (val r = connector.fetchChapters(externalId, language)) {
             is Result.Success -> r.value
             is Result.Failure -> return r
         }
@@ -168,20 +181,19 @@ class TaskExecutorService(
         }
 
         val context = connectorRegistry.getContext(connectorId)
-        val pages: List<Page> = if (context != null) {
-            downloadResult.pageUrls.mapIndexedNotNull { index, url ->
+        if (context != null) {
+            val pages = mutableListOf<Page>()
+            val failedIndices = mutableListOf<Int>()
+            for ((index, url) in downloadResult.pageUrls.withIndex()) {
                 when (val r = context.download(url)) {
-                    is Result.Success -> Page(index, r.value)
-                    is Result.Failure -> null
+                    is Result.Success -> pages.add(Page(index, r.value))
+                    is Result.Failure -> failedIndices.add(index)
                 }
             }
-        } else {
-            emptyList()
-        }
-
-        if (context != null) {
-            if (pages.isEmpty()) {
-                return Result.Failure(AppError.InternalError("All page downloads failed for chapter ${chapter.id}"))
+            if (failedIndices.isNotEmpty()) {
+                return Result.Failure(AppError.InternalError(
+                    "Failed to download ${failedIndices.size}/${downloadResult.pageUrls.size} page(s) for chapter ${chapter.id}: indices $failedIndices"
+                ))
             }
             when (val r = fileStorage.writeChapter(chapter.seriesId.toString(), chapter.id.toString(), pages, format)) {
                 is Result.Failure -> return r

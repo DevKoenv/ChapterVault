@@ -1,20 +1,75 @@
 package dev.koenv.chaptervault.interfaces.api.opds
 
-import dev.koenv.chaptervault.kernel.extension.Capability
-import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
+import dev.koenv.chaptervault.extensions.opds.FeedBuilder
+import dev.koenv.chaptervault.extensions.opds.OpdsV1
+import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.shared.paging.PageRequest
+import dev.koenv.chaptervault.shared.result.AppError
+import dev.koenv.chaptervault.shared.result.Result
+import dev.koenv.chaptervault.shared.utils.Id
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
+import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import java.time.Instant
 
-fun Application.opdsRoutes(registry: ExtensionRegistry) {
-    val opdsExtensions = registry.withCapability(Capability.CanServeOpds)
-    if (opdsExtensions.isEmpty()) return
+private val OPDS_CONTENT_TYPE = ContentType.parse("application/atom+xml;charset=utf-8")
+private val feedBuilder = FeedBuilder()
+private val opdsV1 = OpdsV1()
 
+fun Application.opdsRoutes(libraryRead: LibraryReadApi) {
     routing {
-        get("/opds") {
-            call.respond(HttpStatusCode.NotImplemented, "OPDS not yet implemented")
+        authenticate("auth-basic") {
+            get("/opds") {
+                val feed = feedBuilder.buildNavigationFeed(Instant.now().toString())
+                call.respondText(opdsV1.serialize(feed), OPDS_CONTENT_TYPE)
+            }
+
+            get("/opds/catalog") {
+                val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
+                val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+                when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
+                    is Result.Success -> {
+                        val p = result.value
+                        val feed = feedBuilder.buildCatalogFeed(
+                            series = p.items,
+                            page = page,
+                            size = p.size,
+                            totalItems = p.totalItems,
+                            now = Instant.now().toString(),
+                        )
+                        call.respondText(opdsV1.serialize(feed), OPDS_CONTENT_TYPE)
+                    }
+                    is Result.Failure -> call.respond(HttpStatusCode.InternalServerError)
+                }
+            }
+
+            get("/opds/series/{id}") {
+                val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+                    call.respond(HttpStatusCode.BadRequest); return@get
+                }
+                val seriesResult = libraryRead.getSeries(id)
+                if (seriesResult is Result.Failure) {
+                    val status = if (seriesResult.error is AppError.NotFound) HttpStatusCode.NotFound
+                    else HttpStatusCode.InternalServerError
+                    call.respond(status); return@get
+                }
+                val chaptersResult = libraryRead.listChapters(id)
+                if (chaptersResult is Result.Failure) {
+                    call.respond(HttpStatusCode.InternalServerError); return@get
+                }
+                val now = Instant.now().toString()
+                val feed = feedBuilder.buildSeriesFeed(
+                    series = (seriesResult as Result.Success).value,
+                    chapters = (chaptersResult as Result.Success).value,
+                    now = now,
+                )
+                call.respondText(opdsV1.serialize(feed), OPDS_CONTENT_TYPE)
+            }
         }
     }
 }
