@@ -9,6 +9,10 @@ import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.MockConnector
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
+import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
+import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
+import dev.koenv.chaptervault.infrastructure.storage.FileStorage
+import dev.koenv.chaptervault.infrastructure.storage.FolderWriter
 import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.kernel.api.AuthApi
@@ -24,6 +28,7 @@ import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
 import org.koin.dsl.module
+import java.nio.file.Paths
 
 val configModule = module {
     single<AppConfig> { ConfigLoader.load() }
@@ -39,6 +44,10 @@ val infrastructureModule = module {
     single<TaskReadStore> { get<TaskRepository>() }
     single { createHttpClient() }
     single { RateLimiter(requestsPerSecond = 2.0) }
+    single { CbzWriter() }
+    single { FolderWriter() }
+    single { ArchiveWriterSelector(listOf(get<CbzWriter>(), get<FolderWriter>())) }
+    single { FileStorage(Paths.get(get<AppConfig>().storage.basePath), get()) }
 }
 
 val kernelModule = module {
