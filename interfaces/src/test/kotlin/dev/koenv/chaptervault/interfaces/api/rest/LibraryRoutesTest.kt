@@ -8,6 +8,9 @@ import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
+import dev.koenv.chaptervault.kernel.runtime.Task
+import dev.koenv.chaptervault.kernel.runtime.TaskQueue
+import dev.koenv.chaptervault.kernel.runtime.TaskType
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
@@ -54,6 +57,7 @@ class LibraryRoutesTest {
     private fun testApp(
         readApi: LibraryReadApi,
         commandApi: LibraryCommandApi,
+        taskQueue: TaskQueue = NoOpTaskQueue(),
         block: suspend ApplicationTestBuilder.() -> Unit,
     ) = testApplication {
         application {
@@ -71,7 +75,7 @@ class LibraryRoutesTest {
             }
             routing {
                 authenticate("auth-bearer") {
-                    libraryRoutes(readApi, commandApi)
+                    libraryRoutes(readApi, commandApi, taskQueue)
                 }
             }
         }
@@ -174,6 +178,34 @@ class LibraryRoutesTest {
                 setBody("""{"connectorId":"mangadex","externalId":"ext-001"}""")
             }
             assertEquals(HttpStatusCode.Conflict, response.status)
+        }
+    }
+
+    @Test
+    fun `POST library series enqueues FETCH_SERIES_METADATA task after success`() {
+        val capturingQueue = CapturingTaskQueue()
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, autoDownload: Boolean) =
+                    Result.Success(fakeSeries)
+                override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Success(fakeSeries)
+            },
+            taskQueue = capturingQueue,
+        ) {
+            client.post("/library/series") {
+                bearerAuth("admin-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"connectorId":"mangadex","externalId":"ext-001"}""")
+            }
+            assertEquals(1, capturingQueue.enqueuedTasks.size)
+            val task = capturingQueue.enqueuedTasks.first()
+            assertEquals(TaskType.FETCH_SERIES_METADATA, task.type)
+            assertEquals(fakeSeries.id, task.targetId)
+            assertEquals("mangadex", task.payload["connectorId"])
+            assertEquals("ext-001", task.payload["externalId"])
         }
     }
 
@@ -342,4 +374,22 @@ private class NoOpCommandApi : LibraryCommandApi {
         Result.Failure(AppError.InternalError("not implemented"))
     override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
         Result.Failure(AppError.InternalError("not implemented"))
+}
+
+private class NoOpTaskQueue : TaskQueue {
+    override suspend fun enqueue(task: Task): Result<Id> = Result.Success(task.id)
+    override suspend fun dequeue(): Task? = null
+    override suspend fun cancel(taskId: Id): Result<Unit> = Result.Success(Unit)
+    override suspend fun getTask(taskId: Id): Task? = null
+}
+
+private class CapturingTaskQueue : TaskQueue {
+    val enqueuedTasks = mutableListOf<Task>()
+    override suspend fun enqueue(task: Task): Result<Id> {
+        enqueuedTasks.add(task)
+        return Result.Success(task.id)
+    }
+    override suspend fun dequeue(): Task? = null
+    override suspend fun cancel(taskId: Id): Result<Unit> = Result.Success(Unit)
+    override suspend fun getTask(taskId: Id): Task? = null
 }

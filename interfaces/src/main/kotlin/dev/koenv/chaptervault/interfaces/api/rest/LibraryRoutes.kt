@@ -7,6 +7,11 @@ import dev.koenv.chaptervault.interfaces.serialization.mappers.v1.toDto
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.runtime.TargetType
+import dev.koenv.chaptervault.kernel.runtime.Task
+import dev.koenv.chaptervault.kernel.runtime.TaskQueue
+import dev.koenv.chaptervault.kernel.runtime.TaskStatus
+import dev.koenv.chaptervault.kernel.runtime.TaskType
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
@@ -21,10 +26,12 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
+import java.time.Instant
 
 fun Route.libraryRoutes(
     libraryRead: LibraryReadApi,
     libraryCommand: LibraryCommandApi,
+    taskQueue: TaskQueue,
 ) {
     // GET routes are accessible to any authenticated user
     get("/library/series") {
@@ -82,7 +89,22 @@ fun Route.libraryRoutes(
             call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@post
         }
         when (val result = libraryCommand.addToLibrary(request.connectorId, request.externalId, request.autoDownload)) {
-            is Result.Success -> call.respond(HttpStatusCode.Created, result.value.toDto())
+            is Result.Success -> {
+                val series = result.value
+                val now = Instant.now()
+                val task = Task(
+                    id = Id.generate(),
+                    type = TaskType.FETCH_SERIES_METADATA,
+                    status = TaskStatus.PENDING,
+                    targetType = TargetType.SERIES,
+                    targetId = series.id,
+                    payload = mapOf("connectorId" to series.connectorId, "externalId" to series.externalId),
+                    createdAt = now,
+                    updatedAt = now,
+                )
+                taskQueue.enqueue(task)
+                call.respond(HttpStatusCode.Created, series.toDto())
+            }
             is Result.Failure -> when (result.error) {
                 is AppError.Conflict -> call.respond(HttpStatusCode.Conflict, result.error.message)
                 is AppError.ValidationError -> call.respond(HttpStatusCode.BadRequest, result.error.message)

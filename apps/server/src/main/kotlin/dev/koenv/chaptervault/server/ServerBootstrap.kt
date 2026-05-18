@@ -5,6 +5,7 @@ import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
+import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.interfaces.api.opds.opdsRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.adminRoutes
@@ -34,6 +35,7 @@ fun Application.bootstrap() {
 
     val libraryRead by inject<LibraryReadApi>()
     val libraryCommand by inject<LibraryCommandApi>()
+    val taskQueue by inject<TaskQueue>()
     val system by inject<SystemApi>()
     val auth by inject<AuthApi>()
     val registry by inject<ExtensionRegistry>()
@@ -56,7 +58,7 @@ fun Application.bootstrap() {
     // Protected routes
     routing {
         authenticate("auth-bearer") {
-            libraryRoutes(libraryRead, libraryCommand)
+            libraryRoutes(libraryRead, libraryCommand, taskQueue)
             taskRoutes(system)
             adminRoutes(registry)
             eventSocket(projectionService)
