@@ -193,7 +193,7 @@ class LibraryRoutesTest {
         }
     }
 
-    // RBAC tests — USER role should get 403 on write endpoints
+    // RBAC tests: USER role should get 403 on write endpoints
 
     @Test
     fun `POST library series returns 403 for USER role`() {
