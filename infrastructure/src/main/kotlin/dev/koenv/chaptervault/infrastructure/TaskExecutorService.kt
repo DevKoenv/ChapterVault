@@ -168,8 +168,14 @@ class TaskExecutorService(
             emptyList()
         }
 
-        if (context != null && pages.isNotEmpty()) {
-            fileStorage.writeChapter(chapter.seriesId.toString(), chapter.id.toString(), pages, format)
+        if (context != null) {
+            if (pages.isEmpty()) {
+                return Result.Failure(AppError.InternalError("All page downloads failed for chapter ${chapter.id}"))
+            }
+            when (val r = fileStorage.writeChapter(chapter.seriesId.toString(), chapter.id.toString(), pages, format)) {
+                is Result.Failure -> return r
+                is Result.Success -> Unit
+            }
         }
 
         chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.DOWNLOADED)

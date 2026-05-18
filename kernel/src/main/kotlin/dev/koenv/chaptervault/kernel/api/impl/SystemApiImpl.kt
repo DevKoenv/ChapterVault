@@ -8,7 +8,6 @@ import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
-import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 
@@ -21,8 +20,7 @@ class SystemApiImpl(
         taskReadStore.listTasks(request)
 
     override suspend fun getTask(id: Id): Result<Task> =
-        taskQueue.getTask(id)?.let { Result.Success(it) }
-            ?: Result.Failure(AppError.NotFound("Task", id.toString()))
+        taskReadStore.findTask(id)
 
     override suspend fun cancelTask(id: Id): Result<Unit> = taskQueue.cancel(id)
 
