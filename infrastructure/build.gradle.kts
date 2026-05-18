@@ -3,6 +3,7 @@ dependencies {
     implementation(project(":kernel"))
     implementation(libs.bundles.exposed)
     implementation(libs.sqlite.jdbc)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)

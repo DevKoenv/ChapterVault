@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.server
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.config.ConfigLoader
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
@@ -21,6 +22,7 @@ import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
+import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
 import org.koin.dsl.module
 
 val configModule = module {
@@ -33,6 +35,8 @@ val infrastructureModule = module {
     single<LibraryCommandApi> { get<SeriesRepository>() }
     single { UserRepository() }
     single<AuthApi> { get<UserRepository>() }
+    single { TaskRepository() }
+    single<TaskReadStore> { get<TaskRepository>() }
     single { createHttpClient() }
     single { RateLimiter(requestsPerSecond = 2.0) }
 }
@@ -41,7 +45,7 @@ val kernelModule = module {
     single<EventBus> { InMemoryEventBus() }
     single<ExtensionRegistry> { DefaultExtensionRegistry() }
     single<TaskQueue> { InMemoryTaskQueue() }
-    single<SystemApi> { SystemApiImpl(get(), get()) }
+    single<SystemApi> { SystemApiImpl(get(), get(), get()) }
 }
 
 val extensionModule = module {

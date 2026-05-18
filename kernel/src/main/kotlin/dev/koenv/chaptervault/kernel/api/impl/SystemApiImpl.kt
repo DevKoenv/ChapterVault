@@ -5,6 +5,7 @@ import dev.koenv.chaptervault.kernel.extension.Extension
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
+import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.AppError
@@ -14,9 +15,10 @@ import dev.koenv.chaptervault.shared.utils.Id
 class SystemApiImpl(
     private val taskQueue: TaskQueue,
     private val registry: ExtensionRegistry,
+    private val taskReadStore: TaskReadStore,
 ) : SystemApi {
     override suspend fun listTasks(request: PageRequest): Result<Pagination<Task>> =
-        Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
+        taskReadStore.listTasks(request)
 
     override suspend fun getTask(id: Id): Result<Task> =
         taskQueue.getTask(id)?.let { Result.Success(it) }
