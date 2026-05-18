@@ -11,5 +11,6 @@ fun Task.toDto(): TaskDto = TaskDto(
     targetId = targetId.toString(),
     createdAt = createdAt.toString(),
     updatedAt = updatedAt.toString(),
+    payload = payload,
     errorMessage = errorMessage,
 )

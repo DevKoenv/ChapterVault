@@ -11,5 +11,6 @@ data class TaskDto(
     val targetId: String,
     val createdAt: String,
     val updatedAt: String,
+    val payload: Map<String, String> = emptyMap(),
     val errorMessage: String? = null,
 )
