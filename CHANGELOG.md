@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Architectural rewrite (targeting 0.5.0)
+## [0.5.0] - 2026-05-18
+
+### Architectural rewrite
 
 Complete rebuild from scratch with strict layered architecture and a kernel-based extension model. Nothing from 0.4.x was carried forward at the code level; the two lines of history will be joined via a merge commit when 0.5.0 is released.
 
 #### Added
 
+- **Task recovery on boot**: RUNNING tasks are reset to PENDING and all PENDING tasks are re-enqueued on startup, so downloads interrupted by a server restart resume automatically
 - **Six-module Gradle project** with enforced one-way dependency graph: `:shared` -> `:kernel` -> `:extensions` / `:infrastructure` / `:interfaces` -> `:apps:server`; `:interfaces` and `:infrastructure` additionally depend on `:extensions` for connector types
 - **`:shared`**: `Result<T>` / `AppError` sealed hierarchy, `Pagination<T>` / `PageRequest`, `Id` (UUID value class), `Time`, `ChapterFormat` sealed class (`Cbz`, `Folder`), `RateLimiter` (sliding-window with Mutex and burst support)
 - **`:kernel` contracts**: all domain models (`Series`, `Chapter`, `SeriesStatus`, `ChapterStatus`), runtime types (`Task`, `TaskType`, `TaskStatus`, `TaskQueue`, `TaskExecutor`, `TaskScheduler`, `TaskEvents`, `TaskReadStore`), auth types (`UserPrincipal`, `Role`, `Permission`), event system (`DomainEvent`, `EventBus`), extension contracts (`Extension`, `ExtensionLifecycle`, `ExtensionContext`, `ExtensionRegistry`, `Capability`)
@@ -221,7 +224,8 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 | 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                      |
 | 0.1.0   | 2026-01-31 | Initial public release                                       |
 
-[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...v0.4.1
 [0.3.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0

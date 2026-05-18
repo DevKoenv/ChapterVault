@@ -74,7 +74,7 @@ fun Application.bootstrap() {
 
     opdsRoutes(registry)
 
-    launch { executor.start() }
+    launch { executor.recoverOnBoot(); executor.start() }
 
     // /health must be last
     routing {

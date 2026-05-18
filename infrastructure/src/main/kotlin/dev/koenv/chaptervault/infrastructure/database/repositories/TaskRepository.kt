@@ -26,6 +26,10 @@ class TaskRepository : TaskReadStore {
         newSuspendedTransaction(Dispatchers.IO) { block() }
 
     suspend fun insert(task: Task): Result<Task> = dbQuery {
+        val existing = TaskTable.selectAll()
+            .where { TaskTable.id eq task.id.toString() }
+            .singleOrNull()
+        if (existing != null) return@dbQuery Result.Success(existing.toTask())
         TaskTable.insert {
             it[id] = task.id.toString()
             it[type] = task.type.name
@@ -90,6 +94,13 @@ class TaskRepository : TaskReadStore {
             .offset((request.page.toLong() * request.size))
             .map { it.toTask() }
         Result.Success(Pagination(items, request.page, request.size, total))
+    }
+
+    suspend fun listAllByStatus(status: TaskStatus): List<Task> = dbQuery {
+        TaskTable.selectAll()
+            .where { TaskTable.status eq status.name }
+            .orderBy(TaskTable.createdAt, SortOrder.ASC)
+            .map { it.toTask() }
     }
 
     override suspend fun findTask(id: Id): Result<Task> = findById(id)

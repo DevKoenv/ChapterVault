@@ -28,6 +28,17 @@ class TaskExecutorService(
     private val fileStorage: FileStorage,
 ) {
 
+    suspend fun recoverOnBoot() {
+        val running = taskRepository.listAllByStatus(TaskStatus.RUNNING)
+        val pending = taskRepository.listAllByStatus(TaskStatus.PENDING)
+        for (task in running) {
+            taskRepository.updateStatus(task.id, TaskStatus.PENDING)
+        }
+        for (task in pending + running) {
+            taskQueue.enqueue(task)
+        }
+    }
+
     suspend fun start() {
         while (true) {
             val task = taskQueue.dequeue()
