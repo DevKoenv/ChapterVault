@@ -28,6 +28,7 @@ dependencies {
     implementation(project(":infrastructure"))
     implementation(project(":interfaces"))
     implementation(libs.bundles.ktor.server)
+    implementation(libs.ktor.server.openapi)
     implementation(libs.bundles.koin)
     implementation(libs.logback.classic)
 

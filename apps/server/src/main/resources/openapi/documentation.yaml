@@ -1,0 +1,472 @@
+openapi: "3.0.3"
+info:
+  title: ChapterVault API
+  version: "0.5.0"
+  description: Self-hosted manga/comic library server with connector-based download pipeline.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: auth
+    description: Authentication
+  - name: library
+    description: Library — series and chapters
+  - name: tasks
+    description: Background task queue
+  - name: connectors
+    description: External source connectors (ADMIN only)
+  - name: admin
+    description: Server administration
+  - name: system
+    description: System utilities
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, example: admin }
+        password: { type: string, example: secret }
+
+    LoginResponse:
+      type: object
+      properties:
+        token:    { type: string }
+        username: { type: string }
+        roles:    { type: array, items: { type: string }, example: [ADMIN] }
+
+    UserResponse:
+      type: object
+      properties:
+        id:       { type: string, format: uuid }
+        username: { type: string }
+        roles:    { type: array, items: { type: string } }
+
+    SeriesDto:
+      type: object
+      properties:
+        id:          { type: string, format: uuid }
+        title:       { type: string }
+        connectorId: { type: string }
+        externalId:  { type: string }
+        status:      { type: string, enum: [IN_LIBRARY, REMOVED] }
+        autoDownload: { type: boolean }
+        coverUrl:    { type: string, nullable: true }
+        description: { type: string, nullable: true }
+
+    ChapterDto:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        seriesId:       { type: string, format: uuid }
+        title:          { type: string }
+        chapterIndex:   { type: number, format: double }
+        downloadStatus: { type: string, enum: [PENDING, DOWNLOADING, DOWNLOADED, FAILED] }
+        format:         { type: string, nullable: true, enum: [CBZ, FOLDER] }
+        pageCount:      { type: integer, nullable: true }
+
+    TaskDto:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        type:         { type: string, enum: [FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER] }
+        status:       { type: string, enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED] }
+        targetType:   { type: string, enum: [SERIES, CHAPTER] }
+        targetId:     { type: string, format: uuid }
+        createdAt:    { type: string, format: date-time }
+        updatedAt:    { type: string, format: date-time }
+        payload:      { type: object, additionalProperties: { type: string } }
+        errorMessage: { type: string, nullable: true }
+
+    ConnectorDto:
+      type: object
+      properties:
+        id:   { type: string }
+        name: { type: string }
+
+    SeriesSearchResultDto:
+      type: object
+      properties:
+        externalId:  { type: string }
+        title:       { type: string }
+        coverUrl:    { type: string, nullable: true }
+        description: { type: string, nullable: true }
+
+    SeriesMetadataDto:
+      type: object
+      properties:
+        externalId:  { type: string }
+        title:       { type: string }
+        coverUrl:    { type: string, nullable: true }
+        description: { type: string, nullable: true }
+
+    ChapterMetadataDto:
+      type: object
+      properties:
+        externalId:   { type: string }
+        title:        { type: string }
+        chapterIndex: { type: number, format: double }
+        pageCount:    { type: integer, nullable: true }
+
+    AddSeriesRequest:
+      type: object
+      required: [connectorId, externalId]
+      properties:
+        connectorId:  { type: string, example: mock }
+        externalId:   { type: string, example: series-1 }
+        autoDownload: { type: boolean, default: false }
+
+    UpdateSeriesRequest:
+      type: object
+      properties:
+        autoDownload:  { type: boolean, nullable: true }
+        defaultFormat: { type: string, nullable: true, enum: [CBZ, FOLDER] }
+
+    PaginatedSeriesResponse:
+      type: object
+      properties:
+        items:       { type: array, items: { $ref: "#/components/schemas/SeriesDto" } }
+        page:        { type: integer }
+        size:        { type: integer }
+        totalItems:  { type: integer, format: int64 }
+        totalPages:  { type: integer }
+        hasNext:     { type: boolean }
+        hasPrevious: { type: boolean }
+
+    PaginatedTaskResponse:
+      type: object
+      properties:
+        items:       { type: array, items: { $ref: "#/components/schemas/TaskDto" } }
+        page:        { type: integer }
+        size:        { type: integer }
+        totalItems:  { type: integer, format: int64 }
+        totalPages:  { type: integer }
+        hasNext:     { type: boolean }
+        hasPrevious: { type: boolean }
+
+    PaginatedSearchResponse:
+      type: object
+      properties:
+        items:       { type: array, items: { $ref: "#/components/schemas/SeriesSearchResultDto" } }
+        page:        { type: integer }
+        size:        { type: integer }
+        totalItems:  { type: integer, format: int64 }
+        totalPages:  { type: integer }
+        hasNext:     { type: boolean }
+        hasPrevious: { type: boolean }
+
+    ErrorResponse:
+      type: object
+      properties:
+        message: { type: string }
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: Server is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserResponse" }
+        "400": { description: Invalid request body }
+        "409": { description: Username already taken }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate and obtain a bearer token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResponse" }
+        "401": { description: Invalid credentials }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Invalidate the current bearer token
+      responses:
+        "204": { description: Session invalidated }
+        "401": { description: Missing or invalid token }
+
+  /library/series:
+    get:
+      tags: [library]
+      summary: List all series in the library
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Paginated series list
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedSeriesResponse" }
+
+    post:
+      tags: [library]
+      summary: Add a series to the library (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddSeriesRequest" }
+      responses:
+        "201":
+          description: Series added; metadata fetch task enqueued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeriesDto" }
+        "400": { description: Invalid request body }
+        "403": { description: Requires ADMIN role }
+        "409": { description: Series already in library }
+
+  /library/series/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+
+    get:
+      tags: [library]
+      summary: Get a single series
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeriesDto" }
+        "404": { description: Series not found }
+
+    patch:
+      tags: [library]
+      summary: Update series settings (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSeriesRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeriesDto" }
+        "400": { description: Invalid defaultFormat value }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Series not found }
+
+    delete:
+      tags: [library]
+      summary: Remove a series from the library (ADMIN)
+      responses:
+        "204": { description: Series removed }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Series not found }
+
+  /library/series/{id}/chapters:
+    get:
+      tags: [library]
+      summary: List chapters for a series
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ChapterDto" }
+        "404": { description: Series not found }
+
+  /tasks:
+    get:
+      tags: [tasks]
+      summary: List background tasks
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedTaskResponse" }
+
+  /tasks/{id}:
+    get:
+      tags: [tasks]
+      summary: Get a single task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskDto" }
+        "404": { description: Task not found }
+
+  /tasks/{id}/cancel:
+    post:
+      tags: [tasks]
+      summary: Cancel a pending task (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Task cancelled }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Task not found }
+
+  /connectors:
+    get:
+      tags: [connectors]
+      summary: List registered connectors (ADMIN)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ConnectorDto" }
+        "403": { description: Requires ADMIN role }
+
+  /connectors/{id}/search:
+    get:
+      tags: [connectors]
+      summary: Search a connector for series (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: Connector ID
+        - in: query
+          name: q
+          schema: { type: string, default: "" }
+        - in: query
+          name: page
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedSearchResponse" }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Connector not found }
+
+  /connectors/{id}/series/{externalId}:
+    get:
+      tags: [connectors]
+      summary: Fetch series metadata from a connector (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: externalId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeriesMetadataDto" }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Connector not found }
+
+  /connectors/{id}/series/{externalId}/chapters:
+    get:
+      tags: [connectors]
+      summary: Fetch chapter list from a connector (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: externalId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ChapterMetadataDto" }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Connector not found }
+
+  /admin:
+    get:
+      tags: [admin]
+      summary: Admin overview (ADMIN)
+      responses:
+        "200":
+          description: Extension and registry status
+          content:
+            application/json:
+              schema:
+                type: object

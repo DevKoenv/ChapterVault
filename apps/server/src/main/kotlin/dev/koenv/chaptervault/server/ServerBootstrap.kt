@@ -22,6 +22,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.plugins.openapi.openAPI
 import kotlinx.coroutines.launch
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
@@ -75,6 +76,10 @@ fun Application.bootstrap() {
     opdsRoutes(registry)
 
     launch { executor.recoverOnBoot(); executor.start() }
+
+    routing {
+        openAPI(path = "openapi", swaggerFile = "openapi/documentation.yaml")
+    }
 
     // /health must be last
     routing {
