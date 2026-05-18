@@ -13,14 +13,22 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 
 #### Added
 
-- **Six-module Gradle project** with enforced one-way dependency graph: `:shared` -> `:kernel` -> `:extensions` / `:infrastructure` / `:interfaces` -> `:apps:server`
-- **`:shared`**: `Result<T>` / `AppError` sealed hierarchy, `Pagination<T>` / `PageRequest`, `Id` (UUID value class), `Time`, `ChapterFormat` sealed class (`Cbz`, `Folder`)
-- **`:kernel` contracts**: all domain models (`Series`, `Chapter`, `SeriesStatus`, `ChapterStatus`), runtime types (`Task`, `TaskType`, `TaskStatus`, `TaskQueue`, `TaskExecutor`, `TaskScheduler`, `TaskEvents`), auth types (`UserPrincipal`, `Role`, `Permission`), event system (`DomainEvent`, `EventBus`), extension contracts (`Extension`, `ExtensionLifecycle`, `ExtensionContext`, `ExtensionRegistry`, `Capability`)
+- **Six-module Gradle project** with enforced one-way dependency graph: `:shared` -> `:kernel` -> `:extensions` / `:infrastructure` / `:interfaces` -> `:apps:server`; `:interfaces` and `:infrastructure` additionally depend on `:extensions` for connector types
+- **`:shared`**: `Result<T>` / `AppError` sealed hierarchy, `Pagination<T>` / `PageRequest`, `Id` (UUID value class), `Time`, `ChapterFormat` sealed class (`Cbz`, `Folder`), `RateLimiter` (sliding-window with Mutex and burst support)
+- **`:kernel` contracts**: all domain models (`Series`, `Chapter`, `SeriesStatus`, `ChapterStatus`), runtime types (`Task`, `TaskType`, `TaskStatus`, `TaskQueue`, `TaskExecutor`, `TaskScheduler`, `TaskEvents`, `TaskReadStore`), auth types (`UserPrincipal`, `Role`, `Permission`), event system (`DomainEvent`, `EventBus`), extension contracts (`Extension`, `ExtensionLifecycle`, `ExtensionContext`, `ExtensionRegistry`, `Capability`)
 - **`kernel.api` as sole public surface**: `LibraryReadApi`, `LibraryCommandApi`, `ProgressApi`, `BookmarkApi`, `SystemApi`, `AuthApi`; no duplication with internal service interfaces
-- **`:extensions` stubs**: `ExtensionBase`, `CapabilityDsl`, `Connector` interface, `ConnectorRegistry`, `MockConnector`, `MangaDexConnector` stub, `OpdsExtension` stub, `MetadataProvider`, `AniListProvider` stub, `AdminExtension` stub
-- **`:infrastructure` stubs**: `AppConfig` / `ConfigLoader`, `DatabaseFactory` with `SchemaUtils.create` on boot, Exposed table definitions (`SeriesTable`, `ChapterTable`, `UserTable`, `TaskTable`), `SeriesRepository` (stub), `ChapterArchiveWriter` interface, `CbzWriter` / `FolderWriter` / `ArchiveWriterSelector`, `HttpClientFactory`, `RateLimiter`, `BrowserPool` stub
-- **`:interfaces` stubs**: DTOs v1 (`SeriesDto`, `ChapterDto`, `TaskDto`, `UserDto`), mappers v1, REST routes returning 501, `EventProjectionService` + `/events` WebSocket endpoint, OPDS routes
-- **`:apps:server`**: Koin module definitions, `DependencyInjection`, `ServerBootstrap`, `Main`; `fatJar` Gradle task produces `server-fat.jar` for Docker
+- **`:extensions` connector infrastructure**: `Connector` interface, `ConnectorRegistry` interface + `DefaultConnectorRegistry` (ConcurrentHashMap-backed), `ConnectorContext` interface + `DefaultConnectorContext` (rate-limit buckets, retry, content negotiation), `ConnectorExtensions.getJson<T>()` extension
+- **`MockConnector`**: deterministic fake connector with no HTTP calls; "piece" query returns One Piece + Naruto; blank returns Alpha/Beta/Gamma; 3 chapters per series; 3 mock page URLs per chapter
+- **`:extensions` stubs**: `MangaDexConnector` (all methods return Failure), `OpdsExtension`, `MetadataProvider`, `AniListProvider`, `AdminExtension`
+- **`:infrastructure` repositories**: `SeriesRepository` (getSeries, listSeries, searchLibrary, addToLibrary, removeSeries, updateSeries, updateMetadata), `ChapterRepository` (insertChapter, updateDownloadStatus, listChapters, getChapter), `UserRepository` (bcrypt, session tokens, 30-day TTL), `TaskRepository` (insert, updateStatus, findById, listAll paginated, listByStatus; implements `TaskReadStore`)
+- **`:infrastructure` storage**: `CbzWriter` (ZipOutputStream), `FolderWriter` (Files.write per page), `ArchiveWriterSelector` (dispatches by ChapterFormat), `FileStorage.writeChapter` (delegates to selector)
+- **`TaskExecutorService`**: coroutine dequeue loop; dispatches FETCH_SERIES_METADATA (fetchSeries -> updateMetadata -> enqueue FETCH_CHAPTERS) -> FETCH_CHAPTERS (fetchChapters -> insertChapter -> enqueue DOWNLOAD_CHAPTER if autoDownload) -> DOWNLOAD_CHAPTER (download -> pages -> write archive -> DOWNLOADED status)
+- **`HttpClientFactory`**: upgraded with ContentNegotiation (JSON ignoreUnknownKeys), DefaultRequest (User-Agent: ChapterVault/1.0), HttpRequestRetry (3 retries, exponential delay, 429+5xx)
+- **`:interfaces` REST routes**: `ConnectorRoutes` (GET /connectors, GET /connectors/{id}/search, GET /connectors/{id}/series/{externalId}, GET /connectors/{id}/series/{externalId}/chapters; all ADMIN-only), `TaskRoutes` (GET /tasks paginated, GET /tasks/{id}, POST /tasks/{id}/cancel ADMIN-only), library write routes (POST /library/series enqueues FETCH_SERIES_METADATA after insert; DELETE/PATCH ADMIN-only)
+- **`:interfaces` DTOs**: `ConnectorDto`, `SeriesSearchResultDto`, `SeriesMetadataDto`, `ChapterMetadataDto`, `TaskDto` (with payload map)
+- **`:apps:server` wiring**: `extensionModule` registers `DefaultConnectorRegistry` + `MockConnector`; `infrastructureModule` registers all repositories, writers, `FileStorage`, `TaskExecutorService`; `ServerBootstrap` launches executor coroutine and mounts connector routes
+- **`AppConfig` / `ConfigLoader`**: SnakeYAML, reads `config/application.yaml`, falls back to defaults
+- **`DatabaseFactory`**: creates all tables on boot; `DatabaseFactory` initialises Exposed connection pool
 - **`Dockerfile`** + **`docker-compose.yml`**: JRE 21 Alpine image; volume mounts for `data/`, `downloads/`, `config/`
 - **CI workflow**: GitHub Actions build on push/PR
 - **Package root** `dev.koenv.chaptervault.*`
@@ -30,36 +38,23 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - Kotlin 2.2.0, Gradle 9.5.1, JVM target 21 (JDK 26 runtime)
 - Ktor 3.0.3 (server + client), Koin 4.0.0, Exposed 0.57.0 + SQLite JDBC 3.47.0.0
 - kotlinx-coroutines 1.9.0, kotlinx-serialization 1.7.3, Logback 1.5.12
+- 82 tests passing
 
 #### Kernel internals
 
 - `InMemoryEventBus`: coroutine fan-out with typed and untyped handler subscriptions
 - `DefaultExtensionRegistry`: map-backed registry; capability index built from `extension.capabilities`
 - `InMemoryTaskQueue`: channel-backed queue with `enqueue` / `dequeue` / `cancel`
-- `SystemApiImpl`: delegates task queries to `TaskQueue`, extension list to `ExtensionRegistry`
-- `AuthApiImpl`: stub returning `Unauthorized`; placeholder until real credential store is wired
-- All five bound in `kernelModule`; server now boots to `/health`
+- `SystemApiImpl`: delegates task queries to `TaskReadStore` (implemented by `TaskRepository`); extension list to `ExtensionRegistry`
+- All bound in `kernelModule`; server boots to `/health`
 
-### Planned: infrastructure repositories
+### Remaining for 0.5.0
 
-- `SeriesRepository`: full Exposed implementation: `getSeries`, `listSeries`, `searchLibrary`, `addToLibrary`, `removeSeries`, `updateSeries`; `java.time.Instant` / `kotlinx.datetime.Instant` conversion at boundary
-- `ChapterRepository`: `getChapter`, `listChapters`; extracted from `SeriesRepository`
-- `TaskRepository`: persists task lifecycle; implements `TaskQueue` over the `tasks` table
-- `UserRepository`: user lookup and password verification
-
-### Planned: config and connector wiring
-
-- `ConfigLoader`: parse `config/application.yaml` via Ktor's built-in YAML config support (`ktor-server-config-yaml` already a dependency); env-var override layer
-- `ConnectorContext`: pass `HttpClient` and `RateLimiter` through to connector implementations
-- `MangaDexConnector`: first real connector: search, series metadata, chapter list, page download
-
-### Planned: first runnable release (0.5.0)
-
-- ~~Server boots to `/health`~~ ✓ done
-- Library CRUD via `GET/POST /library/series` and `GET /library/series/{id}/chapters`
-- Task creation on `addToLibrary` with `autoDownload = true`
-- MangaDex series discovery and chapter download
-- OPDS feed from library via `OpdsExtension`
+- `MangaDexConnector`: real HTTP implementation against MangaDex API v5
+- `ProgressRepository` + progress routes (Phase E)
+- `BookmarkRepository` + bookmark routes (Phase E)
+- OPDS feed via `OpdsExtension` + `OpdsRoutes` (Phase F)
+- Structured error responses, auth rate limiting, WebSocket events (Phase G)
 
 ---
 

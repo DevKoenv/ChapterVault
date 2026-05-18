@@ -17,7 +17,13 @@ object DatabaseFactory {
             driver = config.driver,
         )
         transaction {
-            SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, TaskTable)
+            SchemaUtils.createMissingTablesAndColumns(UserTable, SessionTable, SeriesTable, ChapterTable, TaskTable)
+            dropOrphanedColumns()
         }
+    }
+
+    private fun org.jetbrains.exposed.sql.Transaction.dropOrphanedColumns() {
+        // chapters.status was renamed to download_status; drop the old column if still present
+        try { exec("ALTER TABLE chapters DROP COLUMN status") } catch (_: Exception) {}
     }
 }
