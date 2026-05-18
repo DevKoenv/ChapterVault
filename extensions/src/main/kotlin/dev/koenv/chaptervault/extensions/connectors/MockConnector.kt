@@ -10,15 +10,55 @@ class MockConnector : Connector {
     override val id: String = "mock"
     override val name: String = "Mock Connector"
 
-    override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> =
-        Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
+    override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> {
+        val allResults = when {
+            query.contains("piece", ignoreCase = true) -> listOf(
+                SeriesSearchResult("mock-one-piece", "One Piece", null, "A pirate adventure"),
+                SeriesSearchResult("mock-naruto", "Naruto", null, "A ninja adventure"),
+            )
+
+            query.isBlank() -> listOf(
+                SeriesSearchResult("mock-001", "Alpha", null, null),
+                SeriesSearchResult("mock-002", "Beta", null, null),
+                SeriesSearchResult("mock-003", "Gamma", null, null),
+            )
+
+            else -> listOf(
+                SeriesSearchResult("mock-${query.take(8)}", "Mock: $query", null, null)
+            )
+        }
+
+        val skip = request.page * request.size
+        val take = request.size
+        val paginatedItems = allResults.drop(skip).take(take)
+
+        return Result.Success(
+            Pagination(
+                items = paginatedItems,
+                page = request.page,
+                size = request.size,
+                totalItems = allResults.size.toLong(),
+            )
+        )
+    }
 
     override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> =
-        Result.Success(SeriesMetadata(externalId = externalId, title = "Mock Series [$externalId]"))
+        Result.Success(SeriesMetadata(externalId = externalId, title = "Mock: $externalId", description = "Auto-generated mock series"))
 
     override suspend fun fetchChapters(externalId: String): Result<List<ChapterMetadata>> =
-        Result.Success(emptyList())
+        Result.Success(
+            listOf(
+                ChapterMetadata("$externalId-ch1", "Chapter 1", 1.0, 12),
+                ChapterMetadata("$externalId-ch2", "Chapter 2", 2.0, 18),
+                ChapterMetadata("$externalId-ch3", "Chapter 3", 3.0, 24),
+            )
+        )
 
     override suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult> =
-        Result.Success(DownloadResult(pageUrls = emptyList(), totalPages = 0))
+        Result.Success(
+            DownloadResult(
+                pageUrls = listOf("https://mock.local/p1.jpg", "https://mock.local/p2.jpg", "https://mock.local/p3.jpg"),
+                totalPages = 3,
+            )
+        )
 }
