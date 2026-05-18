@@ -4,12 +4,14 @@ import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
+import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.interfaces.api.opds.opdsRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.adminRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
@@ -39,6 +41,7 @@ fun Application.bootstrap() {
     val system by inject<SystemApi>()
     val auth by inject<AuthApi>()
     val registry by inject<ExtensionRegistry>()
+    val connectorRegistry by inject<ConnectorRegistry>()
     val projectionService by inject<EventProjectionService>()
 
     install(Authentication) {
@@ -61,6 +64,7 @@ fun Application.bootstrap() {
             libraryRoutes(libraryRead, libraryCommand, taskQueue)
             taskRoutes(system)
             adminRoutes(registry)
+            connectorRoutes(connectorRegistry)
             eventSocket(projectionService)
         }
     }
