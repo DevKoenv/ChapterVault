@@ -10,7 +10,6 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesReposit
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
-import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorContext
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
 import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
@@ -19,7 +18,6 @@ import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
 import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.infrastructure.storage.FolderWriter
-import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.BookmarkApi
@@ -82,14 +80,7 @@ val kernelModule = module {
 val extensionModule = module {
     single<ConnectorRegistry> { DefaultConnectorRegistry() }
     single { MockConnector() }
-    single {
-        val httpClient = get<io.ktor.client.HttpClient>()
-        val context = DefaultConnectorContext(
-            httpClient,
-            mapOf("api" to RateLimiter(requestsPerSecond = 2.0), "cdn" to RateLimiter(requestsPerSecond = 5.0)),
-        )
-        CustomConnector(context)
-    }
+    single { CustomConnector(get()) }
 }
 
 val interfacesModule = module {
