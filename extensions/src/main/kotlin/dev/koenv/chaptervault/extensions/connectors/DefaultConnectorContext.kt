@@ -12,27 +12,23 @@ import io.ktor.client.statement.readRawBytes
 import io.ktor.http.isSuccess
 
 class DefaultConnectorContext(
-    override val httpClient: HttpClient,
-    private val buckets: Map<String, RateLimiter>,
+    private val httpClient: HttpClient,
+    private val buckets: Map<BucketKey, RateLimiter>,
 ) : ConnectorContext {
-
-    private suspend fun bucket(name: String): RateLimiter? =
-        buckets[name] ?: buckets["default"]
 
     override suspend fun get(
         url: String,
         params: Map<String, String>,
-        bucket: String,
+        bucket: BucketKey,
         headers: Map<String, String>,
     ): Result<HttpResponse> {
-        val limiter = bucket(bucket)
-            ?: return Result.Failure(AppError.InternalError("No rate limiter found for bucket '$bucket' and no 'default' bucket configured"))
+        val limiter = buckets[bucket]
+            ?: return Result.Failure(AppError.InternalError("No rate limiter configured for bucket '${bucket.id}'"))
         limiter.acquire()
         return try {
-            val extraHeaders = headers
             val response = httpClient.get(url) {
                 params.forEach { (k, v) -> parameter(k, v) }
-                extraHeaders.forEach { (k, v) -> header(k, v) }
+                headers.forEach { (k, v) -> header(k, v) }
             }
             if (!response.status.isSuccess()) {
                 return Result.Failure(AppError.InternalError("HTTP ${response.status.value} from $url"))
@@ -43,14 +39,17 @@ class DefaultConnectorContext(
         }
     }
 
-    override suspend fun download(url: String, bucket: String, headers: Map<String, String>): Result<ByteArray> {
-        val limiter = bucket(bucket)
-            ?: return Result.Failure(AppError.InternalError("No rate limiter found for bucket '$bucket' and no 'default' bucket configured"))
+    override suspend fun download(
+        url: String,
+        bucket: BucketKey,
+        headers: Map<String, String>,
+    ): Result<ByteArray> {
+        val limiter = buckets[bucket]
+            ?: return Result.Failure(AppError.InternalError("No rate limiter configured for bucket '${bucket.id}'"))
         limiter.acquire()
         return try {
-            val extraHeaders = headers
             val response = httpClient.get(url) {
-                extraHeaders.forEach { (k, v) -> header(k, v) }
+                headers.forEach { (k, v) -> header(k, v) }
             }
             if (!response.status.isSuccess()) {
                 return Result.Failure(AppError.InternalError("HTTP ${response.status.value} from $url"))
