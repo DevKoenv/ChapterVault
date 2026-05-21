@@ -176,56 +176,61 @@ class TaskExecutorService(
 
         chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.DOWNLOADING)
 
-        val format = ChapterFormat.fromString(task.payload["format"] ?: "Cbz")
-        val downloadResult = when (val r = connector.download(chapter, format)) {
-            is Result.Success -> r.value
-            is Result.Failure -> {
-                chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
-                return r
+        try {
+            val format = ChapterFormat.fromString(task.payload["format"] ?: "Cbz")
+            val downloadResult = when (val r = connector.download(chapter, format)) {
+                is Result.Success -> r.value
+                is Result.Failure -> {
+                    chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                    return r
+                }
             }
-        }
 
-        if (downloadResult.pages.isEmpty()) {
-            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
-            return Result.Failure(AppError.InternalError(
-                "Connector $connectorId returned 0 pages for chapter ${chapter.id}"
-            ))
-        }
-
-        val httpConnector = connector as? HttpConnector
-            ?: run {
+            if (downloadResult.pages.isEmpty()) {
                 chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
                 return Result.Failure(AppError.InternalError(
-                    "Connector $connectorId does not support HTTP page fetching"
+                    "Connector $connectorId returned 0 pages for chapter ${chapter.id}"
                 ))
             }
 
-        val sortedPages = downloadResult.pages.sortedBy { it.index }
-        val pages = mutableListOf<Page>()
-        val failedIndices = mutableListOf<Int>()
-        for (page in sortedPages) {
-            when (val r = httpConnector.fetchPage(page)) {
-                is Result.Success -> pages.add(Page(page.index, r.value))
-                is Result.Failure -> failedIndices.add(page.index)
-            }
-        }
-        if (failedIndices.isNotEmpty()) {
-            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
-            return Result.Failure(AppError.InternalError(
-                "Failed to download ${failedIndices.size}/${downloadResult.pages.size} page(s) " +
-                    "for chapter ${chapter.id}: indices $failedIndices"
-            ))
-        }
+            val httpConnector = connector as? HttpConnector
+                ?: run {
+                    chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                    return Result.Failure(AppError.InternalError(
+                        "Connector $connectorId does not support HTTP page fetching"
+                    ))
+                }
 
-        when (val r = fileStorage.writeChapter(chapter.seriesId.toString(), chapter.id.toString(), pages, format)) {
-            is Result.Failure -> {
+            val sortedPages = downloadResult.pages.sortedBy { it.index }
+            val pages = mutableListOf<Page>()
+            val failedIndices = mutableListOf<Int>()
+            for (page in sortedPages) {
+                when (val r = httpConnector.fetchPage(page)) {
+                    is Result.Success -> pages.add(Page(page.index, r.value))
+                    is Result.Failure -> failedIndices.add(page.index)
+                }
+            }
+            if (failedIndices.isNotEmpty()) {
                 chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
-                return r
+                return Result.Failure(AppError.InternalError(
+                    "Failed to download ${failedIndices.size}/${downloadResult.pages.size} page(s) " +
+                        "for chapter ${chapter.id}: indices $failedIndices"
+                ))
             }
-            is Result.Success -> Unit
-        }
 
-        chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.DOWNLOADED)
-        return Result.Success(Unit)
+            when (val r = fileStorage.writeChapter(chapter.seriesId.toString(), chapter.id.toString(), pages, format)) {
+                is Result.Failure -> {
+                    chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                    return r
+                }
+                is Result.Success -> Unit
+            }
+
+            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.DOWNLOADED)
+            return Result.Success(Unit)
+        } catch (e: Throwable) {
+            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+            throw e
+        }
     }
 }

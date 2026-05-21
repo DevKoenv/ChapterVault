@@ -18,14 +18,16 @@ import io.ktor.client.HttpClient
 
 class MockConnector : HttpConnector(HttpClient()) {
 
+    override val id: String = "mock"
+    override val name: String = "Mock Connector"
+
     override val bucketConfigs: Map<BucketKey, BucketConfig> = mapOf(
         Bucket.CDN to BucketConfig(requestsPerSecond = 100.0),
     )
 
+    // Returns mock bytes directly — bypasses HTTP/rate-limiting intentionally for dev use.
     override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> =
         Result.Success(ByteArray(10) { i -> i.toByte() })
-    override val id: String = "mock"
-    override val name: String = "Mock Connector"
 
     override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> {
         val allResults = when {
