@@ -1,9 +1,12 @@
 package dev.koenv.chaptervault.extensions.connectors.sources
 
-import dev.koenv.chaptervault.extensions.connectors.Connector
+import dev.koenv.chaptervault.extensions.connectors.Bucket
+import dev.koenv.chaptervault.extensions.connectors.BucketConfig
+import dev.koenv.chaptervault.extensions.connectors.BucketKey
 import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
 import dev.koenv.chaptervault.extensions.connectors.DownloadPage
 import dev.koenv.chaptervault.extensions.connectors.DownloadResult
+import dev.koenv.chaptervault.extensions.connectors.HttpConnector
 import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
 import dev.koenv.chaptervault.extensions.connectors.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.library.Chapter
@@ -11,8 +14,16 @@ import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.Result
+import io.ktor.client.HttpClient
 
-class MockConnector : Connector {
+class MockConnector : HttpConnector(HttpClient()) {
+
+    override val bucketConfigs: Map<BucketKey, BucketConfig> = mapOf(
+        Bucket.CDN to BucketConfig(requestsPerSecond = 100.0),
+    )
+
+    override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> =
+        Result.Success(ByteArray(10) { i -> i.toByte() })
     override val id: String = "mock"
     override val name: String = "Mock Connector"
 

@@ -164,6 +164,7 @@ class TaskExecutorService(
     internal suspend fun handleDownloadChapter(task: Task): Result<Unit> {
         val connectorId = task.payload["connectorId"] ?: ""
 
+        // Chapter has not been fetched yet at this point, so we cannot update its download status to FAILED here.
         val connector = connectorRegistry.findById(connectorId)
             ?: return Result.Failure(AppError.InternalError("Connector not found: $connectorId"))
 
