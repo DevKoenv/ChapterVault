@@ -21,6 +21,12 @@ data class ChapterMetadata(
     val pageCount: Int? = null,
 )
 
+data class DownloadPage(
+    val url: String,
+    val index: Int,
+    val headers: Map<String, String> = emptyMap(),
+)
+
 data class DownloadResult(
     val pageUrls: List<String>,
     val totalPages: Int,
