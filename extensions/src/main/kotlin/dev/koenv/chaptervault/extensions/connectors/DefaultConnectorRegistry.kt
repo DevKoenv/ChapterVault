@@ -3,15 +3,13 @@ package dev.koenv.chaptervault.extensions.connectors
 import java.util.concurrent.ConcurrentHashMap
 
 class DefaultConnectorRegistry : ConnectorRegistry {
-    private val entries = ConcurrentHashMap<String, Pair<Connector, ConnectorContext?>>()
+    private val entries = ConcurrentHashMap<String, Connector>()
 
-    override fun register(connector: Connector, context: ConnectorContext?) {
-        entries[connector.id] = connector to context
+    override fun register(connector: Connector) {
+        entries[connector.id] = connector
     }
 
-    override fun findById(id: String): Connector? = entries[id]?.first
+    override fun findById(id: String): Connector? = entries[id]
 
-    override fun getContext(id: String): ConnectorContext? = entries[id]?.second
-
-    override fun all(): List<Connector> = entries.values.map { it.first }
+    override fun all(): List<Connector> = entries.values.toList()
 }

@@ -1,8 +1,7 @@
 package dev.koenv.chaptervault.extensions.connectors
 
 interface ConnectorRegistry {
-    fun register(connector: Connector, context: ConnectorContext? = null)
+    fun register(connector: Connector)
     fun findById(id: String): Connector?
-    fun getContext(id: String): ConnectorContext?
     fun all(): List<Connector>
 }

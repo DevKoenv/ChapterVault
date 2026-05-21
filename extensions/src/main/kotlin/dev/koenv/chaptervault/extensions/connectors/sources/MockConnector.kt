@@ -2,6 +2,7 @@ package dev.koenv.chaptervault.extensions.connectors.sources
 
 import dev.koenv.chaptervault.extensions.connectors.Connector
 import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
+import dev.koenv.chaptervault.extensions.connectors.DownloadPage
 import dev.koenv.chaptervault.extensions.connectors.DownloadResult
 import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
 import dev.koenv.chaptervault.extensions.connectors.SeriesSearchResult
@@ -62,8 +63,7 @@ class MockConnector : Connector {
     override suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult> =
         Result.Success(
             DownloadResult(
-                pageUrls = listOf("https://mock.local/p1.jpg", "https://mock.local/p2.jpg", "https://mock.local/p3.jpg"),
-                totalPages = 3,
+                pages = List(3) { i -> DownloadPage(url = "https://mock.example.com/page/$i", index = i) }
             )
         )
 }

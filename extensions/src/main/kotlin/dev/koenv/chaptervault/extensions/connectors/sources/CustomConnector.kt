@@ -4,6 +4,7 @@ import dev.koenv.chaptervault.extensions.connectors.Bucket
 import dev.koenv.chaptervault.extensions.connectors.BucketConfig
 import dev.koenv.chaptervault.extensions.connectors.BucketKey
 import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
+import dev.koenv.chaptervault.extensions.connectors.DownloadPage
 import dev.koenv.chaptervault.extensions.connectors.DownloadResult
 import dev.koenv.chaptervault.extensions.connectors.HttpConnector
 import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
@@ -130,11 +131,11 @@ class CustomConnector(
         return when (response) {
             is Result.Failure -> response
             is Result.Success -> {
-                val pages = response.value.pages
-                if (pages.isEmpty()) {
+                val pageUrls = response.value.pages
+                if (pageUrls.isEmpty()) {
                     return Result.Failure(AppError.InternalError("No pages returned for chapter ${chapter.externalId}"))
                 }
-                Result.Success(DownloadResult(pageUrls = pages, totalPages = pages.size))
+                Result.Success(DownloadResult(pages = pageUrls.mapIndexed { i, url -> DownloadPage(url = url, index = i) }))
             }
         }
     }

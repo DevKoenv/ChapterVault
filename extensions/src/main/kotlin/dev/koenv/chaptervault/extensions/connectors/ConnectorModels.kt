@@ -28,6 +28,5 @@ data class DownloadPage(
 )
 
 data class DownloadResult(
-    val pageUrls: List<String>,
-    val totalPages: Int,
+    val pages: List<DownloadPage>,
 )

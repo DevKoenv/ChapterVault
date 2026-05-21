@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.infrastructure
 
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.extensions.connectors.HttpConnector
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
@@ -160,7 +161,7 @@ class TaskExecutorService(
         return Result.Success(Unit)
     }
 
-    private suspend fun handleDownloadChapter(task: Task): Result<Unit> {
+    internal suspend fun handleDownloadChapter(task: Task): Result<Unit> {
         val connectorId = task.payload["connectorId"] ?: ""
 
         val connector = connectorRegistry.findById(connectorId)
@@ -177,32 +178,53 @@ class TaskExecutorService(
         val format = ChapterFormat.fromString(task.payload["format"] ?: "Cbz")
         val downloadResult = when (val r = connector.download(chapter, format)) {
             is Result.Success -> r.value
-            is Result.Failure -> return r
+            is Result.Failure -> {
+                chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                return r
+            }
         }
 
-        val context = connectorRegistry.getContext(connectorId)
-        if (context != null) {
-            val pages = mutableListOf<Page>()
-            val failedIndices = mutableListOf<Int>()
-            for ((index, url) in downloadResult.pageUrls.withIndex()) {
-                when (val r = context.download(url)) {
-                    is Result.Success -> pages.add(Page(index, r.value))
-                    is Result.Failure -> failedIndices.add(index)
-                }
-            }
-            if (failedIndices.isNotEmpty()) {
+        if (downloadResult.pages.isEmpty()) {
+            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+            return Result.Failure(AppError.InternalError(
+                "Connector $connectorId returned 0 pages for chapter ${chapter.id}"
+            ))
+        }
+
+        val httpConnector = connector as? HttpConnector
+            ?: run {
+                chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
                 return Result.Failure(AppError.InternalError(
-                    "Failed to download ${failedIndices.size}/${downloadResult.pageUrls.size} page(s) for chapter ${chapter.id}: indices $failedIndices"
+                    "Connector $connectorId does not support HTTP page fetching"
                 ))
             }
-            when (val r = fileStorage.writeChapter(chapter.seriesId.toString(), chapter.id.toString(), pages, format)) {
-                is Result.Failure -> return r
-                is Result.Success -> Unit
+
+        val sortedPages = downloadResult.pages.sortedBy { it.index }
+        val pages = mutableListOf<Page>()
+        val failedIndices = mutableListOf<Int>()
+        for (page in sortedPages) {
+            when (val r = httpConnector.fetchPage(page)) {
+                is Result.Success -> pages.add(Page(page.index, r.value))
+                is Result.Failure -> failedIndices.add(page.index)
             }
+        }
+        if (failedIndices.isNotEmpty()) {
+            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+            return Result.Failure(AppError.InternalError(
+                "Failed to download ${failedIndices.size}/${downloadResult.pages.size} page(s) " +
+                    "for chapter ${chapter.id}: indices $failedIndices"
+            ))
+        }
+
+        when (val r = fileStorage.writeChapter(chapter.seriesId.toString(), chapter.id.toString(), pages, format)) {
+            is Result.Failure -> {
+                chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                return r
+            }
+            is Result.Success -> Unit
         }
 
         chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.DOWNLOADED)
-
         return Result.Success(Unit)
     }
 }
