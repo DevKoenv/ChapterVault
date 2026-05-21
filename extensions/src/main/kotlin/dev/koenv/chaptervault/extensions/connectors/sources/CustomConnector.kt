@@ -1,9 +1,11 @@
 package dev.koenv.chaptervault.extensions.connectors.sources
 
+import dev.koenv.chaptervault.extensions.connectors.Bucket
+import dev.koenv.chaptervault.extensions.connectors.BucketConfig
+import dev.koenv.chaptervault.extensions.connectors.BucketKey
 import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
-import dev.koenv.chaptervault.extensions.connectors.Connector
-import dev.koenv.chaptervault.extensions.connectors.ConnectorContext
 import dev.koenv.chaptervault.extensions.connectors.DownloadResult
+import dev.koenv.chaptervault.extensions.connectors.HttpConnector
 import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
 import dev.koenv.chaptervault.extensions.connectors.SeriesSearchResult
 import dev.koenv.chaptervault.extensions.connectors.getJson
@@ -13,6 +15,7 @@ import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
+import io.ktor.client.HttpClient
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -56,14 +59,19 @@ private data class ApiChapterPages(
 // ── End customize ────────────────────────────────────────────────────────────────
 
 class CustomConnector(
-    private val context: ConnectorContext,
+    httpClient: HttpClient,
     // Customize: replace with your site's base URL
     private val baseUrl: String = "https://your-site.example.com",
-) : Connector {
+) : HttpConnector(httpClient) {
 
     // Customize: change these to match your site's connector ID and display name
     override val id: String = "custom"
     override val name: String = "Custom Connector"
+
+    override val bucketConfigs: Map<BucketKey, BucketConfig> = mapOf(
+        Bucket.API to BucketConfig(requestsPerSecond = 2.0),
+        Bucket.CDN to BucketConfig(requestsPerSecond = 5.0),
+    )
 
     override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> {
         // Customize: adjust the endpoint path and parameter names to match your site's search API
@@ -117,7 +125,7 @@ class CustomConnector(
         // Customize: adjust the endpoint path; chapter.externalId is the ID from fetchChapters
         val response = context.getJson<ApiChapterPages>(
             url = "$baseUrl/api/chapters/${chapter.externalId}/pages",
-            bucket = "cdn",
+            bucket = Bucket.CDN,
         )
         return when (response) {
             is Result.Failure -> response
