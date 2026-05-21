@@ -12,4 +12,5 @@ dependencies {
 
     testImplementation(libs.bundles.testing)
     testImplementation(libs.ktor.client.cio)
+    testImplementation(libs.ktor.client.mock)
 }
