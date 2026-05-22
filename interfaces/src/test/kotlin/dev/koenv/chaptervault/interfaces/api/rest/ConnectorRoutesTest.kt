@@ -3,8 +3,14 @@ package dev.koenv.chaptervault.interfaces.api.rest
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
+import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
+import dev.koenv.chaptervault.kernel.library.Chapter
+import dev.koenv.chaptervault.kernel.library.Series
+import dev.koenv.chaptervault.shared.paging.PageRequest
+import dev.koenv.chaptervault.shared.paging.Pagination
+import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -22,8 +28,19 @@ import kotlin.test.assertContains
 class ConnectorRoutesTest {
     private val registry: ConnectorRegistry = DefaultConnectorRegistry().also { it.register(MockConnector()) }
 
+    private fun stubLibrary(inLibraryIds: Set<String> = emptySet()): LibraryReadApi = object : LibraryReadApi {
+        override suspend fun getSeries(id: Id): Result<Series> = error("not used")
+        override suspend fun listSeries(request: PageRequest): Result<Pagination<Series>> = error("not used")
+        override suspend fun searchLibrary(query: String, request: PageRequest): Result<Pagination<Series>> = error("not used")
+        override suspend fun getChapter(id: Id): Result<Chapter> = error("not used")
+        override suspend fun listChapters(seriesId: Id): Result<List<Chapter>> = error("not used")
+        override suspend fun inLibraryExternalIds(connectorId: String, externalIds: List<String>): Result<Set<String>> =
+            Result.Success(inLibraryIds.intersect(externalIds.toSet()))
+    }
+
     private fun testApp(
         registry: ConnectorRegistry,
+        libraryRead: LibraryReadApi = stubLibrary(),
         block: suspend ApplicationTestBuilder.() -> Unit,
     ) = testApplication {
         application {
@@ -41,7 +58,7 @@ class ConnectorRoutesTest {
             }
             routing {
                 authenticate("auth-bearer") {
-                    connectorRoutes(registry)
+                    connectorRoutes(registry, libraryRead)
                 }
             }
         }
@@ -97,6 +114,19 @@ class ConnectorRoutesTest {
             assertContains(body, "Chapter 1")
             assertContains(body, "Chapter 2")
             assertContains(body, "Chapter 3")
+        }
+    }
+
+    @Test
+    fun `GET connectors search marks inLibrary true for known externalId`() {
+        testApp(registry, stubLibrary(inLibraryIds = setOf("mock-one-piece"))) {
+            val response = client.get("/connectors/mock/search?q=piece") { bearerAuth("admin-token") }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            // mock-one-piece (One Piece) should be inLibrary:true, mock-naruto should be false
+            assertContains(body, "\"externalId\":\"mock-one-piece\"")
+            assertContains(body, "\"inLibrary\":true")
+            assertContains(body, "\"inLibrary\":false")
         }
     }
 

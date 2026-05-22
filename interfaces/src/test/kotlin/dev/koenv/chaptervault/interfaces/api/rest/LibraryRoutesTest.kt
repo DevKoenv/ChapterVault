@@ -225,6 +225,7 @@ class LibraryRoutesTest {
                     Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
                 override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
                 override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
+                override suspend fun inLibraryExternalIds(connectorId: String, externalIds: List<String>) = Result.Success(emptySet<String>())
             },
             commandApi = NoOpCommandApi(),
         ) {
@@ -497,6 +498,7 @@ private open class NoOpReadApi : LibraryReadApi {
         Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
     override suspend fun getChapter(id: Id): Result<Chapter> = Result.Failure(AppError.NotFound("Chapter", id.toString()))
     override suspend fun listChapters(seriesId: Id): Result<List<Chapter>> = Result.Success(emptyList<Chapter>())
+    override suspend fun inLibraryExternalIds(connectorId: String, externalIds: List<String>): Result<Set<String>> = Result.Success(emptySet())
 }
 
 private class NoOpCommandApi : LibraryCommandApi {

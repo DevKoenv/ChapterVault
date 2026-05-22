@@ -137,6 +137,15 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
         else Result.Success(Unit)
     }
 
+    override suspend fun inLibraryExternalIds(connectorId: String, externalIds: List<String>): Result<Set<String>> = dbQuery {
+        if (externalIds.isEmpty()) return@dbQuery Result.Success(emptySet())
+        val found = SeriesTable.selectAll()
+            .where { (SeriesTable.connectorId eq connectorId) and (SeriesTable.externalId inList externalIds) }
+            .map { it[SeriesTable.externalId] }
+            .toSet()
+        Result.Success(found)
+    }
+
     override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?): Result<Series> = dbQuery {
         val count = SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.count()
         if (count == 0L) return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))

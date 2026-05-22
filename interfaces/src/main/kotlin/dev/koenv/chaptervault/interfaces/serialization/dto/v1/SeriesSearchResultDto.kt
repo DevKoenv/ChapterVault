@@ -8,4 +8,5 @@ data class SeriesSearchResultDto(
     val title: String,
     val coverUrl: String?,
     val description: String?,
+    val inLibrary: Boolean,
 )

@@ -6,6 +6,7 @@ import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ConnectorDto
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.SeriesMetadataDto
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.SeriesSearchResultDto
+import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.Result
@@ -15,7 +16,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 
-fun Route.connectorRoutes(registry: ConnectorRegistry) {
+fun Route.connectorRoutes(registry: ConnectorRegistry, libraryRead: LibraryReadApi) {
     get("/connectors") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
@@ -39,18 +40,25 @@ fun Route.connectorRoutes(registry: ConnectorRegistry) {
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
         val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
         when (val result = connector.search(q, PageRequest(page, size.coerceIn(1, 100)))) {
-            is Result.Success -> call.respond(
-                HttpStatusCode.OK,
-                PaginatedResponse(
-                    items = result.value.items.map { SeriesSearchResultDto(it.externalId, it.title, it.coverUrl, it.description) },
-                    page = result.value.page,
-                    size = result.value.size,
-                    totalItems = result.value.totalItems,
-                    totalPages = result.value.totalPages,
-                    hasNext = result.value.hasNext,
-                    hasPrevious = result.value.hasPrevious,
+            is Result.Success -> {
+                val items = result.value.items
+                val inLibrary = when (val r = libraryRead.inLibraryExternalIds(id, items.map { it.externalId })) {
+                    is Result.Success -> r.value
+                    is Result.Failure -> emptySet()
+                }
+                call.respond(
+                    HttpStatusCode.OK,
+                    PaginatedResponse(
+                        items = items.map { SeriesSearchResultDto(it.externalId, it.title, it.coverUrl, it.description, it.externalId in inLibrary) },
+                        page = result.value.page,
+                        size = result.value.size,
+                        totalItems = result.value.totalItems,
+                        totalPages = result.value.totalPages,
+                        hasNext = result.value.hasNext,
+                        hasPrevious = result.value.hasPrevious,
+                    )
                 )
-            )
+            }
             is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
         }
     }

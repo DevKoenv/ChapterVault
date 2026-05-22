@@ -114,7 +114,7 @@ fun Application.bootstrap() {
             libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage)
             taskRoutes(system)
             adminRoutes(registry)
-            connectorRoutes(connectorRegistry)
+            connectorRoutes(connectorRegistry, libraryRead)
             progressRoutes(progressApi)
             bookmarkRoutes(bookmarkApi)
             eventSocket(projectionService)
