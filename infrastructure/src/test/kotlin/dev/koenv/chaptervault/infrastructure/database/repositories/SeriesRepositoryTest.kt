@@ -264,7 +264,7 @@ class SeriesRepositoryTest {
     }
 
     @Test
-    fun `evictChapter resets status to PENDING and keeps the record`() = runBlocking {
+    fun `evictChapter resets status to AVAILABLE and keeps the record`() = runBlocking {
         val series = (repo.addToLibrary("mangadex", "ext-evict", autoDownload = false) as Result.Success).value
         val chapterId = insertChapter(Id.from(series.id.toString()))
         transaction {
@@ -279,7 +279,7 @@ class SeriesRepositoryTest {
         assertIs<Result.Success<Unit>>(result)
 
         val chapter = (repo.getChapter(Id.from(chapterId.toString())) as Result.Success).value
-        assertEquals(DownloadStatus.PENDING, chapter.downloadStatus)
+        assertEquals(DownloadStatus.AVAILABLE, chapter.downloadStatus)
         assertNull(chapter.format)
         assertNull(chapter.pageCount)
     }

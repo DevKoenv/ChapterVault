@@ -66,7 +66,7 @@ class ChapterRepositoryTest {
     }
 
     @Test
-    fun `insertChapter creates and returns chapter with PENDING status`() {
+    fun `insertChapter creates and returns chapter with AVAILABLE status`() {
         runBlocking {
             val seriesId = insertSeries()
             val result = repo.insertChapter(
@@ -81,7 +81,7 @@ class ChapterRepositoryTest {
             assertEquals("Chapter 1", chapter.title)
             assertEquals(1.0, chapter.chapterIndex)
             assertEquals("ext-ch-001", chapter.externalId)
-            assertEquals(DownloadStatus.PENDING, chapter.downloadStatus)
+            assertEquals(DownloadStatus.AVAILABLE, chapter.downloadStatus)
         }
     }
 

@@ -69,7 +69,7 @@ components:
         seriesId:       { type: string, format: uuid }
         title:          { type: string }
         chapterIndex:   { type: number, format: double }
-        downloadStatus: { type: string, enum: [PENDING, DOWNLOADING, DOWNLOADED, FAILED] }
+        downloadStatus: { type: string, enum: [AVAILABLE, PENDING, DOWNLOADING, DOWNLOADED, FAILED] }
         format:         { type: string, nullable: true, enum: [CBZ, FOLDER] }
         pageCount:      { type: integer, nullable: true }
 
@@ -374,7 +374,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [PENDING, DOWNLOADING, DOWNLOADED, FAILED]
+            enum: [AVAILABLE, PENDING, DOWNLOADING, DOWNLOADED, FAILED]
           description: Filter chapters by download status
       responses:
         "200":
@@ -471,7 +471,7 @@ paths:
   /library/chapters/{id}:
     delete:
       tags: [library]
-      summary: Evict a chapter's downloaded files and reset status to PENDING (ADMIN)
+      summary: Evict a chapter's downloaded files and reset status to AVAILABLE (ADMIN)
       parameters:
         - in: path
           name: id

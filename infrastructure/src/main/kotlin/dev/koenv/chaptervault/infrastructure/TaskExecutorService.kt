@@ -139,6 +139,7 @@ class TaskExecutorService(
 
         if (series.autoDownload) {
             for (chapter in insertedChapters) {
+                chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.PENDING)
                 taskQueue.enqueue(
                     Task(
                         id = Id.generate(),

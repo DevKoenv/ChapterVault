@@ -228,9 +228,10 @@ fun Route.libraryRoutes(
         val format = series.defaultFormat ?: ChapterFormat.Cbz
         val now = Instant.now()
         val toDownload = chapters.filter {
-            it.downloadStatus == DownloadStatus.PENDING || it.downloadStatus == DownloadStatus.FAILED
+            it.downloadStatus == DownloadStatus.AVAILABLE || it.downloadStatus == DownloadStatus.FAILED
         }
         for (chapter in toDownload) {
+            libraryCommand.markChapterPending(chapter.id)
             taskQueue.enqueue(Task(
                 id = Id.generate(),
                 type = TaskType.DOWNLOAD_CHAPTER,
@@ -270,6 +271,7 @@ fun Route.libraryRoutes(
         }
         val format = series.defaultFormat ?: ChapterFormat.Cbz
         val now = Instant.now()
+        libraryCommand.markChapterPending(chapter.id)
         taskQueue.enqueue(Task(
             id = Id.generate(),
             type = TaskType.DOWNLOAD_CHAPTER,
@@ -308,6 +310,7 @@ fun Route.libraryRoutes(
         }
         val format = series.defaultFormat ?: ChapterFormat.Cbz
         val now = Instant.now()
+        libraryCommand.markChapterPending(chapter.id)
         taskQueue.enqueue(Task(
             id = Id.generate(),
             type = TaskType.DOWNLOAD_CHAPTER,

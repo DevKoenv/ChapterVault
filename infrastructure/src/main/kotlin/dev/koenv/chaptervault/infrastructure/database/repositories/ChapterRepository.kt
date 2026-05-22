@@ -45,7 +45,7 @@ class ChapterRepository {
             it[ChapterTable.title] = title
             it[ChapterTable.chapterIndex] = chapterIndex
             it[ChapterTable.externalId] = externalId
-            it[ChapterTable.downloadStatus] = DownloadStatus.PENDING.name
+            it[ChapterTable.downloadStatus] = DownloadStatus.AVAILABLE.name
             it[ChapterTable.format] = null
             it[ChapterTable.pageCount] = null
             it[ChapterTable.addedAt] = now

@@ -122,7 +122,7 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
         val (seriesId, chapterId) = chapterData
         dbQuery {
             ChapterTable.update({ ChapterTable.id eq chapterId }) {
-                it[downloadStatus] = DownloadStatus.PENDING.name
+                it[downloadStatus] = DownloadStatus.AVAILABLE.name
                 it[format] = null
                 it[pageCount] = null
                 it[updatedAt] = Instant.now().toKotlinInstant()
@@ -130,6 +130,15 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
         }
         fileStorage.deleteChapterFiles(seriesId, chapterId)
         return Result.Success(Unit)
+    }
+
+    override suspend fun markChapterPending(id: Id): Result<Unit> = dbQuery {
+        val updated = ChapterTable.update({ ChapterTable.id eq id.toString() }) {
+            it[downloadStatus] = DownloadStatus.PENDING.name
+            it[updatedAt] = Instant.now().toKotlinInstant()
+        }
+        if (updated == 0) Result.Failure(AppError.NotFound("Chapter", id.toString()))
+        else Result.Success(Unit)
     }
 
     override suspend fun removeSeries(id: Id): Result<Unit> {
