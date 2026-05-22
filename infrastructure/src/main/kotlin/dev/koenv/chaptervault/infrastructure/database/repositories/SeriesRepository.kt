@@ -141,7 +141,6 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
                 BookmarkTable.deleteWhere { chapterId inList chapterIds }
                 ProgressTable.deleteWhere { chapterId inList chapterIds }
             }
-            TaskTable.deleteWhere { (targetId inList chapterIds) or (targetId eq id.toString()) }
             ChapterTable.deleteWhere { seriesId eq id.toString() }
 
             val deleted = SeriesTable.deleteWhere { SeriesTable.id eq id.toString() }

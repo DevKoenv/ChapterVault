@@ -66,7 +66,7 @@ class SeriesRepositoryTest {
     // --- cascade delete tests ---
 
     @Test
-    fun `removeSeries deletes chapters, progress, bookmarks, and tasks`() = runBlocking {
+    fun `removeSeries deletes chapters, progress, bookmarks but preserves tasks`() = runBlocking {
         val userId = insertUser()
         val series = (repo.addToLibrary("mangadex", "ext-cascade", autoDownload = false) as Result.Success).value
         val chapterId = insertChapter(Id.from(series.id.toString()))
@@ -82,7 +82,7 @@ class SeriesRepositoryTest {
             assertEquals(0L, ChapterTable.selectAll().where { ChapterTable.seriesId eq series.id.toString() }.count())
             assertEquals(0L, ProgressTable.selectAll().count())
             assertEquals(0L, BookmarkTable.selectAll().count())
-            assertEquals(0L, TaskTable.selectAll().count())
+            assertEquals(2L, TaskTable.selectAll().count())
         }
     }
 
