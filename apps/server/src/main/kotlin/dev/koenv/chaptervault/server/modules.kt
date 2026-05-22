@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.config.ConfigLoader
@@ -60,6 +61,7 @@ val infrastructureModule = module {
     single { FolderWriter() }
     single { ArchiveWriterSelector(listOf(get<CbzWriter>(), get<FolderWriter>())) }
     single { FileStorage(Paths.get(get<AppConfig>().storage.basePath), get()) }
+    single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
     single {
         TaskExecutorService(
             taskQueue = get(),

@@ -7,6 +7,12 @@ data class AppConfig(
     val database: DatabaseConfig = DatabaseConfig(),
     val storage: StorageConfig = StorageConfig(),
     val log: LogConfig = LogConfig(),
+    val refresh: RefreshConfig = RefreshConfig(),
+)
+
+// intervalHours <= 0 disables auto-refresh
+data class RefreshConfig(
+    val intervalHours: Int = 24,
 )
 
 data class ServerConfig(

@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
@@ -99,6 +100,7 @@ fun Application.bootstrap() {
     val connectorRegistry by inject<ConnectorRegistry>()
     val projectionService by inject<EventProjectionService>()
     val executor by inject<TaskExecutorService>()
+    val refreshScheduler by inject<SeriesRefreshScheduler>()
     val progressApi by inject<ProgressApi>()
     val bookmarkApi by inject<BookmarkApi>()
 
@@ -180,6 +182,7 @@ fun Application.bootstrap() {
 
     launch { projectionService.start() }
     launch { executor.recoverOnBoot(); executor.start() }
+    launch { refreshScheduler.start() }
 
     routing {
         swaggerUI(path = "swagger", swaggerFile = "openapi/documentation.yaml")

@@ -40,6 +40,10 @@ object ConfigLoader {
             LogConfig(level = (l["level"] as? String) ?: "INFO")
         } ?: LogConfig()
 
-        return AppConfig(server = server, database = database, storage = storage, log = log)
+        val refresh = (map["refresh"] as? Map<*, *>)?.let { r ->
+            RefreshConfig(intervalHours = (r["intervalHours"] as? Int) ?: 24)
+        } ?: RefreshConfig()
+
+        return AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh)
     }
 }
