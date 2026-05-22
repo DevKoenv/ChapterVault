@@ -82,7 +82,7 @@ components:
       type: object
       properties:
         id:           { type: string, format: uuid }
-        type:         { type: string, enum: [FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER] }
+        type:         { type: string, enum: [FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER, DOWNLOAD_SERIES] }
         status:       { type: string, enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED] }
         targetType:   { type: string, enum: [SERIES, CHAPTER] }
         targetId:     { type: string, format: uuid }
@@ -90,6 +90,27 @@ components:
         updatedAt:    { type: string, format: date-time }
         payload:      { type: object, additionalProperties: { type: string } }
         errorMessage: { type: string, nullable: true }
+        retryCount:   { type: integer, default: 0, description: "Number of times this task has been retried after failure" }
+
+    TaskStateChangedEvent:
+      type: object
+      description: Emitted when a task transitions to a new state
+      properties:
+        taskId:       { type: string, format: uuid }
+        taskType:     { type: string, enum: [FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER, DOWNLOAD_SERIES] }
+        targetId:     { type: string, format: uuid }
+        status:       { type: string, enum: [QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED] }
+        errorMessage: { type: string, nullable: true, description: "Only present when status is FAILED" }
+        occurredAt:   { type: string, format: date-time }
+
+    ChapterDownloadStatusEvent:
+      type: object
+      description: Emitted when a chapter's download status changes
+      properties:
+        chapterId:  { type: string, format: uuid }
+        seriesId:   { type: string, format: uuid }
+        status:     { type: string, enum: [AVAILABLE, PENDING, DOWNLOADING, DOWNLOADED, FAILED] }
+        occurredAt: { type: string, format: date-time }
 
     ConnectorDto:
       type: object
@@ -214,13 +235,57 @@ paths:
       security: []
       responses:
         "200":
-          description: Server is running
+          description: All checks passing
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: ok }
+                  status: { type: string, enum: [ok, degraded], example: ok }
+                  checks:
+                    type: object
+                    properties:
+                      database: { type: string, enum: [ok, error] }
+                      executor: { type: string, enum: [ok, error] }
+        "503":
+          description: One or more checks failing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok, degraded], example: degraded }
+                  checks:
+                    type: object
+                    properties:
+                      database: { type: string, enum: [ok, error] }
+                      executor: { type: string, enum: [ok, error] }
+
+  /events:
+    get:
+      tags: [system]
+      summary: Server-Sent Events stream for live updates
+      description: |
+        Streams real-time events as Server-Sent Events (SSE). Each event has an `event` type field and a JSON `data` payload.
+
+        **Event types:**
+        - `task.state_changed` — a background task changed state (queued/running/completed/failed/cancelled). Data: `TaskStateChangedEvent`.
+        - `chapter.download_status` — a chapter's download status changed. Data: `ChapterDownloadStatusEvent`.
+
+        The stream stays open until the client disconnects. A buffer of 64 events is maintained per connection; oldest events are dropped if the client falls behind.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Each SSE message has `event: <type>` and `data: <json>`.
+                  See TaskStateChangedEvent and ChapterDownloadStatusEvent schemas.
+        "401": { description: Not authenticated }
 
   /auth/register:
     post:

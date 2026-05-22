@@ -36,6 +36,4 @@ class SystemApiImpl(
     }
 
     override fun listExtensions(): List<Extension> = registry.all()
-
-    override fun isHealthy(): Boolean = true
 }

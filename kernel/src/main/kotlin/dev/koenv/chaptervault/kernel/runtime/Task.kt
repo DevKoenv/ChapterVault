@@ -13,4 +13,5 @@ data class Task(
     val createdAt: Instant,
     val updatedAt: Instant,
     val errorMessage: String? = null,
+    val retryCount: Int = 0,
 )

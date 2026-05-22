@@ -12,5 +12,4 @@ interface SystemApi {
     suspend fun getTask(id: Id): Result<Task>
     suspend fun cancelTask(id: Id): Result<Unit>
     fun listExtensions(): List<Extension>
-    fun isHealthy(): Boolean
 }

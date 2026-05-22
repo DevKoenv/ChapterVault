@@ -40,6 +40,7 @@ class TaskRepository : TaskReadStore {
             it[createdAt] = task.createdAt.toKotlinInstant()
             it[updatedAt] = task.updatedAt.toKotlinInstant()
             it[errorMessage] = task.errorMessage
+            it[retryCount] = task.retryCount
         }
         val row = TaskTable.selectAll()
             .where { TaskTable.id eq task.id.toString() }
@@ -115,5 +116,6 @@ class TaskRepository : TaskReadStore {
         createdAt = this[TaskTable.createdAt].toJavaInstant(),
         updatedAt = this[TaskTable.updatedAt].toJavaInstant(),
         errorMessage = this[TaskTable.errorMessage],
+        retryCount = this[TaskTable.retryCount],
     )
 }

@@ -13,4 +13,5 @@ data class TaskDto(
     val updatedAt: String,
     val payload: Map<String, String> = emptyMap(),
     val errorMessage: String? = null,
+    val retryCount: Int = 0,
 )

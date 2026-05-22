@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.server
 
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
+import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.BookmarkApi
@@ -187,7 +188,17 @@ fun Application.bootstrap() {
     // /health must be last
     routing {
         get("/health") {
-            call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))
+            val dbOk = DatabaseFactory.ping()
+            val executorOk = executor.isAlive()
+            val status = if (dbOk && executorOk) "ok" else "degraded"
+            val httpStatus = if (status == "ok") HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
+            call.respond(httpStatus, mapOf(
+                "status" to status,
+                "checks" to mapOf(
+                    "database" to if (dbOk) "ok" else "error",
+                    "executor" to if (executorOk) "ok" else "error",
+                )
+            ))
         }
     }
 }

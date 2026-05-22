@@ -8,8 +8,10 @@ import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SessionTable
 import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object DatabaseFactory {
@@ -23,6 +25,13 @@ object DatabaseFactory {
             SchemaUtils.createMissingTablesAndColumns(UserTable, SessionTable, SeriesTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
             dropOrphanedColumns()
         }
+    }
+
+    suspend fun ping(): Boolean = try {
+        newSuspendedTransaction(Dispatchers.IO) { exec("SELECT 1") }
+        true
+    } catch (_: Exception) {
+        false
     }
 
     private fun org.jetbrains.exposed.sql.Transaction.dropOrphanedColumns() {

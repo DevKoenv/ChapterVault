@@ -13,6 +13,7 @@ object TaskTable : Table("tasks") {
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     val errorMessage = text("error_message").nullable()
+    val retryCount = integer("retry_count").default(0)
 
     override val primaryKey = PrimaryKey(id)
 }

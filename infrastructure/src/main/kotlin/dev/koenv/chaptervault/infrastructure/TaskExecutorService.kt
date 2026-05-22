@@ -25,8 +25,11 @@ import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import org.slf4j.LoggerFactory
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicLong
 
 class TaskExecutorService(
     private val taskQueue: TaskQueue,
@@ -39,6 +42,14 @@ class TaskExecutorService(
     private val eventBus: EventBus,
 ) {
     private val log = LoggerFactory.getLogger(TaskExecutorService::class.java)
+    private val lastHeartbeatMs = AtomicLong(0L)
+
+    fun isAlive(): Boolean = System.currentTimeMillis() - lastHeartbeatMs.get() < 2_000L
+
+    companion object {
+        private const val MAX_RETRIES = 3
+        private val RETRY_DELAYS_MS = listOf(30_000L, 120_000L, 600_000L)
+    }
 
     suspend fun recoverOnBoot() {
         val running = taskRepository.listAllByStatus(TaskStatus.RUNNING)
@@ -52,27 +63,46 @@ class TaskExecutorService(
     }
 
     suspend fun start() {
-        while (true) {
-            val task = taskQueue.dequeue()
-            if (task == null) { delay(500); continue }
-            taskRepository.insert(task)
-            taskRepository.updateStatus(task.id, TaskStatus.RUNNING)
-            eventBus.publish(TaskEvents.TaskStarted(task.id, task.type, task.targetId, Instant.now()))
-            log.info("Task ${task.id} [${task.type}] started — target=${task.targetId}")
-            val result = runCatching { dispatch(task) }.getOrElse { e ->
-                log.error("Task ${task.id} [${task.type}] threw uncaught exception", e)
-                Result.Failure(AppError.InternalError(e.message ?: "Executor error"))
-            }
-            when (result) {
-                is Result.Success -> {
-                    taskRepository.updateStatus(task.id, TaskStatus.COMPLETED)
-                    eventBus.publish(TaskEvents.TaskCompleted(task.id, task.type, task.targetId, Instant.now()))
-                    log.info("Task ${task.id} [${task.type}] completed")
+        supervisorScope {
+            while (true) {
+                lastHeartbeatMs.set(System.currentTimeMillis())
+                val task = taskQueue.dequeue()
+                if (task == null) { delay(500); continue }
+                taskRepository.insert(task)
+                taskRepository.updateStatus(task.id, TaskStatus.RUNNING)
+                eventBus.publish(TaskEvents.TaskStarted(task.id, task.type, task.targetId, Instant.now()))
+                log.info("Task ${task.id} [${task.type}] started — target=${task.targetId}")
+                val result = runCatching { dispatch(task) }.getOrElse { e ->
+                    log.error("Task ${task.id} [${task.type}] threw uncaught exception", e)
+                    Result.Failure(AppError.InternalError(e.message ?: "Executor error"))
                 }
-                is Result.Failure -> {
-                    taskRepository.updateStatus(task.id, TaskStatus.FAILED, result.error.message)
-                    eventBus.publish(TaskEvents.TaskFailed(task.id, task.type, task.targetId, result.error.message, Instant.now()))
-                    log.error("Task ${task.id} [${task.type}] failed: ${result.error.message}")
+                when (result) {
+                    is Result.Success -> {
+                        taskRepository.updateStatus(task.id, TaskStatus.COMPLETED)
+                        eventBus.publish(TaskEvents.TaskCompleted(task.id, task.type, task.targetId, Instant.now()))
+                        log.info("Task ${task.id} [${task.type}] completed")
+                    }
+                    is Result.Failure -> {
+                        taskRepository.updateStatus(task.id, TaskStatus.FAILED, result.error.message)
+                        eventBus.publish(TaskEvents.TaskFailed(task.id, task.type, task.targetId, result.error.message, Instant.now()))
+                        log.error("Task ${task.id} [${task.type}] failed: ${result.error.message}")
+                        if (task.retryCount < MAX_RETRIES) {
+                            val delayMs = RETRY_DELAYS_MS[task.retryCount]
+                            val retryTask = task.copy(
+                                id = Id.generate(),
+                                status = TaskStatus.PENDING,
+                                retryCount = task.retryCount + 1,
+                                errorMessage = null,
+                                createdAt = Instant.now(),
+                                updatedAt = Instant.now(),
+                            )
+                            log.info("Task ${task.id} will be retried (attempt ${retryTask.retryCount}/$MAX_RETRIES) in ${delayMs}ms")
+                            launch {
+                                delay(delayMs)
+                                taskQueue.enqueue(retryTask)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -82,7 +112,7 @@ class TaskExecutorService(
         TaskType.FETCH_SERIES_METADATA -> handleFetchSeriesMetadata(task)
         TaskType.FETCH_CHAPTERS -> handleFetchChapters(task)
         TaskType.DOWNLOAD_CHAPTER -> handleDownloadChapter(task)
-        TaskType.DOWNLOAD_SERIES -> Result.Failure(AppError.InternalError("DOWNLOAD_SERIES not handled by executor"))
+        TaskType.DOWNLOAD_SERIES -> handleDownloadSeries(task)
     }
 
     private suspend fun handleFetchSeriesMetadata(task: Task): Result<Unit> {
@@ -182,6 +212,42 @@ class TaskExecutorService(
             }
         }
 
+        return Result.Success(Unit)
+    }
+
+    private suspend fun handleDownloadSeries(task: Task): Result<Unit> {
+        val series = when (val r = seriesRepository.getSeries(task.targetId)) {
+            is Result.Success -> r.value
+            is Result.Failure -> return r
+        }
+        val allChapters = when (val r = chapterRepository.listChapters(task.targetId)) {
+            is Result.Success -> r.value
+            is Result.Failure -> return r
+        }
+        val toDownload = allChapters.filter {
+            it.downloadStatus == DownloadStatus.AVAILABLE || it.downloadStatus == DownloadStatus.FAILED
+        }
+        val format = series.defaultFormat ?: ChapterFormat.Cbz
+        val now = Instant.now()
+        for (chapter in toDownload) {
+            setChapterStatus(chapter, DownloadStatus.PENDING)
+            taskQueue.enqueue(
+                Task(
+                    id = Id.generate(),
+                    type = TaskType.DOWNLOAD_CHAPTER,
+                    status = TaskStatus.PENDING,
+                    targetType = TargetType.CHAPTER,
+                    targetId = chapter.id,
+                    payload = mapOf(
+                        "connectorId" to series.connectorId,
+                        "chapterId" to chapter.id.toString(),
+                        "format" to format.toString(),
+                    ),
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+        }
         return Result.Success(Unit)
     }
 

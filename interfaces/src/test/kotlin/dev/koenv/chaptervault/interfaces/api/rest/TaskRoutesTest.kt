@@ -148,5 +148,4 @@ private fun fakeSystem(
     override suspend fun getTask(id: Id) = getTaskResult
     override suspend fun cancelTask(id: Id) = cancelResult
     override fun listExtensions(): List<Extension> = emptyList()
-    override fun isHealthy() = true
 }

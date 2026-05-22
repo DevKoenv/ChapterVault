@@ -13,4 +13,5 @@ fun Task.toDto(): TaskDto = TaskDto(
     updatedAt = updatedAt.toString(),
     payload = payload,
     errorMessage = errorMessage,
+    retryCount = retryCount,
 )
