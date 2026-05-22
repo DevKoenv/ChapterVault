@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.server
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
 import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
+import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.MangaDexConnector
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
 import dev.koenv.chaptervault.kernel.api.AuthApi
@@ -25,6 +26,7 @@ object DependencyInjection {
         val connectorRegistry = GlobalContext.get().get<ConnectorRegistry>()
         connectorRegistry.register(GlobalContext.get().get<MockConnector>())
         connectorRegistry.register(GlobalContext.get().get<CustomConnector>())
+        connectorRegistry.register(GlobalContext.get().get<MangaDexConnector>())
 
         // Register default admin on first boot; silently ignored if admin already exists
         val authApi = GlobalContext.get().get<AuthApi>()

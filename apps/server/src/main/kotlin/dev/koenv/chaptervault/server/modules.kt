@@ -13,6 +13,7 @@ import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
 import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
+import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.MangaDexConnector
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
 import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
 import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
@@ -81,6 +82,7 @@ val extensionModule = module {
     single<ConnectorRegistry> { DefaultConnectorRegistry() }
     single { MockConnector() }
     single { CustomConnector(get()) }
+    single { MangaDexConnector(get()) }
 }
 
 val interfacesModule = module {

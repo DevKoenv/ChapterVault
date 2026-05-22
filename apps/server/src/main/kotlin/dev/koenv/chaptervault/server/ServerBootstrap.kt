@@ -26,6 +26,8 @@ import dev.koenv.chaptervault.interfaces.api.websocket.eventSocket
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -36,6 +38,7 @@ import io.ktor.server.auth.basic
 import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.swagger.swaggerUI
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.uri
@@ -59,6 +62,14 @@ fun Application.bootstrap() {
         }
     }
     install(ContentNegotiation) { json() }
+    install(CORS) {
+        anyHost()
+        allowHeader(HttpHeaders.Authorization)
+        allowHeader(HttpHeaders.ContentType)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Patch)
+    }
     install(WebSockets)
 
     val libraryRead by inject<LibraryReadApi>()
