@@ -23,8 +23,11 @@ open class FileStorage(
     fun resolvePath(seriesId: String, chapterId: String): Path =
         basePath.resolve(seriesId).resolve(chapterId)
 
-    private fun chapterPath(chapter: Chapter): Path =
-        resolvePath(chapter.seriesId.toString(), chapter.id.toString())
+    private fun chapterPath(chapter: Chapter): Path {
+        val base = resolvePath(chapter.seriesId.toString(), chapter.id.toString())
+        val cbz = base.resolveSibling(base.fileName.toString() + ".cbz")
+        return if (Files.isRegularFile(cbz)) cbz else base
+    }
 
     suspend fun readPages(chapter: Chapter): Result<List<Page>> {
         val path = chapterPath(chapter)
@@ -61,8 +64,10 @@ open class FileStorage(
         pages: List<Page>,
         format: ChapterFormat,
     ): Result<Unit> {
+        val base = resolvePath(seriesId, chapterId)
+        val dest = if (format is ChapterFormat.Cbz) base.resolveSibling(base.fileName.toString() + ".cbz") else base
         return try {
-            writerSelector.write(pages, resolvePath(seriesId, chapterId), format)
+            writerSelector.write(pages, dest, format)
         } catch (e: Exception) {
             Result.Failure(AppError.InternalError("writeChapter failed: ${e.message}", e))
         }

@@ -79,7 +79,7 @@ class FileStorageTest {
     )
 
     private fun cbzPath(seriesId: String, chapterId: String) =
-        basePath.resolve(seriesId).resolve(chapterId)
+        basePath.resolve(seriesId).resolve("$chapterId.cbz")
 
     private fun writeCbz(seriesId: String, chapterId: String, pages: List<Pair<String, ByteArray>>) {
         val path = cbzPath(seriesId, chapterId)
