@@ -41,6 +41,27 @@ fun Route.libraryRoutes(
     fileStorage: ChapterPageSource,
 ) {
     // GET routes are accessible to any authenticated user
+    get("/library/series/search") {
+        val q = call.request.queryParameters["q"] ?: ""
+        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
+        val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+        when (val result = libraryRead.searchLibrary(q, PageRequest(page, size.coerceIn(1, 100)))) {
+            is Result.Success -> call.respond(
+                HttpStatusCode.OK,
+                PaginatedResponse(
+                    items = result.value.items.map { it.toDto() },
+                    page = result.value.page,
+                    size = result.value.size,
+                    totalItems = result.value.totalItems,
+                    totalPages = result.value.totalPages,
+                    hasNext = result.value.hasNext,
+                    hasPrevious = result.value.hasPrevious,
+                )
+            )
+            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+        }
+    }
+
     get("/library/series") {
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
         val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
@@ -78,7 +99,15 @@ fun Route.libraryRoutes(
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
             call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
         }
-        when (val result = libraryRead.listChapters(id)) {
+        val statusParam = call.request.queryParameters["status"]
+        val statusFilter = if (statusParam != null) {
+            try { DownloadStatus.valueOf(statusParam.uppercase()) } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid status value"); return@get
+            }
+        } else null
+        val result = if (statusFilter != null) libraryRead.listChaptersByStatus(id, statusFilter)
+                     else libraryRead.listChapters(id)
+        when (result) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.map { it.toDto() })
             is Result.Failure -> when (result.error) {
                 is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
@@ -256,6 +285,86 @@ fun Route.libraryRoutes(
             updatedAt = now,
         ))
         call.respond(HttpStatusCode.Accepted, mapOf("queued" to 1))
+    }
+
+    post("/library/chapters/{id}/redownload") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+        }
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@post
+        }
+        val chapter = when (val r = libraryRead.getChapter(id)) {
+            is Result.Success -> r.value
+            is Result.Failure -> when (r.error) {
+                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@post }
+                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+            }
+        }
+        val series = when (val r = libraryRead.getSeries(chapter.seriesId)) {
+            is Result.Success -> r.value
+            is Result.Failure -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+        }
+        val format = series.defaultFormat ?: ChapterFormat.Cbz
+        val now = Instant.now()
+        taskQueue.enqueue(Task(
+            id = Id.generate(),
+            type = TaskType.DOWNLOAD_CHAPTER,
+            status = TaskStatus.PENDING,
+            targetType = TargetType.CHAPTER,
+            targetId = chapter.id,
+            payload = mapOf("connectorId" to series.connectorId, "chapterId" to chapter.id.toString(), "format" to format.toString()),
+            createdAt = now,
+            updatedAt = now,
+        ))
+        call.respond(HttpStatusCode.Accepted, mapOf("queued" to 1))
+    }
+
+    delete("/library/chapters/{id}") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@delete
+        }
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@delete
+        }
+        when (val result = libraryCommand.deleteChapter(id)) {
+            is Result.Success -> call.respond(HttpStatusCode.NoContent)
+            is Result.Failure -> when (result.error) {
+                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
+                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            }
+        }
+    }
+
+    post("/library/series/{id}/refresh") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+        }
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@post
+        }
+        val series = when (val r = libraryRead.getSeries(id)) {
+            is Result.Success -> r.value
+            is Result.Failure -> when (r.error) {
+                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@post }
+                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+            }
+        }
+        val now = Instant.now()
+        taskQueue.enqueue(Task(
+            id = Id.generate(),
+            type = TaskType.FETCH_SERIES_METADATA,
+            status = TaskStatus.PENDING,
+            targetType = TargetType.SERIES,
+            targetId = series.id,
+            payload = mapOf("connectorId" to series.connectorId, "externalId" to series.externalId, "language" to series.language),
+            createdAt = now,
+            updatedAt = now,
+        ))
+        call.respond(HttpStatusCode.Accepted)
     }
 
     patch("/library/series/{id}") {

@@ -7,6 +7,7 @@ import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.library.Chapter
+import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
@@ -34,6 +35,7 @@ class ConnectorRoutesTest {
         override suspend fun searchLibrary(query: String, request: PageRequest): Result<Pagination<Series>> = error("not used")
         override suspend fun getChapter(id: Id): Result<Chapter> = error("not used")
         override suspend fun listChapters(seriesId: Id): Result<List<Chapter>> = error("not used")
+        override suspend fun listChaptersByStatus(seriesId: Id, status: DownloadStatus): Result<List<Chapter>> = error("not used")
         override suspend fun inLibraryExternalIds(connectorId: String, externalIds: List<String>): Result<Set<String>> =
             Result.Success(inLibraryIds.intersect(externalIds.toSet()))
     }

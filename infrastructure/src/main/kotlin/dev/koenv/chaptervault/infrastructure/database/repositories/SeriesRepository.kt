@@ -70,6 +70,15 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
     override suspend fun listChapters(seriesId: Id): Result<List<Chapter>> = dbQuery {
         val chapters = ChapterTable.selectAll()
             .where { ChapterTable.seriesId eq seriesId.toString() }
+            .orderBy(ChapterTable.chapterIndex, SortOrder.ASC)
+            .map { it.toChapter() }
+        Result.Success(chapters)
+    }
+
+    override suspend fun listChaptersByStatus(seriesId: Id, status: DownloadStatus): Result<List<Chapter>> = dbQuery {
+        val chapters = ChapterTable.selectAll()
+            .where { (ChapterTable.seriesId eq seriesId.toString()) and (ChapterTable.downloadStatus eq status.name) }
+            .orderBy(ChapterTable.chapterIndex, SortOrder.ASC)
             .map { it.toChapter() }
         Result.Success(chapters)
     }
@@ -101,6 +110,25 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
         }
 
         Result.Success(SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.single().toSeries())
+    }
+
+    override suspend fun deleteChapter(id: Id): Result<Unit> {
+        val chapterData = dbQuery {
+            ChapterTable.selectAll()
+                .where { ChapterTable.id eq id.toString() }
+                .singleOrNull()
+                ?.let { it[ChapterTable.seriesId] to it[ChapterTable.id] }
+        } ?: return Result.Failure(AppError.NotFound("Chapter", id.toString()))
+
+        val (seriesId, chapterId) = chapterData
+        dbQuery {
+            BookmarkTable.deleteWhere { BookmarkTable.chapterId eq chapterId }
+            ProgressTable.deleteWhere { ProgressTable.chapterId eq chapterId }
+            TaskTable.deleteWhere { TaskTable.targetId eq chapterId }
+            ChapterTable.deleteWhere { ChapterTable.id eq chapterId }
+        }
+        fileStorage.deleteChapterFiles(seriesId, chapterId)
+        return Result.Success(Unit)
     }
 
     override suspend fun removeSeries(id: Id): Result<Unit> {

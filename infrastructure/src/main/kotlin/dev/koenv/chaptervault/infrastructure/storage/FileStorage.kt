@@ -47,6 +47,18 @@ open class FileStorage(
         }
     }
 
+    fun deleteChapterFiles(seriesId: String, chapterId: String) {
+        val base = resolvePath(seriesId, chapterId)
+        val cbz = base.resolveSibling(base.fileName.toString() + ".cbz")
+        try {
+            Files.deleteIfExists(cbz)
+            if (Files.isDirectory(base)) base.toFile().deleteRecursively()
+            else Files.deleteIfExists(base)
+        } catch (e: IOException) {
+            logger.warn("Failed to delete files for chapter $chapterId: ${e.message}")
+        }
+    }
+
     open fun deleteSeriesFiles(seriesId: String) {
         val dir = basePath.resolve(seriesId)
         try {

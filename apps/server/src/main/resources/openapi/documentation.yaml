@@ -260,6 +260,28 @@ paths:
         "204": { description: Session invalidated }
         "401": { description: Missing or invalid token }
 
+  /library/series/search:
+    get:
+      tags: [library]
+      summary: Search series in the library
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string, default: "" }
+          description: Search query (matches series title)
+        - in: query
+          name: page
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Paginated search results
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedSeriesResponse" }
+
   /library/series:
     get:
       tags: [library]
@@ -341,12 +363,19 @@ paths:
   /library/series/{id}/chapters:
     get:
       tags: [library]
-      summary: List chapters for a series
+      summary: List chapters for a series, optionally filtered by download status
       parameters:
         - in: path
           name: id
           required: true
           schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, DOWNLOADING, DOWNLOADED, FAILED]
+          description: Filter chapters by download status
       responses:
         "200":
           content:
@@ -354,6 +383,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ChapterDto" }
+        "400": { description: Invalid status value }
         "404": { description: Series not found }
 
   /library/series/{id}/download:
@@ -371,6 +401,20 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DownloadQueuedResponse" }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Series not found }
+
+  /library/series/{id}/refresh:
+    post:
+      tags: [library]
+      summary: Re-enqueue a metadata fetch task for a series (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "202": { description: Metadata fetch task enqueued }
         "403": { description: Requires ADMIN role }
         "404": { description: Series not found }
 
@@ -410,6 +454,38 @@ paths:
     post:
       tags: [library]
       summary: Enqueue a download task for a single chapter (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Task enqueued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DownloadQueuedResponse" }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Chapter not found }
+
+  /library/chapters/{id}:
+    delete:
+      tags: [library]
+      summary: Delete a chapter and its downloaded files (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Chapter deleted }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Chapter not found }
+
+  /library/chapters/{id}/redownload:
+    post:
+      tags: [library]
+      summary: Re-enqueue a download task for an already-downloaded chapter (ADMIN)
       parameters:
         - in: path
           name: id

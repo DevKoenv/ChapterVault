@@ -225,6 +225,7 @@ class LibraryRoutesTest {
                     Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
                 override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
                 override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
+                override suspend fun listChaptersByStatus(seriesId: Id, status: DownloadStatus) = Result.Success(emptyList<Chapter>())
                 override suspend fun inLibraryExternalIds(connectorId: String, externalIds: List<String>) = Result.Success(emptySet<String>())
             },
             commandApi = NoOpCommandApi(),
@@ -279,6 +280,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Success(fakeSeries)
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Success(fakeSeries)
             },
@@ -301,6 +303,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.Conflict("Already in library"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Success(fakeSeries)
             },
@@ -323,6 +326,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Success(fakeSeries)
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Success(fakeSeries)
             },
@@ -413,6 +417,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Failure(AppError.InternalError("not implemented"))
             },
@@ -433,6 +438,8 @@ class LibraryRoutesTest {
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) =
                     Result.Failure(AppError.NotFound("Series", id.toString()))
+                override suspend fun deleteChapter(id: Id) =
+                    Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Failure(AppError.InternalError("not implemented"))
             },
@@ -441,6 +448,201 @@ class LibraryRoutesTest {
                 bearerAuth("admin-token")
             }
             assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    // Search tests
+
+    @Test
+    fun `GET library series search returns 200 with matching results`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun searchLibrary(query: String, request: PageRequest) =
+                    Result.Success(Pagination(listOf(fakeSeries), 0, 20, 1L))
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/series/search?q=One") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(response.bodyAsText(), "One Piece")
+            assertContains(response.bodyAsText(), "totalItems")
+        }
+    }
+
+    // Chapters-by-status tests
+
+    @Test
+    fun `GET library chapters with status filter returns only matching chapters`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun listChaptersByStatus(seriesId: Id, status: DownloadStatus) =
+                    Result.Success(listOf(fakeChapter))
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/series/00000000-0000-0000-0000-000000000001/chapters?status=PENDING") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(response.bodyAsText(), "Chapter 1")
+        }
+    }
+
+    @Test
+    fun `GET library chapters with invalid status returns 400`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            val response = client.get("/library/series/00000000-0000-0000-0000-000000000001/chapters?status=BOGUS") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    // Redownload tests
+
+    @Test
+    fun `POST chapter redownload returns 202 and enqueues DOWNLOAD_CHAPTER task`() {
+        val capturingQueue = CapturingTaskQueue()
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getChapter(id: Id) = Result.Success(downloadedChapter)
+                override suspend fun getSeries(id: Id) = Result.Success(fakeSeries)
+            },
+            commandApi = NoOpCommandApi(),
+            taskQueue = capturingQueue,
+        ) {
+            val response = client.post("/library/chapters/00000000-0000-0000-0000-000000000002/redownload") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.Accepted, response.status)
+            assertEquals(1, capturingQueue.enqueuedTasks.size)
+            assertEquals(TaskType.DOWNLOAD_CHAPTER, capturingQueue.enqueuedTasks.first().type)
+        }
+    }
+
+    @Test
+    fun `POST chapter redownload returns 404 for unknown chapter`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.post("/library/chapters/00000000-0000-0000-0000-000000000099/redownload") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    @Test
+    fun `POST chapter redownload returns 403 for USER role`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            val response = client.post("/library/chapters/00000000-0000-0000-0000-000000000002/redownload") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+        }
+    }
+
+    // Delete chapter tests
+
+    @Test
+    fun `DELETE library chapter returns 204 when ADMIN deletes existing chapter`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun removeSeries(id: Id) = Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun deleteChapter(id: Id) = Result.Success(Unit)
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+            },
+        ) {
+            val response = client.delete("/library/chapters/00000000-0000-0000-0000-000000000002") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.NoContent, response.status)
+        }
+    }
+
+    @Test
+    fun `DELETE library chapter returns 404 when chapter not found`() {
+        testApp(
+            readApi = NoOpReadApi(),
+            commandApi = object : LibraryCommandApi {
+                override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun removeSeries(id: Id) = Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun deleteChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+                override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
+                    Result.Failure(AppError.InternalError("not implemented"))
+            },
+        ) {
+            val response = client.delete("/library/chapters/00000000-0000-0000-0000-000000000099") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    @Test
+    fun `DELETE library chapter returns 403 for USER role`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            val response = client.delete("/library/chapters/00000000-0000-0000-0000-000000000002") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+        }
+    }
+
+    // Refresh tests
+
+    @Test
+    fun `POST series refresh returns 202 and enqueues FETCH_SERIES_METADATA task`() {
+        val capturingQueue = CapturingTaskQueue()
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getSeries(id: Id) = Result.Success(fakeSeries)
+            },
+            commandApi = NoOpCommandApi(),
+            taskQueue = capturingQueue,
+        ) {
+            val response = client.post("/library/series/00000000-0000-0000-0000-000000000001/refresh") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.Accepted, response.status)
+            assertEquals(1, capturingQueue.enqueuedTasks.size)
+            assertEquals(TaskType.FETCH_SERIES_METADATA, capturingQueue.enqueuedTasks.first().type)
+            assertEquals(fakeSeries.id, capturingQueue.enqueuedTasks.first().targetId)
+        }
+    }
+
+    @Test
+    fun `POST series refresh returns 404 when series not found`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getSeries(id: Id) = Result.Failure(AppError.NotFound("Series", id.toString()))
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.post("/library/series/00000000-0000-0000-0000-000000000099/refresh") {
+                bearerAuth("admin-token")
+            }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    @Test
+    fun `POST series refresh returns 403 for USER role`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            val response = client.post("/library/series/00000000-0000-0000-0000-000000000001/refresh") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.Forbidden, response.status)
         }
     }
 
@@ -454,6 +656,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Success(fakeSeries)
             },
@@ -476,6 +679,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
+                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Failure(AppError.NotFound("Series", id.toString()))
             },
@@ -498,6 +702,7 @@ private open class NoOpReadApi : LibraryReadApi {
         Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
     override suspend fun getChapter(id: Id): Result<Chapter> = Result.Failure(AppError.NotFound("Chapter", id.toString()))
     override suspend fun listChapters(seriesId: Id): Result<List<Chapter>> = Result.Success(emptyList<Chapter>())
+    override suspend fun listChaptersByStatus(seriesId: Id, status: DownloadStatus): Result<List<Chapter>> = Result.Success(emptyList<Chapter>())
     override suspend fun inLibraryExternalIds(connectorId: String, externalIds: List<String>): Result<Set<String>> = Result.Success(emptySet())
 }
 
@@ -505,6 +710,8 @@ private class NoOpCommandApi : LibraryCommandApi {
     override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
         Result.Failure(AppError.InternalError("not implemented"))
     override suspend fun removeSeries(id: Id): Result<Unit> =
+        Result.Failure(AppError.InternalError("not implemented"))
+    override suspend fun deleteChapter(id: Id): Result<Unit> =
         Result.Failure(AppError.InternalError("not implemented"))
     override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
         Result.Failure(AppError.InternalError("not implemented"))
