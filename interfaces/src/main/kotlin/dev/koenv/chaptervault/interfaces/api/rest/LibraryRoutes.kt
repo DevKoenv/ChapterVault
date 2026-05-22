@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.AddSeriesRequest
+import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.UpdateSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.mappers.v1.toDto
@@ -16,7 +17,6 @@ import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
-import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
@@ -58,7 +58,7 @@ fun Route.libraryRoutes(
                     hasPrevious = result.value.hasPrevious,
                 )
             )
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
@@ -78,73 +78,60 @@ fun Route.libraryRoutes(
                     hasPrevious = result.value.hasPrevious,
                 )
             )
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     get("/library/series/{id}") {
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
+            call.respondBadRequest("Invalid series ID"); return@get
         }
         when (val result = libraryRead.getSeries(id)) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
-            is Result.Failure -> when (result.error) {
-                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     get("/library/series/{id}/chapters") {
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
+            call.respondBadRequest("Invalid series ID"); return@get
         }
         val statusParam = call.request.queryParameters["status"]
         val statusFilter = if (statusParam != null) {
             try { DownloadStatus.valueOf(statusParam.uppercase()) } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid status value"); return@get
+                call.respondBadRequest("Invalid status value"); return@get
             }
         } else null
         val result = if (statusFilter != null) libraryRead.listChaptersByStatus(id, statusFilter)
                      else libraryRead.listChapters(id)
         when (result) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.map { it.toDto() })
-            is Result.Failure -> when (result.error) {
-                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     get("/library/chapters/{id}/pages/{index}") {
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@get
+            call.respondBadRequest("Invalid chapter ID"); return@get
         }
         val index = call.parameters["index"]?.toIntOrNull()
-            ?: run { call.respond(HttpStatusCode.BadRequest, "Invalid page index"); return@get }
+            ?: run { call.respondBadRequest("Invalid page index"); return@get }
 
         val chapter = when (val r = libraryRead.getChapter(id)) {
             is Result.Success -> r.value
-            is Result.Failure -> when (r.error) {
-                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@get }
-                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@get }
-            }
+            is Result.Failure -> { call.respondError(r.error); return@get }
         }
 
         if (chapter.downloadStatus != DownloadStatus.DOWNLOADED) {
-            call.respond(HttpStatusCode.Locked, "Chapter not yet downloaded"); return@get
+            call.respond(HttpStatusCode.Locked, ErrorResponse("CHAPTER_NOT_DOWNLOADED", "Chapter not yet downloaded")); return@get
         }
 
         val page = when (val r = fileStorage.readPage(chapter, index)) {
             is Result.Success -> r.value
-            is Result.Failure -> when (r.error) {
-                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@get }
-                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@get }
-            }
+            is Result.Failure -> { call.respondError(r.error); return@get }
         }
 
         // ETag correctness relies on chapter.updatedAt being bumped on re-download.
-        // If a re-download updates content without touching updatedAt, clients will serve stale cached pages.
         val etag = "\"${chapter.id}-${chapter.updatedAt.epochSecond}-${index}\""
         val ifNoneMatch = call.request.header(HttpHeaders.IfNoneMatch)
         if (ifNoneMatch == etag) {
@@ -159,10 +146,10 @@ fun Route.libraryRoutes(
     post("/library/series") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+            call.respondForbidden(); return@post
         }
         val request = try { call.receive<AddSeriesRequest>() } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@post
+            call.respondBadRequest("Invalid request body"); return@post
         }
         when (val result = libraryCommand.addToLibrary(request.connectorId, request.externalId, request.language, request.autoDownload)) {
             is Result.Success -> {
@@ -181,49 +168,39 @@ fun Route.libraryRoutes(
                 taskQueue.enqueue(task)
                 call.respond(HttpStatusCode.Created, series.toDto())
             }
-            is Result.Failure -> when (result.error) {
-                is AppError.Conflict -> call.respond(HttpStatusCode.Conflict, result.error.message)
-                is AppError.ValidationError -> call.respond(HttpStatusCode.BadRequest, result.error.message)
-                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     delete("/library/series/{id}") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@delete
+            call.respondForbidden(); return@delete
         }
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@delete
+            call.respondBadRequest("Invalid series ID"); return@delete
         }
         when (val result = libraryCommand.removeSeries(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
-            is Result.Failure -> when (result.error) {
-                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     post("/library/series/{id}/download") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+            call.respondForbidden(); return@post
         }
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@post
+            call.respondBadRequest("Invalid series ID"); return@post
         }
         val series = when (val r = libraryRead.getSeries(id)) {
             is Result.Success -> r.value
-            is Result.Failure -> when (r.error) {
-                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@post }
-                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
-            }
+            is Result.Failure -> { call.respondError(r.error); return@post }
         }
         val chapters = when (val r = libraryRead.listChapters(id)) {
             is Result.Success -> r.value
-            is Result.Failure -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+            is Result.Failure -> { call.respondError(r.error); return@post }
         }
         val format = series.defaultFormat ?: ChapterFormat.Cbz
         val now = Instant.now()
@@ -253,21 +230,18 @@ fun Route.libraryRoutes(
     post("/library/chapters/{id}/download") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+            call.respondForbidden(); return@post
         }
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@post
+            call.respondBadRequest("Invalid chapter ID"); return@post
         }
         val chapter = when (val r = libraryRead.getChapter(id)) {
             is Result.Success -> r.value
-            is Result.Failure -> when (r.error) {
-                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@post }
-                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
-            }
+            is Result.Failure -> { call.respondError(r.error); return@post }
         }
         val series = when (val r = libraryRead.getSeries(chapter.seriesId)) {
             is Result.Success -> r.value
-            is Result.Failure -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+            is Result.Failure -> { call.respondError(r.error); return@post }
         }
         val format = series.defaultFormat ?: ChapterFormat.Cbz
         val now = Instant.now()
@@ -292,21 +266,18 @@ fun Route.libraryRoutes(
     post("/library/chapters/{id}/redownload") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+            call.respondForbidden(); return@post
         }
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@post
+            call.respondBadRequest("Invalid chapter ID"); return@post
         }
         val chapter = when (val r = libraryRead.getChapter(id)) {
             is Result.Success -> r.value
-            is Result.Failure -> when (r.error) {
-                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@post }
-                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
-            }
+            is Result.Failure -> { call.respondError(r.error); return@post }
         }
         val series = when (val r = libraryRead.getSeries(chapter.seriesId)) {
             is Result.Success -> r.value
-            is Result.Failure -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
+            is Result.Failure -> { call.respondError(r.error); return@post }
         }
         val format = series.defaultFormat ?: ChapterFormat.Cbz
         val now = Instant.now()
@@ -327,34 +298,28 @@ fun Route.libraryRoutes(
     delete("/library/chapters/{id}") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@delete
+            call.respondForbidden(); return@delete
         }
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@delete
+            call.respondBadRequest("Invalid chapter ID"); return@delete
         }
         when (val result = libraryCommand.evictChapter(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
-            is Result.Failure -> when (result.error) {
-                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     post("/library/series/{id}/refresh") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+            call.respondForbidden(); return@post
         }
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@post
+            call.respondBadRequest("Invalid series ID"); return@post
         }
         val series = when (val r = libraryRead.getSeries(id)) {
             is Result.Success -> r.value
-            is Result.Failure -> when (r.error) {
-                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@post }
-                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@post }
-            }
+            is Result.Failure -> { call.respondError(r.error); return@post }
         }
         val now = Instant.now()
         taskQueue.enqueue(Task(
@@ -373,25 +338,22 @@ fun Route.libraryRoutes(
     patch("/library/series/{id}") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@patch
+            call.respondForbidden(); return@patch
         }
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@patch
+            call.respondBadRequest("Invalid series ID"); return@patch
         }
         val request = try { call.receive<UpdateSeriesRequest>() } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid request body"); return@patch
+            call.respondBadRequest("Invalid request body"); return@patch
         }
         val defaultFormat = try {
             request.defaultFormat?.let { ChapterFormat.fromString(it) }
         } catch (e: IllegalArgumentException) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid defaultFormat value"); return@patch
+            call.respondBadRequest("Invalid defaultFormat value"); return@patch
         }
         when (val result = libraryCommand.updateSeries(id, request.autoDownload, defaultFormat)) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
-            is Result.Failure -> when (result.error) {
-                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 }

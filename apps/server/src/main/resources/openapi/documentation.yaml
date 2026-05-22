@@ -198,8 +198,10 @@ components:
 
     ErrorResponse:
       type: object
+      required: [error, message]
       properties:
-        message: { type: string }
+        error:   { type: string, example: NOT_FOUND, description: "Machine-readable error code" }
+        message: { type: string, example: "Series 'abc' not found", description: "Human-readable description" }
 
 security:
   - bearerAuth: []

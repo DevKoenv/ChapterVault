@@ -23,6 +23,8 @@ import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.interfaces.api.websocket.eventSocket
+import dev.koenv.chaptervault.interfaces.api.rest.respondBadRequest
+import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
@@ -39,6 +41,7 @@ import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.plugins.swagger.swaggerUI
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.uri
@@ -65,6 +68,17 @@ fun Application.bootstrap() {
         }
     }
     install(ContentNegotiation) { json() }
+    install(StatusPages) {
+        exception<Throwable> { call, cause ->
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", cause.message ?: "An unexpected error occurred"))
+        }
+        status(HttpStatusCode.NotFound) { call, status ->
+            call.respond(status, ErrorResponse("NOT_FOUND", "The requested resource was not found"))
+        }
+        status(HttpStatusCode.MethodNotAllowed) { call, status ->
+            call.respond(status, ErrorResponse("METHOD_NOT_ALLOWED", "HTTP method not allowed for this endpoint"))
+        }
+    }
     install(CORS) {
         anyHost()
         allowHeader(HttpHeaders.Authorization)
@@ -131,7 +145,7 @@ fun Application.bootstrap() {
         authenticate("auth-basic") {
             get("/opds/v1/download/{chapterId}") {
                 val chapterId = try { Id.from(call.parameters["chapterId"]!!) } catch (e: Exception) {
-                    call.respond(HttpStatusCode.BadRequest); return@get
+                    call.respondBadRequest("Invalid chapter ID"); return@get
                 }
                 when (val chapterResult = libraryRead.getChapter(chapterId)) {
                     is Result.Failure -> { call.respond(HttpStatusCode.NotFound); return@get }
@@ -151,7 +165,7 @@ fun Application.bootstrap() {
     routing {
         get("/library/series/{id}/cover") {
             val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest); return@get
+                call.respondBadRequest("Invalid series ID"); return@get
             }
             when (val result = fileStorage.readCover(id.toString())) {
                 is Result.Failure -> call.respond(HttpStatusCode.NotFound)

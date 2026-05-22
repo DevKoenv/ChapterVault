@@ -25,7 +25,7 @@ fun Application.authRoutes(auth: AuthApi) {
     routing {
         post("/auth/register") {
             val request = try { call.receive<LoginRequest>() } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid request"); return@post
+                call.respondBadRequest("Invalid request body"); return@post
             }
             when (val result = auth.register(Credentials(request.username, request.password))) {
                 is Result.Success -> call.respond(
@@ -36,16 +36,13 @@ fun Application.authRoutes(auth: AuthApi) {
                         roles = result.value.roles.map { it.name },
                     )
                 )
-                is Result.Failure -> when (result.error) {
-                    is AppError.Conflict -> call.respond(HttpStatusCode.Conflict, result.error.message)
-                    else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-                }
+                is Result.Failure -> call.respondError(result.error)
             }
         }
 
         post("/auth/login") {
             val request = try { call.receive<LoginRequest>() } catch (e: Exception) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid request"); return@post
+                call.respondBadRequest("Invalid request body"); return@post
             }
             when (val result = auth.authenticate(Credentials(request.username, request.password))) {
                 is Result.Success -> {
@@ -59,7 +56,7 @@ fun Application.authRoutes(auth: AuthApi) {
                         )
                     )
                 }
-                is Result.Failure -> call.respond(HttpStatusCode.Unauthorized, result.error.message)
+                is Result.Failure -> call.respondError(result.error)
             }
         }
 
@@ -67,7 +64,7 @@ fun Application.authRoutes(auth: AuthApi) {
             val token = call.request.headers["Authorization"]
                 ?.removePrefix("Bearer ")
                 ?.trim()
-                ?: run { call.respond(HttpStatusCode.Unauthorized); return@post }
+                ?: run { call.respondError(AppError.Unauthorized("No token provided")); return@post }
             auth.invalidateSession(token)
             call.respond(HttpStatusCode.NoContent)
         }

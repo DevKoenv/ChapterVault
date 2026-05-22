@@ -9,6 +9,7 @@ import dev.koenv.chaptervault.interfaces.serialization.dto.v1.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.paging.PageRequest
+import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
@@ -20,7 +21,7 @@ fun Route.connectorRoutes(registry: ConnectorRegistry, libraryRead: LibraryReadA
     get("/connectors") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@get
+            call.respondForbidden(); return@get
         }
         val connectors = registry.all().map { ConnectorDto(it.id, it.name) }
         call.respond(HttpStatusCode.OK, connectors)
@@ -29,12 +30,12 @@ fun Route.connectorRoutes(registry: ConnectorRegistry, libraryRead: LibraryReadA
     get("/connectors/{id}/search") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@get
+            call.respondForbidden(); return@get
         }
         val id = call.parameters["id"]!!
         val connector = registry.findById(id)
         if (connector == null) {
-            call.respond(HttpStatusCode.NotFound, "Connector not found"); return@get
+            call.respondError(AppError.NotFound("Connector", id)); return@get
         }
         val q = call.request.queryParameters["q"] ?: ""
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
@@ -59,19 +60,19 @@ fun Route.connectorRoutes(registry: ConnectorRegistry, libraryRead: LibraryReadA
                     )
                 )
             }
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     get("/connectors/{id}/series/{externalId}") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@get
+            call.respondForbidden(); return@get
         }
         val id = call.parameters["id"]!!
         val connector = registry.findById(id)
         if (connector == null) {
-            call.respond(HttpStatusCode.NotFound, "Connector not found"); return@get
+            call.respondError(AppError.NotFound("Connector", id)); return@get
         }
         val externalId = call.parameters["externalId"]!!
         when (val result = connector.fetchSeries(externalId)) {
@@ -82,19 +83,19 @@ fun Route.connectorRoutes(registry: ConnectorRegistry, libraryRead: LibraryReadA
                 }
                 call.respond(HttpStatusCode.OK, SeriesMetadataDto(result.value.externalId, result.value.title, result.value.coverUrl, result.value.description, inLibrary))
             }
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     get("/connectors/{id}/series/{externalId}/chapters") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@get
+            call.respondForbidden(); return@get
         }
         val id = call.parameters["id"]!!
         val connector = registry.findById(id)
         if (connector == null) {
-            call.respond(HttpStatusCode.NotFound, "Connector not found"); return@get
+            call.respondError(AppError.NotFound("Connector", id)); return@get
         }
         val externalId = call.parameters["externalId"]!!
         when (val result = connector.fetchChapters(externalId)) {
@@ -102,7 +103,7 @@ fun Route.connectorRoutes(registry: ConnectorRegistry, libraryRead: LibraryReadA
                 HttpStatusCode.OK,
                 result.value.map { ChapterMetadataDto(it.externalId, it.title, it.chapterIndex, it.pageCount) }
             )
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 }

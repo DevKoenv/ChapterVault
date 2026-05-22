@@ -16,33 +16,33 @@ fun Route.progressRoutes(progressApi: ProgressApi) {
     get("/library/series/{id}/progress") {
         val principal = call.principal<KtorPrincipal>()!!
         val seriesId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid series ID"); return@get
+            call.respondBadRequest("Invalid series ID"); return@get
         }
         when (val result = progressApi.getProgress(principal.user.id, seriesId)) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     post("/library/chapters/{id}/read") {
         val principal = call.principal<KtorPrincipal>()!!
         val chapterId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@post
+            call.respondBadRequest("Invalid chapter ID"); return@post
         }
         when (val result = progressApi.markRead(principal.user.id, chapterId)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     delete("/library/chapters/{id}/read") {
         val principal = call.principal<KtorPrincipal>()!!
         val chapterId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@delete
+            call.respondBadRequest("Invalid chapter ID"); return@delete
         }
         when (val result = progressApi.markUnread(principal.user.id, chapterId)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 }

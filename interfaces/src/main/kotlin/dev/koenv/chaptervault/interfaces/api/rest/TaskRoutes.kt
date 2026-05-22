@@ -5,7 +5,6 @@ import dev.koenv.chaptervault.interfaces.serialization.mappers.v1.toDto
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.paging.PageRequest
-import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.HttpStatusCode
@@ -32,37 +31,31 @@ fun Route.taskRoutes(system: SystemApi) {
                     hasPrevious = result.value.hasPrevious,
                 )
             )
-            is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     get("/tasks/{id}") {
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid task ID"); return@get
+            call.respondBadRequest("Invalid task ID"); return@get
         }
         when (val result = system.getTask(id)) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
-            is Result.Failure -> when (result.error) {
-                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 
     post("/tasks/{id}/cancel") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respond(HttpStatusCode.Forbidden, "Forbidden"); return@post
+            call.respondForbidden(); return@post
         }
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respond(HttpStatusCode.BadRequest, "Invalid task ID"); return@post
+            call.respondBadRequest("Invalid task ID"); return@post
         }
         when (val result = system.cancelTask(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
-            is Result.Failure -> when (result.error) {
-                is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)
-                else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
-            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 }
