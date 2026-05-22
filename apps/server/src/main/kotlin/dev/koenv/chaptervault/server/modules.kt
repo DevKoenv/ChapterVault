@@ -67,6 +67,7 @@ val infrastructureModule = module {
             seriesRepository = get(),
             chapterRepository = get(),
             fileStorage = get(),
+            httpClient = get(),
         )
     }
 }

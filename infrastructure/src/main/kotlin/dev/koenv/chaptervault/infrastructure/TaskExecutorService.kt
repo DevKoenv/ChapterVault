@@ -2,6 +2,9 @@ package dev.koenv.chaptervault.infrastructure
 
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.HttpConnector
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.readRawBytes
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
@@ -28,6 +31,7 @@ class TaskExecutorService(
     private val seriesRepository: SeriesRepository,
     private val chapterRepository: ChapterRepository,
     private val fileStorage: FileStorage,
+    private val httpClient: HttpClient,
 ) {
     private val log = LoggerFactory.getLogger(TaskExecutorService::class.java)
 
@@ -86,7 +90,18 @@ class TaskExecutorService(
             is Result.Failure -> return r
         }
 
-        when (val r = seriesRepository.updateMetadata(task.targetId, metadata.title, metadata.coverUrl, metadata.description)) {
+        val localCoverUrl = metadata.coverUrl?.let { coverUrl ->
+            try {
+                val bytes = httpClient.get(coverUrl).readRawBytes()
+                fileStorage.writeCover(task.targetId.toString(), bytes)
+                "/library/series/${task.targetId}/cover"
+            } catch (e: Exception) {
+                log.warn("Cover download failed for series ${task.targetId}, using remote URL: ${e.message}")
+                coverUrl
+            }
+        }
+
+        when (val r = seriesRepository.updateMetadata(task.targetId, metadata.title, localCoverUrl, metadata.description)) {
             is Result.Success -> Unit
             is Result.Failure -> return r
         }

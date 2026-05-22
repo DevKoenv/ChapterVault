@@ -24,12 +24,12 @@ private val opdsV1 = OpdsV1()
 fun Application.opdsRoutes(libraryRead: LibraryReadApi) {
     routing {
         authenticate("auth-basic") {
-            get("/opds") {
+            get("/opds/v1") {
                 val feed = feedBuilder.buildNavigationFeed(Instant.now().toString())
                 call.respondText(opdsV1.serialize(feed), OPDS_CONTENT_TYPE)
             }
 
-            get("/opds/catalog") {
+            get("/opds/v1/catalog") {
                 val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
                 val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
                 when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
@@ -48,7 +48,7 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi) {
                 }
             }
 
-            get("/opds/series/{id}") {
+            get("/opds/v1/series/{id}") {
                 val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
                     call.respond(HttpStatusCode.BadRequest); return@get
                 }

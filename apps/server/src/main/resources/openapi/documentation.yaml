@@ -21,12 +21,17 @@ tags:
     description: Server administration
   - name: system
     description: System utilities
+  - name: opds
+    description: OPDS v1 feed (Basic Auth)
 
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
+    basicAuth:
+      type: http
+      scheme: basic
 
   schemas:
     LoginRequest:
@@ -715,6 +720,28 @@ paths:
         "403": { description: Requires ADMIN role }
         "404": { description: Connector not found }
 
+  /library/series/{id}/cover:
+    get:
+      tags: [library]
+      summary: Serve the locally-cached cover image for a series (public, no auth)
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Cover image bytes
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/gif:
+              schema: { type: string, format: binary }
+        "404": { description: Cover not found (not yet downloaded) }
+
   /admin:
     get:
       tags: [admin]
@@ -726,3 +753,74 @@ paths:
             application/json:
               schema:
                 type: object
+
+  /opds/v1:
+    get:
+      tags: [opds]
+      summary: OPDS v1 navigation feed
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Atom XML navigation feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+
+  /opds/v1/catalog:
+    get:
+      tags: [opds]
+      summary: OPDS v1 acquisition catalog (paginated series list)
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Atom XML acquisition feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+
+  /opds/v1/series/{id}:
+    get:
+      tags: [opds]
+      summary: OPDS v1 series feed (chapter list with download links)
+      security:
+        - basicAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Atom XML series feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+        "404": { description: Series not found }
+
+  /opds/v1/download/{chapterId}:
+    get:
+      tags: [opds]
+      summary: Download a chapter as CBZ (Basic Auth)
+      security:
+        - basicAuth: []
+      parameters:
+        - in: path
+          name: chapterId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Chapter CBZ file
+          content:
+            application/x-cbz:
+              schema: { type: string, format: binary }
+        "404": { description: Chapter not found or not downloaded }

@@ -10,14 +10,14 @@ class FeedBuilder {
         id = "urn:chaptervault:root",
         title = "ChapterVault",
         updated = now,
-        selfHref = "/opds",
+        selfHref = "/opds/v1",
         entries = listOf(
             OpdsEntry(
                 id = "urn:chaptervault:catalog",
                 title = "Library",
                 updated = now,
                 content = "Browse the manga library",
-                links = listOf(OpdsLink(rel = "subsection", href = "/opds/catalog", type = TYPE_ACQUISITION)),
+                links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/catalog", type = TYPE_ACQUISITION)),
             )
         ),
     )
@@ -34,9 +34,9 @@ class FeedBuilder {
             id = "urn:chaptervault:catalog",
             title = "ChapterVault Library",
             updated = now,
-            selfHref = "/opds/catalog?page=$page&size=$size",
-            nextHref = if (page + 1 < totalPages) "/opds/catalog?page=${page + 1}&size=$size" else null,
-            prevHref = if (page > 0) "/opds/catalog?page=${page - 1}&size=$size" else null,
+            selfHref = "/opds/v1/catalog?page=$page&size=$size",
+            nextHref = if (page + 1 < totalPages) "/opds/v1/catalog?page=${page + 1}&size=$size" else null,
+            prevHref = if (page > 0) "/opds/v1/catalog?page=${page - 1}&size=$size" else null,
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
@@ -48,13 +48,13 @@ class FeedBuilder {
         id = "urn:chaptervault:series:${series.id}",
         title = series.title,
         updated = now,
-        selfHref = "/opds/series/${series.id}",
+        selfHref = "/opds/v1/series/${series.id}",
         entries = chapters.map { buildChapterEntry(it, now) },
     )
 
     private fun buildSeriesEntry(series: Series, now: String): OpdsEntry {
         val links = mutableListOf(
-            OpdsLink(rel = "subsection", href = "/opds/series/${series.id}", type = TYPE_ACQUISITION),
+            OpdsLink(rel = "subsection", href = "/opds/v1/series/${series.id}", type = TYPE_ACQUISITION),
         )
         series.coverUrl?.let { links.add(OpdsLink(rel = REL_IMAGE, href = it, type = "image/jpeg")) }
         return OpdsEntry(
@@ -69,7 +69,7 @@ class FeedBuilder {
     private fun buildChapterEntry(chapter: Chapter, now: String): OpdsEntry {
         val links = mutableListOf<OpdsLink>()
         if (chapter.downloadStatus == DownloadStatus.DOWNLOADED) {
-            links.add(OpdsLink(rel = REL_ACQUISITION, href = "/opds/download/${chapter.id}", type = TYPE_CBZ))
+            links.add(OpdsLink(rel = REL_ACQUISITION, href = "/opds/v1/download/${chapter.id}", type = TYPE_CBZ))
         }
         return OpdsEntry(
             id = "urn:chaptervault:chapter:${chapter.id}",

@@ -52,6 +52,9 @@ import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
 
 fun Application.bootstrap() {
+    val fileStorage by inject<FileStorage>()
+    fileStorage.ensureDirectories()
+
     install(CallLogging) {
         level = Level.INFO
         format { call ->
@@ -83,7 +86,6 @@ fun Application.bootstrap() {
     val executor by inject<TaskExecutorService>()
     val progressApi by inject<ProgressApi>()
     val bookmarkApi by inject<BookmarkApi>()
-    val fileStorage by inject<FileStorage>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -127,7 +129,7 @@ fun Application.bootstrap() {
     // OPDS chapter download (Basic Auth — in server module to access FileStorage)
     routing {
         authenticate("auth-basic") {
-            get("/opds/download/{chapterId}") {
+            get("/opds/v1/download/{chapterId}") {
                 val chapterId = try { Id.from(call.parameters["chapterId"]!!) } catch (e: Exception) {
                     call.respond(HttpStatusCode.BadRequest); return@get
                 }
@@ -135,12 +137,27 @@ fun Application.bootstrap() {
                     is Result.Failure -> { call.respond(HttpStatusCode.NotFound); return@get }
                     is Result.Success -> {
                         val chapter = chapterResult.value
-                        val path = fileStorage.resolvePath(chapter.seriesId.toString(), chapter.id.toString())
-                        val file = path.toFile()
-                        if (!file.exists()) { call.respond(HttpStatusCode.NotFound); return@get }
-                        val bytes = file.readBytes()
-                        call.respondBytes(bytes, ContentType.parse("application/x-cbz"))
+                        when (val bytesResult = fileStorage.readChapterBytes(chapter)) {
+                            is Result.Failure -> { call.respond(HttpStatusCode.NotFound); return@get }
+                            is Result.Success -> call.respondBytes(bytesResult.value, ContentType.parse("application/x-cbz"))
+                        }
                     }
+                }
+            }
+        }
+    }
+
+    // Cover images are served without auth — they're thumbnails, not content
+    routing {
+        get("/library/series/{id}/cover") {
+            val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest); return@get
+            }
+            when (val result = fileStorage.readCover(id.toString())) {
+                is Result.Failure -> call.respond(HttpStatusCode.NotFound)
+                is Result.Success -> {
+                    val (bytes, mimeType) = result.value
+                    call.respondBytes(bytes, ContentType.parse(mimeType))
                 }
             }
         }

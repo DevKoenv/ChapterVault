@@ -7,11 +7,14 @@ import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import org.slf4j.LoggerFactory
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 open class FileStorage(
     private val basePath: Path,
@@ -19,6 +22,49 @@ open class FileStorage(
 ) : ChapterPageSource {
 
     private val logger = LoggerFactory.getLogger(FileStorage::class.java)
+
+    fun ensureDirectories() {
+        Files.createDirectories(basePath)
+    }
+
+    fun writeCover(seriesId: String, bytes: ByteArray) {
+        val dir = basePath.resolve(seriesId)
+        Files.createDirectories(dir)
+        Files.write(dir.resolve("cover"), bytes)
+    }
+
+    fun readCover(seriesId: String): Result<Pair<ByteArray, String>> {
+        val file = basePath.resolve(seriesId).resolve("cover")
+        if (!Files.isRegularFile(file)) return Result.Failure(AppError.NotFound("Cover", seriesId))
+        val bytes = Files.readAllBytes(file)
+        return Result.Success(bytes to detectImageMimeType(bytes))
+    }
+
+    fun readChapterBytes(chapter: Chapter): Result<ByteArray> {
+        val path = chapterPath(chapter)
+        return when {
+            Files.isRegularFile(path) -> Result.Success(Files.readAllBytes(path))
+            Files.isDirectory(path) -> {
+                val baos = ByteArrayOutputStream()
+                ZipOutputStream(baos).use { zip ->
+                    Files.list(path).sorted().forEach { file ->
+                        zip.putNextEntry(ZipEntry(file.fileName.toString()))
+                        zip.write(Files.readAllBytes(file))
+                        zip.closeEntry()
+                    }
+                }
+                Result.Success(baos.toByteArray())
+            }
+            else -> Result.Failure(AppError.NotFound("Chapter files", chapter.id.toString()))
+        }
+    }
+
+    private fun detectImageMimeType(bytes: ByteArray): String = when {
+        bytes.size >= 3 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() && bytes[2] == 0xFF.toByte() -> "image/jpeg"
+        bytes.size >= 4 && bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() && bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte() -> "image/png"
+        bytes.size >= 3 && bytes[0] == 0x47.toByte() && bytes[1] == 0x49.toByte() && bytes[2] == 0x46.toByte() -> "image/gif"
+        else -> "image/jpeg"
+    }
 
     fun resolvePath(seriesId: String, chapterId: String): Path =
         basePath.resolve(seriesId).resolve(chapterId)
