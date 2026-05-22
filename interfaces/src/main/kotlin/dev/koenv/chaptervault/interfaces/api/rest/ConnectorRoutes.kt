@@ -75,10 +75,13 @@ fun Route.connectorRoutes(registry: ConnectorRegistry, libraryRead: LibraryReadA
         }
         val externalId = call.parameters["externalId"]!!
         when (val result = connector.fetchSeries(externalId)) {
-            is Result.Success -> call.respond(
-                HttpStatusCode.OK,
-                SeriesMetadataDto(result.value.externalId, result.value.title, result.value.coverUrl, result.value.description)
-            )
+            is Result.Success -> {
+                val inLibrary = when (val r = libraryRead.inLibraryExternalIds(id, listOf(externalId))) {
+                    is Result.Success -> externalId in r.value
+                    is Result.Failure -> false
+                }
+                call.respond(HttpStatusCode.OK, SeriesMetadataDto(result.value.externalId, result.value.title, result.value.coverUrl, result.value.description, inLibrary))
+            }
             is Result.Failure -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
         }
     }

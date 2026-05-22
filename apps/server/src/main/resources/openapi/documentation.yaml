@@ -99,6 +99,7 @@ components:
         title:       { type: string }
         coverUrl:    { type: string, nullable: true }
         description: { type: string, nullable: true }
+        inLibrary:   { type: boolean, description: "True if this series (by externalId) already exists in the library" }
 
     SeriesMetadataDto:
       type: object
@@ -107,6 +108,7 @@ components:
         title:       { type: string }
         coverUrl:    { type: string, nullable: true }
         description: { type: string, nullable: true }
+        inLibrary:   { type: boolean, description: "True if this series (by externalId) already exists in the library" }
 
     ChapterMetadataDto:
       type: object
