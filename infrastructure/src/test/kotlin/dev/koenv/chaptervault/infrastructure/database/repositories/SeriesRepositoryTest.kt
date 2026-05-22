@@ -18,9 +18,11 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -31,6 +33,7 @@ import java.nio.file.Paths
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SeriesRepositoryTest {
@@ -258,6 +261,34 @@ class SeriesRepositoryTest {
             assertIs<Result.Failure>(result)
             assertIs<AppError.NotFound>((result as Result.Failure).error)
         }
+    }
+
+    @Test
+    fun `evictChapter resets status to PENDING and keeps the record`() = runBlocking {
+        val series = (repo.addToLibrary("mangadex", "ext-evict", autoDownload = false) as Result.Success).value
+        val chapterId = insertChapter(Id.from(series.id.toString()))
+        transaction {
+            ChapterTable.update({ ChapterTable.id eq chapterId.toString() }) {
+                it[ChapterTable.downloadStatus] = DownloadStatus.DOWNLOADED.name
+                it[ChapterTable.format] = "CBZ"
+                it[ChapterTable.pageCount] = 10
+            }
+        }
+
+        val result = repo.evictChapter(Id.from(chapterId.toString()))
+        assertIs<Result.Success<Unit>>(result)
+
+        val chapter = (repo.getChapter(Id.from(chapterId.toString())) as Result.Success).value
+        assertEquals(DownloadStatus.PENDING, chapter.downloadStatus)
+        assertNull(chapter.format)
+        assertNull(chapter.pageCount)
+    }
+
+    @Test
+    fun `evictChapter returns NotFound for unknown chapter`() = runBlocking {
+        val result = repo.evictChapter(Id.generate())
+        assertIs<Result.Failure>(result)
+        assertIs<AppError.NotFound>((result as Result.Failure).error)
     }
 
     @Test

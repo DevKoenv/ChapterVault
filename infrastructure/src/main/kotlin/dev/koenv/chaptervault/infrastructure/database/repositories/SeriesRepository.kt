@@ -4,7 +4,6 @@ import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
-import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
@@ -112,7 +111,7 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
         Result.Success(SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.single().toSeries())
     }
 
-    override suspend fun deleteChapter(id: Id): Result<Unit> {
+    override suspend fun evictChapter(id: Id): Result<Unit> {
         val chapterData = dbQuery {
             ChapterTable.selectAll()
                 .where { ChapterTable.id eq id.toString() }
@@ -122,10 +121,12 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
 
         val (seriesId, chapterId) = chapterData
         dbQuery {
-            BookmarkTable.deleteWhere { BookmarkTable.chapterId eq chapterId }
-            ProgressTable.deleteWhere { ProgressTable.chapterId eq chapterId }
-            TaskTable.deleteWhere { TaskTable.targetId eq chapterId }
-            ChapterTable.deleteWhere { ChapterTable.id eq chapterId }
+            ChapterTable.update({ ChapterTable.id eq chapterId }) {
+                it[downloadStatus] = DownloadStatus.PENDING.name
+                it[format] = null
+                it[pageCount] = null
+                it[updatedAt] = Instant.now().toKotlinInstant()
+            }
         }
         fileStorage.deleteChapterFiles(seriesId, chapterId)
         return Result.Success(Unit)

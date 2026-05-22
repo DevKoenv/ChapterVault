@@ -280,7 +280,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Success(fakeSeries)
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
-                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun evictChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Success(fakeSeries)
             },
@@ -303,7 +303,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.Conflict("Already in library"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
-                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun evictChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Success(fakeSeries)
             },
@@ -326,7 +326,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Success(fakeSeries)
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
-                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun evictChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Success(fakeSeries)
             },
@@ -417,7 +417,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
-                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun evictChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Failure(AppError.InternalError("not implemented"))
             },
@@ -438,7 +438,7 @@ class LibraryRoutesTest {
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) =
                     Result.Failure(AppError.NotFound("Series", id.toString()))
-                override suspend fun deleteChapter(id: Id) =
+                override suspend fun evictChapter(id: Id) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Failure(AppError.InternalError("not implemented"))
@@ -557,7 +557,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Failure(AppError.InternalError("not implemented"))
-                override suspend fun deleteChapter(id: Id) = Result.Success(Unit)
+                override suspend fun evictChapter(id: Id) = Result.Success(Unit)
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Failure(AppError.InternalError("not implemented"))
             },
@@ -577,7 +577,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Failure(AppError.InternalError("not implemented"))
-                override suspend fun deleteChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+                override suspend fun evictChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Failure(AppError.InternalError("not implemented"))
             },
@@ -656,7 +656,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
-                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun evictChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Success(fakeSeries)
             },
@@ -679,7 +679,7 @@ class LibraryRoutesTest {
                 override suspend fun addToLibrary(connectorId: String, externalId: String, language: String, autoDownload: Boolean) =
                     Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun removeSeries(id: Id) = Result.Success(Unit)
-                override suspend fun deleteChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
+                override suspend fun evictChapter(id: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
                 override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
                     Result.Failure(AppError.NotFound("Series", id.toString()))
             },
@@ -711,7 +711,7 @@ private class NoOpCommandApi : LibraryCommandApi {
         Result.Failure(AppError.InternalError("not implemented"))
     override suspend fun removeSeries(id: Id): Result<Unit> =
         Result.Failure(AppError.InternalError("not implemented"))
-    override suspend fun deleteChapter(id: Id): Result<Unit> =
+    override suspend fun evictChapter(id: Id): Result<Unit> =
         Result.Failure(AppError.InternalError("not implemented"))
     override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
         Result.Failure(AppError.InternalError("not implemented"))

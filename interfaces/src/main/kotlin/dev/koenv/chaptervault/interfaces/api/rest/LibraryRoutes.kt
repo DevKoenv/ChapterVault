@@ -329,7 +329,7 @@ fun Route.libraryRoutes(
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
             call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@delete
         }
-        when (val result = libraryCommand.deleteChapter(id)) {
+        when (val result = libraryCommand.evictChapter(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> when (result.error) {
                 is AppError.NotFound -> call.respond(HttpStatusCode.NotFound, result.error.message)

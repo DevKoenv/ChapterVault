@@ -471,7 +471,7 @@ paths:
   /library/chapters/{id}:
     delete:
       tags: [library]
-      summary: Delete a chapter and its downloaded files (ADMIN)
+      summary: Evict a chapter's downloaded files and reset status to PENDING (ADMIN)
       parameters:
         - in: path
           name: id
