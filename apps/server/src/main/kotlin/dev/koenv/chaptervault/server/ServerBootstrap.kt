@@ -22,7 +22,7 @@ import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
-import dev.koenv.chaptervault.interfaces.api.websocket.eventSocket
+import dev.koenv.chaptervault.interfaces.api.sse.sseRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.respondBadRequest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.shared.result.Result
@@ -50,7 +50,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import io.ktor.server.websocket.WebSockets
+import io.ktor.server.sse.SSE
 import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
 
@@ -87,7 +87,7 @@ fun Application.bootstrap() {
         allowMethod(HttpMethod.Delete)
         allowMethod(HttpMethod.Patch)
     }
-    install(WebSockets)
+    install(SSE)
 
     val libraryRead by inject<LibraryReadApi>()
     val libraryCommand by inject<LibraryCommandApi>()
@@ -133,7 +133,7 @@ fun Application.bootstrap() {
             connectorRoutes(connectorRegistry, libraryRead)
             progressRoutes(progressApi)
             bookmarkRoutes(bookmarkApi)
-            eventSocket(projectionService)
+            sseRoutes(projectionService)
         }
     }
 
@@ -177,6 +177,7 @@ fun Application.bootstrap() {
         }
     }
 
+    launch { projectionService.start() }
     launch { executor.recoverOnBoot(); executor.start() }
 
     routing {

@@ -31,6 +31,7 @@ import dev.koenv.chaptervault.kernel.event.EventBus
 import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
 import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
+import dev.koenv.chaptervault.kernel.runtime.EventPublishingTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
@@ -68,6 +69,7 @@ val infrastructureModule = module {
             chapterRepository = get(),
             fileStorage = get(),
             httpClient = get(),
+            eventBus = get(),
         )
     }
 }
@@ -75,8 +77,8 @@ val infrastructureModule = module {
 val kernelModule = module {
     single<EventBus> { InMemoryEventBus() }
     single<ExtensionRegistry> { DefaultExtensionRegistry() }
-    single<TaskQueue> { InMemoryTaskQueue() }
-    single<SystemApi> { SystemApiImpl(get(), get(), get()) }
+    single<TaskQueue> { EventPublishingTaskQueue(InMemoryTaskQueue(), get()) }
+    single<SystemApi> { SystemApiImpl(get(), get(), get(), get()) }
 }
 
 val extensionModule = module {

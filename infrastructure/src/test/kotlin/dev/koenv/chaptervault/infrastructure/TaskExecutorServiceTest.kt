@@ -21,6 +21,7 @@ import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
+import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
@@ -142,7 +143,7 @@ class TaskExecutorServiceTest {
 
     private fun makeExecutor(tempDir: java.nio.file.Path): TaskExecutorService {
         val fileStorage = FileStorage(tempDir, ArchiveWriterSelector(listOf(CbzWriter())))
-        return TaskExecutorService(taskQueue, taskRepository, registry, seriesRepository, chapterRepository, fileStorage, HttpClient())
+        return TaskExecutorService(taskQueue, taskRepository, registry, seriesRepository, chapterRepository, fileStorage, HttpClient(), InMemoryEventBus())
     }
 
     @Test

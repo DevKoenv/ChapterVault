@@ -9,10 +9,14 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterReposi
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
+import dev.koenv.chaptervault.kernel.event.EventBus
+import dev.koenv.chaptervault.kernel.library.Chapter
+import dev.koenv.chaptervault.kernel.library.ChapterEvents
 import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
+import dev.koenv.chaptervault.kernel.runtime.TaskEvents
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
@@ -32,6 +36,7 @@ class TaskExecutorService(
     private val chapterRepository: ChapterRepository,
     private val fileStorage: FileStorage,
     private val httpClient: HttpClient,
+    private val eventBus: EventBus,
 ) {
     private val log = LoggerFactory.getLogger(TaskExecutorService::class.java)
 
@@ -52,6 +57,7 @@ class TaskExecutorService(
             if (task == null) { delay(500); continue }
             taskRepository.insert(task)
             taskRepository.updateStatus(task.id, TaskStatus.RUNNING)
+            eventBus.publish(TaskEvents.TaskStarted(task.id, task.type, task.targetId, Instant.now()))
             log.info("Task ${task.id} [${task.type}] started — target=${task.targetId}")
             val result = runCatching { dispatch(task) }.getOrElse { e ->
                 log.error("Task ${task.id} [${task.type}] threw uncaught exception", e)
@@ -60,10 +66,12 @@ class TaskExecutorService(
             when (result) {
                 is Result.Success -> {
                     taskRepository.updateStatus(task.id, TaskStatus.COMPLETED)
+                    eventBus.publish(TaskEvents.TaskCompleted(task.id, task.type, task.targetId, Instant.now()))
                     log.info("Task ${task.id} [${task.type}] completed")
                 }
                 is Result.Failure -> {
                     taskRepository.updateStatus(task.id, TaskStatus.FAILED, result.error.message)
+                    eventBus.publish(TaskEvents.TaskFailed(task.id, task.type, task.targetId, result.error.message, Instant.now()))
                     log.error("Task ${task.id} [${task.type}] failed: ${result.error.message}")
                 }
             }
@@ -139,7 +147,7 @@ class TaskExecutorService(
             is Result.Failure -> return r
         }
 
-        val insertedChapters = mutableListOf<dev.koenv.chaptervault.kernel.library.Chapter>()
+        val insertedChapters = mutableListOf<Chapter>()
         for (ch in chapters) {
             val result = chapterRepository.insertChapter(task.targetId, ch.title, ch.chapterIndex, ch.externalId)
             if (result is Result.Success) {
@@ -154,7 +162,7 @@ class TaskExecutorService(
 
         if (series.autoDownload) {
             for (chapter in insertedChapters) {
-                chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.PENDING)
+                setChapterStatus(chapter, DownloadStatus.PENDING)
                 taskQueue.enqueue(
                     Task(
                         id = Id.generate(),
@@ -190,20 +198,20 @@ class TaskExecutorService(
             is Result.Failure -> return r
         }
 
-        chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.DOWNLOADING)
+        setChapterStatus(chapter, DownloadStatus.DOWNLOADING)
 
         try {
             val format = ChapterFormat.fromString(task.payload["format"] ?: "Cbz")
             val downloadResult = when (val r = connector.download(chapter, format)) {
                 is Result.Success -> r.value
                 is Result.Failure -> {
-                    chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                    setChapterStatus(chapter, DownloadStatus.FAILED)
                     return r
                 }
             }
 
             if (downloadResult.pages.isEmpty()) {
-                chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                setChapterStatus(chapter, DownloadStatus.FAILED)
                 return Result.Failure(AppError.InternalError(
                     "Connector $connectorId returned 0 pages for chapter ${chapter.id}"
                 ))
@@ -211,7 +219,7 @@ class TaskExecutorService(
 
             val httpConnector = connector as? HttpConnector
                 ?: run {
-                    chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                    setChapterStatus(chapter, DownloadStatus.FAILED)
                     return Result.Failure(AppError.InternalError(
                         "Connector $connectorId does not support HTTP page fetching"
                     ))
@@ -227,7 +235,7 @@ class TaskExecutorService(
                 }
             }
             if (failedIndices.isNotEmpty()) {
-                chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                setChapterStatus(chapter, DownloadStatus.FAILED)
                 return Result.Failure(AppError.InternalError(
                     "Failed to download ${failedIndices.size}/${downloadResult.pages.size} page(s) " +
                         "for chapter ${chapter.id}: indices $failedIndices"
@@ -236,17 +244,22 @@ class TaskExecutorService(
 
             when (val r = fileStorage.writeChapter(chapter.seriesId.toString(), chapter.id.toString(), pages, format)) {
                 is Result.Failure -> {
-                    chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+                    setChapterStatus(chapter, DownloadStatus.FAILED)
                     return r
                 }
                 is Result.Success -> Unit
             }
 
-            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.DOWNLOADED)
+            setChapterStatus(chapter, DownloadStatus.DOWNLOADED)
             return Result.Success(Unit)
         } catch (e: Throwable) {
-            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.FAILED)
+            setChapterStatus(chapter, DownloadStatus.FAILED)
             throw e
         }
+    }
+
+    private suspend fun setChapterStatus(chapter: Chapter, status: DownloadStatus) {
+        chapterRepository.updateDownloadStatus(chapter.id, status)
+        eventBus.publish(ChapterEvents.DownloadStatusChanged(chapter.id, chapter.seriesId, status, Instant.now()))
     }
 }
