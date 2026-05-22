@@ -118,6 +118,32 @@ components:
         chapterIndex: { type: number, format: double }
         pageCount:    { type: integer, nullable: true }
 
+    BookmarkDto:
+      type: object
+      properties:
+        id:        { type: string, format: uuid }
+        chapterId: { type: string, format: uuid }
+        page:      { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    CreateBookmarkRequest:
+      type: object
+      required: [page]
+      properties:
+        page: { type: integer, example: 5 }
+
+    ProgressDto:
+      type: object
+      properties:
+        seriesId:   { type: string, format: uuid }
+        readCount:  { type: integer, description: Number of chapters marked as read }
+        totalCount: { type: integer, description: Total number of chapters in the series }
+
+    DownloadQueuedResponse:
+      type: object
+      properties:
+        queued: { type: integer, description: Number of download tasks enqueued }
+
     AddSeriesRequest:
       type: object
       required: [connectorId, externalId]
@@ -329,6 +355,158 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ChapterDto" }
         "404": { description: Series not found }
+
+  /library/series/{id}/download:
+    post:
+      tags: [library]
+      summary: Enqueue download tasks for all pending/failed chapters in a series (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Tasks enqueued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DownloadQueuedResponse" }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Series not found }
+
+  /library/series/{id}/progress:
+    get:
+      tags: [library]
+      summary: Get read progress for a series (current user)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProgressDto" }
+
+  /library/series/{id}/bookmarks:
+    get:
+      tags: [library]
+      summary: List bookmarks across all chapters of a series (current user)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BookmarkDto" }
+
+  /library/chapters/{id}/download:
+    post:
+      tags: [library]
+      summary: Enqueue a download task for a single chapter (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Task enqueued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DownloadQueuedResponse" }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Chapter not found }
+
+  /library/chapters/{id}/pages/{index}:
+    get:
+      tags: [library]
+      summary: Serve a single page image from a downloaded chapter
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: index
+          required: true
+          schema: { type: integer }
+          description: Zero-based page index
+      responses:
+        "200":
+          description: Page image bytes
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        "304": { description: Not modified (ETag match) }
+        "404": { description: Chapter or page not found }
+        "423": { description: Chapter not yet downloaded }
+
+  /library/chapters/{id}/read:
+    post:
+      tags: [library]
+      summary: Mark a chapter as read (current user)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Marked as read }
+    delete:
+      tags: [library]
+      summary: Mark a chapter as unread (current user)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Marked as unread }
+
+  /library/chapters/{id}/bookmarks:
+    post:
+      tags: [library]
+      summary: Create a bookmark on a chapter page (current user)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBookmarkRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookmarkDto" }
+        "400": { description: Invalid request body }
+
+  /library/bookmarks/{id}:
+    delete:
+      tags: [library]
+      summary: Delete a bookmark (current user)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Bookmark deleted }
+        "404": { description: Bookmark not found }
 
   /tasks:
     get:
