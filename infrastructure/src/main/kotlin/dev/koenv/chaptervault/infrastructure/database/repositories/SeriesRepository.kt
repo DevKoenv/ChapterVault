@@ -1,7 +1,11 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
+import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
+import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
+import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
+import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.library.Chapter
@@ -19,10 +23,11 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 
-class SeriesRepository : LibraryReadApi, LibraryCommandApi {
+class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, LibraryCommandApi {
 
     private suspend fun <T> dbQuery(block: Transaction.() -> T): T =
         newSuspendedTransaction(Dispatchers.IO) { block() }
@@ -98,10 +103,27 @@ class SeriesRepository : LibraryReadApi, LibraryCommandApi {
         Result.Success(SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.single().toSeries())
     }
 
-    override suspend fun removeSeries(id: Id): Result<Unit> = dbQuery {
-        val deleted = SeriesTable.deleteWhere { SeriesTable.id eq id.toString() }
-        if (deleted == 0) Result.Failure(AppError.NotFound("Series", id.toString()))
-        else Result.Success(Unit)
+    override suspend fun removeSeries(id: Id): Result<Unit> {
+        val result = dbQuery {
+            val chapterIds = ChapterTable.selectAll()
+                .where { ChapterTable.seriesId eq id.toString() }
+                .map { it[ChapterTable.id] }
+
+            if (chapterIds.isNotEmpty()) {
+                BookmarkTable.deleteWhere { chapterId inList chapterIds }
+                ProgressTable.deleteWhere { chapterId inList chapterIds }
+            }
+            TaskTable.deleteWhere { (targetId inList chapterIds) or (targetId eq id.toString()) }
+            ChapterTable.deleteWhere { seriesId eq id.toString() }
+
+            val deleted = SeriesTable.deleteWhere { SeriesTable.id eq id.toString() }
+            if (deleted == 0) Result.Failure(AppError.NotFound("Series", id.toString()))
+            else Result.Success(Unit)
+        }
+        if (result is Result.Success) {
+            fileStorage.deleteSeriesFiles(id.toString())
+        }
+        return result
     }
 
     suspend fun updateMetadata(id: Id, title: String, coverUrl: String?, description: String?): Result<Unit> = dbQuery {

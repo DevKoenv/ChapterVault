@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.infrastructure.storage
 
+import dev.koenv.chaptervault.kernel.library.Page
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.nio.file.Files

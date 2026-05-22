@@ -17,6 +17,7 @@ object DatabaseFactory {
         Database.connect(
             url = config.url,
             driver = config.driver,
+            setupConnection = { it.createStatement().execute("PRAGMA foreign_keys = ON") },
         )
         transaction {
             SchemaUtils.createMissingTablesAndColumns(UserTable, SessionTable, SeriesTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)

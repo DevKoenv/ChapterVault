@@ -42,7 +42,7 @@ val configModule = module {
 }
 
 val infrastructureModule = module {
-    single { SeriesRepository() }
+    single { SeriesRepository(get()) }
     single<LibraryReadApi> { get<SeriesRepository>() }
     single<LibraryCommandApi> { get<SeriesRepository>() }
     single { UserRepository() }

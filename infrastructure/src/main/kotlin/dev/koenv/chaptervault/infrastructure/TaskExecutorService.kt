@@ -6,7 +6,7 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterReposi
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
-import dev.koenv.chaptervault.infrastructure.storage.Page
+import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task

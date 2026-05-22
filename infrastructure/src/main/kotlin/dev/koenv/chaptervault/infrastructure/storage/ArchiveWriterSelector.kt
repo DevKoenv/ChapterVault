@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.infrastructure.storage
 
+import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result

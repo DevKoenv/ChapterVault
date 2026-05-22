@@ -52,7 +52,11 @@ class TaskExecutorServiceTest {
 
     private val chapterRepository = ChapterRepository()
     private val taskRepository = TaskRepository()
-    private val seriesRepository = SeriesRepository()
+    private val fileStorage = FileStorage(
+        Files.createTempDirectory("executor-test-storage"),
+        ArchiveWriterSelector(listOf(CbzWriter())),
+    )
+    private val seriesRepository = SeriesRepository(fileStorage)
     private val taskQueue = InMemoryTaskQueue()
     private val registry = DefaultConnectorRegistry()
 

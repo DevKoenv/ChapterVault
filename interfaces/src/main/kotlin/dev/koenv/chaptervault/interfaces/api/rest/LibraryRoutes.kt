@@ -4,24 +4,29 @@ import dev.koenv.chaptervault.interfaces.serialization.dto.v1.AddSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.UpdateSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.mappers.v1.toDto
+import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
-import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
+import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -33,6 +38,7 @@ fun Route.libraryRoutes(
     libraryRead: LibraryReadApi,
     libraryCommand: LibraryCommandApi,
     taskQueue: TaskQueue,
+    fileStorage: ChapterPageSource,
 ) {
     // GET routes are accessible to any authenticated user
     get("/library/series") {
@@ -79,6 +85,46 @@ fun Route.libraryRoutes(
                 else -> call.respond(HttpStatusCode.InternalServerError, result.error.message)
             }
         }
+    }
+
+    get("/library/chapters/{id}/pages/{index}") {
+        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, "Invalid chapter ID"); return@get
+        }
+        val index = call.parameters["index"]?.toIntOrNull()
+            ?: run { call.respond(HttpStatusCode.BadRequest, "Invalid page index"); return@get }
+
+        val chapter = when (val r = libraryRead.getChapter(id)) {
+            is Result.Success -> r.value
+            is Result.Failure -> when (r.error) {
+                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@get }
+                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@get }
+            }
+        }
+
+        if (chapter.downloadStatus != DownloadStatus.DOWNLOADED) {
+            call.respond(HttpStatusCode.Locked, "Chapter not yet downloaded"); return@get
+        }
+
+        val page = when (val r = fileStorage.readPage(chapter, index)) {
+            is Result.Success -> r.value
+            is Result.Failure -> when (r.error) {
+                is AppError.NotFound -> { call.respond(HttpStatusCode.NotFound, r.error.message); return@get }
+                else -> { call.respond(HttpStatusCode.InternalServerError, r.error.message); return@get }
+            }
+        }
+
+        // ETag correctness relies on chapter.updatedAt being bumped on re-download.
+        // If a re-download updates content without touching updatedAt, clients will serve stale cached pages.
+        val etag = "\"${chapter.id}-${chapter.updatedAt.epochSecond}-${index}\""
+        val ifNoneMatch = call.request.header(HttpHeaders.IfNoneMatch)
+        if (ifNoneMatch == etag) {
+            call.respond(HttpStatusCode.NotModified); return@get
+        }
+
+        call.response.headers.append(HttpHeaders.ETag, etag)
+        call.response.headers.append(HttpHeaders.CacheControl, "max-age=86400, immutable")
+        call.respondBytes(page.data, ContentType.parse(page.mimeType))
     }
 
     post("/library/series") {

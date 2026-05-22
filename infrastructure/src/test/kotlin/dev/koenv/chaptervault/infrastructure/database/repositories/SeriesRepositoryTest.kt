@@ -1,25 +1,41 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
+import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
+import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
+import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
+import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
+import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
+import dev.koenv.chaptervault.infrastructure.storage.FileStorage
+import dev.koenv.chaptervault.kernel.library.DownloadStatus
+import dev.koenv.chaptervault.kernel.library.SeriesStatus
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SeriesRepositoryTest {
-    private val repo = SeriesRepository()
+    private val mockStorage = CapturingFileStorage()
+    private val repo = SeriesRepository(mockStorage)
 
     companion object {
         @BeforeAll
@@ -27,20 +43,69 @@ class SeriesRepositoryTest {
         fun setup() {
             val dbFile = Files.createTempFile("chaptervault-test", ".sqlite").toFile()
             dbFile.deleteOnExit()
-            Database.connect("jdbc:sqlite:${dbFile.absolutePath}", driver = "org.sqlite.JDBC")
+            Database.connect(
+                "jdbc:sqlite:${dbFile.absolutePath}",
+                driver = "org.sqlite.JDBC",
+                setupConnection = { it.createStatement().execute("PRAGMA foreign_keys = ON") },
+            )
             transaction {
-                SchemaUtils.create(SeriesTable, ChapterTable)
+                SchemaUtils.create(UserTable, SeriesTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
             }
         }
     }
 
     @AfterEach
     fun cleanTables() {
+        mockStorage.reset()
         transaction {
-            SchemaUtils.drop(ChapterTable, SeriesTable)
-            SchemaUtils.create(SeriesTable, ChapterTable)
+            SchemaUtils.drop(BookmarkTable, ProgressTable, TaskTable, ChapterTable, SeriesTable, UserTable)
+            SchemaUtils.create(UserTable, SeriesTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
         }
     }
+
+    // --- cascade delete tests ---
+
+    @Test
+    fun `removeSeries deletes chapters, progress, bookmarks, and tasks`() = runBlocking {
+        val userId = insertUser()
+        val series = (repo.addToLibrary("mangadex", "ext-cascade", autoDownload = false) as Result.Success).value
+        val chapterId = insertChapter(Id.from(series.id.toString()))
+        insertProgress(userId, chapterId)
+        insertBookmark(userId, chapterId)
+        insertTask(chapterId.toString())
+        insertTask(series.id.toString())
+
+        val result = repo.removeSeries(series.id)
+        assertIs<Result.Success<Unit>>(result)
+
+        transaction {
+            assertEquals(0L, ChapterTable.selectAll().where { ChapterTable.seriesId eq series.id.toString() }.count())
+            assertEquals(0L, ProgressTable.selectAll().count())
+            assertEquals(0L, BookmarkTable.selectAll().count())
+            assertEquals(0L, TaskTable.selectAll().count())
+        }
+    }
+
+    @Test
+    fun `removeSeries calls deleteSeriesFiles after the DB commit`() = runBlocking {
+        val series = (repo.addToLibrary("mangadex", "ext-del-files", autoDownload = false) as Result.Success).value
+
+        repo.removeSeries(series.id)
+
+        assertEquals(listOf(series.id.toString()), mockStorage.deletedSeries)
+    }
+
+    @Test
+    fun `removeSeries succeeds even when deleteSeriesFiles throws`() = runBlocking {
+        val series = (repo.addToLibrary("mangadex", "ext-del-fail", autoDownload = false) as Result.Success).value
+        mockStorage.shouldFail = true
+
+        val result = repo.removeSeries(series.id)
+
+        assertIs<Result.Success<Unit>>(result)
+    }
+
+    // --- existing tests ---
 
     @Test
     fun `getSeries returns NotFound when series does not exist`() {
@@ -217,5 +282,89 @@ class SeriesRepositoryTest {
             assertIs<Result.Failure>(result)
             assertIs<AppError.NotFound>((result as Result.Failure).error)
         }
+    }
+
+    // --- helpers ---
+
+    private fun insertUser(id: Id = Id.generate()): Id {
+        transaction {
+            UserTable.insert {
+                it[UserTable.id] = id.toString()
+                it[UserTable.username] = "user-${id}"
+                it[UserTable.passwordHash] = "hash"
+                it[UserTable.roles] = "USER"
+                it[UserTable.createdAt] = Instant.now().toKotlinInstant()
+            }
+        }
+        return id
+    }
+
+    private fun insertChapter(seriesId: Id, id: Id = Id.generate()): Id {
+        transaction {
+            ChapterTable.insert {
+                it[ChapterTable.id] = id.toString()
+                it[ChapterTable.seriesId] = seriesId.toString()
+                it[ChapterTable.title] = "Chapter"
+                it[ChapterTable.chapterIndex] = 1.0
+                it[ChapterTable.externalId] = "ext-ch-${id}"
+                it[ChapterTable.downloadStatus] = DownloadStatus.PENDING.name
+                it[ChapterTable.addedAt] = Instant.now().toKotlinInstant()
+                it[ChapterTable.updatedAt] = Instant.now().toKotlinInstant()
+            }
+        }
+        return id
+    }
+
+    private fun insertProgress(userId: Id, chapterId: Id) {
+        transaction {
+            ProgressTable.insert {
+                it[ProgressTable.userId] = userId.toString()
+                it[ProgressTable.chapterId] = chapterId.toString()
+                it[ProgressTable.readAt] = Instant.now().toKotlinInstant()
+            }
+        }
+    }
+
+    private fun insertBookmark(userId: Id, chapterId: Id) {
+        transaction {
+            BookmarkTable.insert {
+                it[BookmarkTable.id] = Id.generate().toString()
+                it[BookmarkTable.userId] = userId.toString()
+                it[BookmarkTable.chapterId] = chapterId.toString()
+                it[BookmarkTable.page] = 1
+                it[BookmarkTable.createdAt] = Instant.now().toKotlinInstant()
+            }
+        }
+    }
+
+    private fun insertTask(targetId: String) {
+        transaction {
+            TaskTable.insert {
+                it[TaskTable.id] = Id.generate().toString()
+                it[TaskTable.type] = "DOWNLOAD_CHAPTER"
+                it[TaskTable.status] = "PENDING"
+                it[TaskTable.targetType] = "CHAPTER"
+                it[TaskTable.targetId] = targetId
+                it[TaskTable.createdAt] = Instant.now().toKotlinInstant()
+                it[TaskTable.updatedAt] = Instant.now().toKotlinInstant()
+            }
+        }
+    }
+}
+
+private class CapturingFileStorage(
+    basePath: Path = Paths.get(System.getProperty("java.io.tmpdir")),
+) : FileStorage(basePath, ArchiveWriterSelector(emptyList())) {
+    val deletedSeries = mutableListOf<String>()
+    var shouldFail = false
+
+    override fun deleteSeriesFiles(seriesId: String) {
+        if (shouldFail) throw IOException("simulated failure")
+        deletedSeries.add(seriesId)
+    }
+
+    fun reset() {
+        deletedSeries.clear()
+        shouldFail = false
     }
 }

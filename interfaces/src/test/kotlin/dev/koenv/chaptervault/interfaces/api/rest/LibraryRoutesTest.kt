@@ -1,11 +1,13 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
+import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
+import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.kernel.library.Series
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
 import dev.koenv.chaptervault.kernel.runtime.Task
@@ -54,10 +56,13 @@ class LibraryRoutesTest {
         updatedAt = Instant.EPOCH,
     )
 
+    private val downloadedChapter = fakeChapter.copy(downloadStatus = DownloadStatus.DOWNLOADED)
+
     private fun testApp(
         readApi: LibraryReadApi,
         commandApi: LibraryCommandApi,
         taskQueue: TaskQueue = NoOpTaskQueue(),
+        fileStorage: ChapterPageSource = NoOpPageSource(),
         block: suspend ApplicationTestBuilder.() -> Unit,
     ) = testApplication {
         application {
@@ -75,12 +80,139 @@ class LibraryRoutesTest {
             }
             routing {
                 authenticate("auth-bearer") {
-                    libraryRoutes(readApi, commandApi, taskQueue)
+                    libraryRoutes(readApi, commandApi, taskQueue, fileStorage)
                 }
             }
         }
         block()
     }
+
+    // --- page endpoint tests ---
+
+    @Test
+    fun `GET chapter page returns 200 with correct Content-Type, ETag, and Cache-Control`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getChapter(id: Id) = Result.Success(downloadedChapter)
+            },
+            commandApi = NoOpCommandApi(),
+            fileStorage = object : ChapterPageSource {
+                override suspend fun readPage(chapter: Chapter, index: Int) =
+                    Result.Success(Page(index, byteArrayOf(1, 2, 3), "image/jpeg"))
+            },
+        ) {
+            val response = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/0") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("image/jpeg", response.headers[HttpHeaders.ContentType])
+            assertContains(response.headers[HttpHeaders.CacheControl]!!, "max-age=86400")
+            assertContains(response.headers[HttpHeaders.CacheControl]!!, "immutable")
+            val etag = response.headers[HttpHeaders.ETag]
+            assertContains(etag!!, "00000000-0000-0000-0000-000000000002")
+        }
+    }
+
+    @Test
+    fun `GET chapter page returns 304 when If-None-Match matches ETag`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getChapter(id: Id) = Result.Success(downloadedChapter)
+            },
+            commandApi = NoOpCommandApi(),
+            fileStorage = object : ChapterPageSource {
+                override suspend fun readPage(chapter: Chapter, index: Int) =
+                    Result.Success(Page(index, byteArrayOf(1, 2, 3), "image/jpeg"))
+            },
+        ) {
+            val firstResponse = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/0") {
+                bearerAuth("user-token")
+            }
+            val etag = firstResponse.headers[HttpHeaders.ETag]!!
+
+            val secondResponse = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/0") {
+                bearerAuth("user-token")
+                header(HttpHeaders.IfNoneMatch, etag)
+            }
+            assertEquals(HttpStatusCode.NotModified, secondResponse.status)
+        }
+    }
+
+    @Test
+    fun `GET chapter page returns 400 for invalid chapter ID`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            val response = client.get("/library/chapters/not-a-uuid/pages/0") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
+    fun `GET chapter page returns 400 for non-integer page index`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getChapter(id: Id) = Result.Success(downloadedChapter)
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/abc") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
+    fun `GET chapter page returns 404 for unknown chapter`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/chapters/00000000-0000-0000-0000-000000000099/pages/0") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    @Test
+    fun `GET chapter page returns 423 when chapter is not downloaded`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getChapter(id: Id) = Result.Success(fakeChapter) // status = PENDING
+            },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/0") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.Locked, response.status)
+        }
+    }
+
+    @Test
+    fun `GET chapter page returns 404 when page index is out of range`() {
+        testApp(
+            readApi = object : NoOpReadApi() {
+                override suspend fun getChapter(id: Id) = Result.Success(downloadedChapter)
+            },
+            commandApi = NoOpCommandApi(),
+            fileStorage = object : ChapterPageSource {
+                override suspend fun readPage(chapter: Chapter, index: Int) =
+                    Result.Failure(AppError.NotFound("Page", index.toString()))
+            },
+        ) {
+            val response = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/999") {
+                bearerAuth("user-token")
+            }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    // --- existing tests ---
 
     @Test
     fun `GET library series returns 200 with paginated list`() {
@@ -374,6 +506,11 @@ private class NoOpCommandApi : LibraryCommandApi {
         Result.Failure(AppError.InternalError("not implemented"))
     override suspend fun updateSeries(id: Id, autoDownload: Boolean?, defaultFormat: ChapterFormat?) =
         Result.Failure(AppError.InternalError("not implemented"))
+}
+
+private class NoOpPageSource : ChapterPageSource {
+    override suspend fun readPage(chapter: Chapter, index: Int): Result<Page> =
+        Result.Failure(AppError.NotFound("Page", index.toString()))
 }
 
 private class NoOpTaskQueue : TaskQueue {
