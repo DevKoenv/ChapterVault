@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.extensions.admin.AdminExtension
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
 import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
@@ -8,7 +9,13 @@ import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
+import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
+import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.ProgressApi
+import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.event.EventBus
+import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
@@ -27,6 +34,19 @@ object DependencyInjection {
         connectorRegistry.register(GlobalContext.get().get<MockConnector>())
         connectorRegistry.register(GlobalContext.get().get<CustomConnector>())
         connectorRegistry.register(GlobalContext.get().get<MangaDexConnector>())
+
+        // Register extensions and call onLoad with their context
+        val extensionRegistry = GlobalContext.get().get<ExtensionRegistry>()
+        val extensionContext = DefaultExtensionContext(
+            libraryRead = GlobalContext.get().get<LibraryReadApi>(),
+            libraryCommand = GlobalContext.get().get<LibraryCommandApi>(),
+            progress = GlobalContext.get().get<ProgressApi>(),
+            system = GlobalContext.get().get<SystemApi>(),
+            eventBus = GlobalContext.get().get<EventBus>(),
+        )
+        val adminExtension = GlobalContext.get().get<AdminExtension>()
+        extensionRegistry.register(adminExtension)
+        runBlocking { adminExtension.onLoad(extensionContext) }
 
         // Register default admin on first boot; silently ignored if admin already exists
         val authApi = GlobalContext.get().get<AuthApi>()

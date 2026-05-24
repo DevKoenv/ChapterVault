@@ -10,6 +10,7 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepos
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
+import dev.koenv.chaptervault.extensions.admin.AdminExtension
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
@@ -88,6 +89,7 @@ val extensionModule = module {
     single { MockConnector() }
     single { CustomConnector(get()) }
     single { MangaDexConnector(get()) }
+    single { AdminExtension() }
 }
 
 val interfacesModule = module {
