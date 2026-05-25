@@ -27,6 +27,12 @@ fun Application.authRoutes(auth: AuthApi) {
             val request = try { call.receive<LoginRequest>() } catch (e: Exception) {
                 call.respondBadRequest("Invalid request body"); return@post
             }
+            if (request.username.isBlank() || request.username.length > 100) {
+                call.respondBadRequest("username must be 1–100 non-whitespace characters"); return@post
+            }
+            if (request.password.isEmpty() || request.password.length > 255) {
+                call.respondBadRequest("password must be 1–255 characters"); return@post
+            }
             when (val result = auth.register(Credentials(request.username, request.password))) {
                 is Result.Success -> call.respond(
                     HttpStatusCode.Created,
@@ -43,6 +49,12 @@ fun Application.authRoutes(auth: AuthApi) {
         post("/auth/login") {
             val request = try { call.receive<LoginRequest>() } catch (e: Exception) {
                 call.respondBadRequest("Invalid request body"); return@post
+            }
+            if (request.username.isBlank() || request.username.length > 100) {
+                call.respondBadRequest("username must be 1–100 non-whitespace characters"); return@post
+            }
+            if (request.password.isEmpty() || request.password.length > 255) {
+                call.respondBadRequest("password must be 1–255 characters"); return@post
             }
             when (val result = auth.authenticate(Credentials(request.username, request.password))) {
                 is Result.Success -> {

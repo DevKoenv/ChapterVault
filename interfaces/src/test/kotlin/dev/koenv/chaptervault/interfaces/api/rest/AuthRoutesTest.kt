@@ -124,4 +124,64 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.Conflict, response.status)
         }
     }
+
+    @Test
+    fun `POST auth-register rejects blank username`() {
+        testApplication {
+            install(happyAuth)
+            val response = client.post("/auth/register") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"username":"   ","password":"pass"}""")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
+    fun `POST auth-register rejects empty password`() {
+        testApplication {
+            install(happyAuth)
+            val response = client.post("/auth/register") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"username":"alice","password":""}""")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
+    fun `POST auth-register rejects username over 100 chars`() {
+        testApplication {
+            install(happyAuth)
+            val response = client.post("/auth/register") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"username":"${"a".repeat(101)}","password":"pass"}""")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
+    fun `POST auth-login rejects blank username`() {
+        testApplication {
+            install(happyAuth)
+            val response = client.post("/auth/login") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"username":"","password":"pass"}""")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
+    fun `POST auth-login rejects empty password`() {
+        testApplication {
+            install(happyAuth)
+            val response = client.post("/auth/login") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"username":"alice","password":""}""")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
 }
