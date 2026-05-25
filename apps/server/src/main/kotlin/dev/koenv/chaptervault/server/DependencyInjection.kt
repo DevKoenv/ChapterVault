@@ -27,6 +27,7 @@ object DependencyInjection {
         }
 
         val config = GlobalContext.get().get<AppConfig>()
+        ConfigValidator.validate(config)
         DatabaseFactory.init(config.database)
 
         // Register connectors post-boot (after all Koin bindings are resolved)
