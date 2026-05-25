@@ -24,6 +24,8 @@ data class RefreshConfig(
 data class ServerConfig(
     val port: Int = 8080,
     val host: String = "0.0.0.0",
+    // empty = anyHost() for local dev; set explicit origins to restrict in production
+    val corsOrigins: List<String> = emptyList(),
 )
 
 data class DatabaseConfig(

@@ -61,6 +61,7 @@ import org.koin.ktor.ext.inject
 private val log = LoggerFactory.getLogger("ServerBootstrap")
 
 fun Application.bootstrap() {
+    val config by inject<dev.koenv.chaptervault.infrastructure.config.AppConfig>()
     val fileStorage by inject<FileStorage>()
     fileStorage.ensureDirectories()
 
@@ -87,7 +88,11 @@ fun Application.bootstrap() {
         }
     }
     install(CORS) {
-        anyHost()
+        if (config.server.corsOrigins.isEmpty()) {
+            anyHost()
+        } else {
+            config.server.corsOrigins.forEach { allowHost(it, schemes = listOf("http", "https")) }
+        }
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
         allowMethod(HttpMethod.Put)

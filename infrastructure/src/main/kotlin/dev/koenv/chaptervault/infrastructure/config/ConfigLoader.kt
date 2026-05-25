@@ -13,9 +13,12 @@ object ConfigLoader {
         val map = Yaml().load<Map<String, Any>>(file.inputStream()) ?: return AppConfig()
 
         val server = (map["server"] as? Map<*, *>)?.let { s ->
+            @Suppress("UNCHECKED_CAST")
+            val corsOrigins = (s["corsOrigins"] as? List<String>) ?: emptyList()
             ServerConfig(
                 port = (s["port"] as? Int) ?: 8080,
                 host = (s["host"] as? String) ?: "0.0.0.0",
+                corsOrigins = corsOrigins,
             )
         } ?: ServerConfig()
 
