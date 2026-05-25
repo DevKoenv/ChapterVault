@@ -70,4 +70,58 @@ class ConfigLoaderTest {
         assertEquals("0.0.0.0", config.server.host)
         assertEquals("org.sqlite.JDBC", config.database.driver)
     }
+
+    @Test
+    fun `env var overrides port from yaml`(@TempDir dir: Path) {
+        val file = dir.resolve("application.yaml").toFile()
+        file.writeText("server:\n  port: 9090")
+        val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_PORT") "7777" else null })
+        assertEquals(7777, config.server.port)
+    }
+
+    @Test
+    fun `env var overrides database url`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_DATABASE_URL") "jdbc:sqlite:env.db" else null })
+        assertEquals("jdbc:sqlite:env.db", config.database.url)
+    }
+
+    @Test
+    fun `env var overrides storage path`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_STORAGE_PATH") "/mnt/data" else null })
+        assertEquals("/mnt/data", config.storage.basePath)
+    }
+
+    @Test
+    fun `env var overrides cors origins as comma-separated list`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_CORS_ORIGINS") "http://a.com, http://b.com" else null })
+        assertEquals(listOf("http://a.com", "http://b.com"), config.server.corsOrigins)
+    }
+
+    @Test
+    fun `env var overrides refresh hours`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_REFRESH_HOURS") "12" else null })
+        assertEquals(12, config.refresh.intervalHours)
+    }
+
+    @Test
+    fun `env var overrides mock connector flag`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_MOCK_CONNECTOR") "true" else null })
+        assertEquals(true, config.debug.mockConnectorEnabled)
+    }
+
+    @Test
+    fun `env vars take precedence over yaml values`(@TempDir dir: Path) {
+        val file = dir.resolve("application.yaml").toFile()
+        file.writeText("database:\n  url: \"jdbc:sqlite:from-yaml.db\"")
+        val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_DATABASE_URL") "jdbc:sqlite:from-env.db" else null })
+        assertEquals("jdbc:sqlite:from-env.db", config.database.url)
+    }
+
+    @Test
+    fun `invalid env var port falls back to yaml value`(@TempDir dir: Path) {
+        val file = dir.resolve("application.yaml").toFile()
+        file.writeText("server:\n  port: 9090")
+        val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_PORT") "not-a-number" else null })
+        assertEquals(9090, config.server.port)
+    }
 }
