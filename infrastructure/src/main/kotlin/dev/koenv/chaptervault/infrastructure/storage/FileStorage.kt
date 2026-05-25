@@ -9,6 +9,7 @@ import dev.koenv.chaptervault.shared.result.Result
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
@@ -40,22 +41,25 @@ open class FileStorage(
         return Result.Success(bytes to detectImageMimeType(bytes))
     }
 
-    fun readChapterBytes(chapter: Chapter): Result<ByteArray> {
+    fun chapterExists(chapter: Chapter): Boolean {
         val path = chapterPath(chapter)
-        return when {
-            Files.isRegularFile(path) -> Result.Success(Files.readAllBytes(path))
-            Files.isDirectory(path) -> {
-                val baos = ByteArrayOutputStream()
-                ZipOutputStream(baos).use { zip ->
-                    Files.list(path).sorted().forEach { file ->
-                        zip.putNextEntry(ZipEntry(file.fileName.toString()))
-                        zip.write(Files.readAllBytes(file))
-                        zip.closeEntry()
-                    }
+        return Files.isRegularFile(path) || Files.isDirectory(path)
+    }
+
+    // Streams chapter content to out without buffering the full archive in memory.
+    // Folder chapters are zipped on-the-fly. Throws if chapter files are not found.
+    fun streamChapterTo(chapter: Chapter, out: OutputStream) {
+        val path = chapterPath(chapter)
+        when {
+            Files.isRegularFile(path) -> Files.newInputStream(path).use { it.copyTo(out) }
+            Files.isDirectory(path) -> ZipOutputStream(out).use { zip ->
+                Files.list(path).sorted().forEach { file ->
+                    zip.putNextEntry(ZipEntry(file.fileName.toString()))
+                    Files.newInputStream(file).use { it.copyTo(zip) }
+                    zip.closeEntry()
                 }
-                Result.Success(baos.toByteArray())
             }
-            else -> Result.Failure(AppError.NotFound("Chapter files", chapter.id.toString()))
+            else -> throw java.io.FileNotFoundException("Chapter files not found: ${chapter.id}")
         }
     }
 

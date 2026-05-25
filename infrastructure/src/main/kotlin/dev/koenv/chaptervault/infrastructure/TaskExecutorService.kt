@@ -68,7 +68,11 @@ class TaskExecutorService(
                 lastHeartbeatMs.set(System.currentTimeMillis())
                 val task = taskQueue.dequeue()
                 if (task == null) { delay(500); continue }
-                taskRepository.insert(task)
+                // skip tasks cancelled between enqueue and dequeue
+                if (taskQueue.getTask(task.id)?.status == TaskStatus.CANCELLED) {
+                    log.info("Task ${task.id} [${task.type}] skipped — cancelled while queued")
+                    continue
+                }
                 taskRepository.updateStatus(task.id, TaskStatus.RUNNING)
                 eventBus.publish(TaskEvents.TaskStarted(task.id, task.type, task.targetId, Instant.now()))
                 log.info("Task ${task.id} [${task.type}] started — target=${task.targetId}")

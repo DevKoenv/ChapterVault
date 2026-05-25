@@ -33,6 +33,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import org.slf4j.LoggerFactory
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -50,11 +51,14 @@ import io.ktor.server.request.uri
 import org.slf4j.event.Level
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
+
+private val log = LoggerFactory.getLogger("ServerBootstrap")
 
 fun Application.bootstrap() {
     val fileStorage by inject<FileStorage>()
@@ -72,7 +76,8 @@ fun Application.bootstrap() {
     install(ContentNegotiation) { json() }
     install(StatusPages) {
         exception<Throwable> { call, cause ->
-            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", cause.message ?: "An unexpected error occurred"))
+            log.error("Unhandled exception on ${call.request.httpMethod.value} ${call.request.uri}", cause)
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", "An unexpected error occurred"))
         }
         status(HttpStatusCode.NotFound) { call, status ->
             call.respond(status, ErrorResponse("NOT_FOUND", "The requested resource was not found"))
@@ -154,9 +159,11 @@ fun Application.bootstrap() {
                     is Result.Failure -> { call.respond(HttpStatusCode.NotFound); return@get }
                     is Result.Success -> {
                         val chapter = chapterResult.value
-                        when (val bytesResult = fileStorage.readChapterBytes(chapter)) {
-                            is Result.Failure -> { call.respond(HttpStatusCode.NotFound); return@get }
-                            is Result.Success -> call.respondBytes(bytesResult.value, ContentType.parse("application/x-cbz"))
+                        if (!fileStorage.chapterExists(chapter)) {
+                            call.respond(HttpStatusCode.NotFound); return@get
+                        }
+                        call.respondOutputStream(ContentType.parse("application/x-cbz")) {
+                            fileStorage.streamChapterTo(chapter, this)
                         }
                     }
                 }

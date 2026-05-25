@@ -8,6 +8,12 @@ data class AppConfig(
     val storage: StorageConfig = StorageConfig(),
     val log: LogConfig = LogConfig(),
     val refresh: RefreshConfig = RefreshConfig(),
+    val debug: DebugConfig = DebugConfig(),
+)
+
+// Enable only during local development — never expose mock connectors in production
+data class DebugConfig(
+    val mockConnectorEnabled: Boolean = false,
 )
 
 // intervalHours <= 0 disables auto-refresh

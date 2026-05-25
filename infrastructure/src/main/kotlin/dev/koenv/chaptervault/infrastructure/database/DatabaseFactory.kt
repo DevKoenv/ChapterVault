@@ -39,5 +39,10 @@ object DatabaseFactory {
         try { exec("ALTER TABLE chapters DROP COLUMN status") } catch (_: Exception) {}
         // unique index not created by createMissingTablesAndColumns on existing tables
         exec("CREATE UNIQUE INDEX IF NOT EXISTS chapters_series_external_uq ON chapters (series_id, external_id)")
+        // FK indices for query performance
+        exec("CREATE INDEX IF NOT EXISTS idx_chapters_series_id ON chapters (series_id)")
+        exec("CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks (user_id)")
+        exec("CREATE INDEX IF NOT EXISTS idx_bookmarks_chapter_id ON bookmarks (chapter_id)")
+        exec("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)")
     }
 }

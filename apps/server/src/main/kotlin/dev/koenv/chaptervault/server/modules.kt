@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.infrastructure.PersistingTaskQueue
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
@@ -80,7 +81,7 @@ val infrastructureModule = module {
 val kernelModule = module {
     single<EventBus> { InMemoryEventBus() }
     single<ExtensionRegistry> { DefaultExtensionRegistry() }
-    single<TaskQueue> { EventPublishingTaskQueue(InMemoryTaskQueue(), get()) }
+    single<TaskQueue> { PersistingTaskQueue(EventPublishingTaskQueue(InMemoryTaskQueue(), get()), get()) }
     single<SystemApi> { SystemApiImpl(get(), get(), get(), get()) }
 }
 

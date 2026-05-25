@@ -44,6 +44,10 @@ object ConfigLoader {
             RefreshConfig(intervalHours = (r["intervalHours"] as? Int) ?: 24)
         } ?: RefreshConfig()
 
-        return AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh)
+        val debug = (map["debug"] as? Map<*, *>)?.let { d ->
+            DebugConfig(mockConnectorEnabled = (d["mockConnectorEnabled"] as? Boolean) ?: false)
+        } ?: DebugConfig()
+
+        return AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh, debug = debug)
     }
 }
