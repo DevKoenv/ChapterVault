@@ -29,6 +29,8 @@ import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.client.HttpClient
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class MangaDexConnector(
     httpClient: HttpClient,
@@ -51,6 +53,8 @@ class MangaDexConnector(
     )
 
     private val tokenCache = ConcurrentHashMap<String, AtHomeCache>()
+    // one mutex per chapter ID so concurrent downloads of different chapters don't block each other
+    private val tokenCacheLocks = ConcurrentHashMap<String, Mutex>()
 
     companion object {
         private const val API_URL = "https://api.mangadex.org"
@@ -145,21 +149,24 @@ class MangaDexConnector(
     }
 
     private suspend fun resolveAtHome(chapterId: String): Result<AtHomeCache> {
-        val cached = tokenCache[chapterId]
-        if (cached != null && System.currentTimeMillis() - cached.timestamp < TOKEN_LIFETIME_MS) {
-            return Result.Success(cached)
-        }
-        return when (val r = context.getJson<MangaDexAtHomeResponse>("$API_URL/at-home/server/$chapterId")) {
-            is Result.Failure -> r
-            is Result.Success -> {
-                val entry = AtHomeCache(
-                    baseUrl = r.value.baseUrl,
-                    hash = r.value.chapter.hash,
-                    filenames = r.value.chapter.data,
-                    timestamp = System.currentTimeMillis(),
-                )
-                tokenCache[chapterId] = entry
-                Result.Success(entry)
+        val lock = tokenCacheLocks.computeIfAbsent(chapterId) { Mutex() }
+        return lock.withLock {
+            val cached = tokenCache[chapterId]
+            if (cached != null && System.currentTimeMillis() - cached.timestamp < TOKEN_LIFETIME_MS) {
+                return@withLock Result.Success(cached)
+            }
+            when (val r = context.getJson<MangaDexAtHomeResponse>("$API_URL/at-home/server/$chapterId")) {
+                is Result.Failure -> r
+                is Result.Success -> {
+                    val entry = AtHomeCache(
+                        baseUrl = r.value.baseUrl,
+                        hash = r.value.chapter.hash,
+                        filenames = r.value.chapter.data,
+                        timestamp = System.currentTimeMillis(),
+                    )
+                    tokenCache[chapterId] = entry
+                    Result.Success(entry)
+                }
             }
         }
     }
