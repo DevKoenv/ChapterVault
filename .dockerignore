@@ -1,0 +1,10 @@
+.gradle/
+build/
+*/build/
+.git/
+.idea/
+.claude/
+docs/
+*.sqlite
+data/
+downloads/
