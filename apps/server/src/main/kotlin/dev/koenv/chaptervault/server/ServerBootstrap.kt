@@ -12,11 +12,9 @@ import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
-import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.interfaces.api.opds.opdsRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
-import dev.koenv.chaptervault.interfaces.api.rest.adminRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
@@ -106,7 +104,6 @@ fun Application.bootstrap() {
     val taskQueue by inject<TaskQueue>()
     val system by inject<SystemApi>()
     val auth by inject<AuthApi>()
-    val registry by inject<ExtensionRegistry>()
     val connectorRegistry by inject<ConnectorRegistry>()
     val projectionService by inject<EventProjectionService>()
     val executor by inject<TaskExecutorService>()
@@ -142,7 +139,6 @@ fun Application.bootstrap() {
         authenticate("auth-bearer") {
             libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage)
             taskRoutes(system)
-            adminRoutes(registry)
             connectorRoutes(connectorRegistry, libraryRead)
             progressRoutes(progressApi)
             bookmarkRoutes(bookmarkApi)
