@@ -7,6 +7,7 @@ import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
 import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.MangaDexConnector
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
+import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
@@ -29,6 +30,7 @@ object DependencyInjection {
         val config = GlobalContext.get().get<AppConfig>()
         ConfigValidator.validate(config)
         DatabaseFactory.init(config.database)
+        runBlocking { GlobalContext.get().get<SeriesRepository>().cleanupOrphanedFiles() }
 
         // Register connectors post-boot (after all Koin bindings are resolved)
         val connectorRegistry = GlobalContext.get().get<ConnectorRegistry>()

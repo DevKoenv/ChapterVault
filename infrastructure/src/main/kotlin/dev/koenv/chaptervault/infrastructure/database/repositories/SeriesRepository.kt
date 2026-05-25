@@ -211,6 +211,15 @@ class SeriesRepository(private val fileStorage: FileStorage) : LibraryReadApi, L
         updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
     )
 
+    // Removes storage directories that have no corresponding series in the DB.
+    // Called on startup to recover from a crash between DB delete and file delete.
+    suspend fun cleanupOrphanedFiles() {
+        val knownIds = dbQuery {
+            SeriesTable.selectAll().map { it[SeriesTable.id] }.toSet()
+        }
+        fileStorage.cleanupOrphanedDirs(knownIds)
+    }
+
     private fun ResultRow.toChapter() = Chapter(
         id = Id.from(this[ChapterTable.id]),
         seriesId = Id.from(this[ChapterTable.seriesId]),

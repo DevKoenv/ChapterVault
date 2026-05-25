@@ -109,6 +109,18 @@ open class FileStorage(
         }
     }
 
+    fun cleanupOrphanedDirs(knownSeriesIds: Set<String>) {
+        if (!Files.isDirectory(basePath)) return
+        Files.list(basePath).use { stream ->
+            stream.filter { Files.isDirectory(it) }
+                .filter { it.fileName.toString() !in knownSeriesIds }
+                .forEach { dir ->
+                    logger.info("Removing orphaned files for series ${dir.fileName}")
+                    dir.toFile().deleteRecursively()
+                }
+        }
+    }
+
     open fun deleteSeriesFiles(seriesId: String) {
         val dir = basePath.resolve(seriesId)
         try {
