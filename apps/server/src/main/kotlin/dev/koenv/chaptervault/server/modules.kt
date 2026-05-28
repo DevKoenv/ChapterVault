@@ -61,7 +61,7 @@ val infrastructureModule = module {
     single { CbzWriter() }
     single { FolderWriter() }
     single { ArchiveWriterSelector(listOf(get<CbzWriter>(), get<FolderWriter>())) }
-    single { FileStorage(Paths.get(get<AppConfig>().storage.basePath), get()) }
+    single { FileStorage(Paths.get(get<AppConfig>().storage.libraryPath), Paths.get(get<AppConfig>().storage.thumbnailsPath), get()) }
     single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
     single {
         TaskExecutorService(

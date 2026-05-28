@@ -7,7 +7,6 @@ import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.nio.file.Files
@@ -18,27 +17,29 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 open class FileStorage(
-    private val basePath: Path,
+    private val libraryPath: Path,
+    private val thumbnailsPath: Path,
     private val writerSelector: ArchiveWriterSelector,
+    private val thumbnailFormat: ThumbnailFormat = JpegThumbnailFormat,
 ) : ChapterPageSource {
 
     private val logger = LoggerFactory.getLogger(FileStorage::class.java)
 
     fun ensureDirectories() {
-        Files.createDirectories(basePath)
+        Files.createDirectories(libraryPath)
+        Files.createDirectories(thumbnailsPath)
     }
 
     fun writeCover(seriesId: String, bytes: ByteArray) {
-        val dir = basePath.resolve(seriesId)
-        Files.createDirectories(dir)
-        Files.write(dir.resolve("cover"), bytes)
+        Files.createDirectories(thumbnailsPath)
+        val encoded = thumbnailFormat.encode(bytes)
+        Files.write(thumbnailsPath.resolve("$seriesId.${thumbnailFormat.extension}"), encoded)
     }
 
     fun readCover(seriesId: String): Result<Pair<ByteArray, String>> {
-        val file = basePath.resolve(seriesId).resolve("cover")
+        val file = thumbnailsPath.resolve("$seriesId.${thumbnailFormat.extension}")
         if (!Files.isRegularFile(file)) return Result.Failure(AppError.NotFound("Cover", seriesId))
-        val bytes = Files.readAllBytes(file)
-        return Result.Success(bytes to detectImageMimeType(bytes))
+        return Result.Success(Files.readAllBytes(file) to thumbnailFormat.mimeType)
     }
 
     fun chapterExists(chapter: Chapter): Boolean {
@@ -63,15 +64,8 @@ open class FileStorage(
         }
     }
 
-    private fun detectImageMimeType(bytes: ByteArray): String = when {
-        bytes.size >= 3 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() && bytes[2] == 0xFF.toByte() -> "image/jpeg"
-        bytes.size >= 4 && bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() && bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte() -> "image/png"
-        bytes.size >= 3 && bytes[0] == 0x47.toByte() && bytes[1] == 0x49.toByte() && bytes[2] == 0x46.toByte() -> "image/gif"
-        else -> "image/jpeg"
-    }
-
     fun resolvePath(seriesId: String, chapterId: String): Path =
-        basePath.resolve(seriesId).resolve(chapterId)
+        libraryPath.resolve(seriesId).resolve(chapterId)
 
     private fun chapterPath(chapter: Chapter): Path {
         val base = resolvePath(chapter.seriesId.toString(), chapter.id.toString())
@@ -110,25 +104,35 @@ open class FileStorage(
     }
 
     fun cleanupOrphanedDirs(knownSeriesIds: Set<String>) {
-        if (!Files.isDirectory(basePath)) return
-        Files.list(basePath).use { stream ->
+        if (!Files.isDirectory(libraryPath)) return
+        Files.list(libraryPath).use { stream ->
             stream.filter { Files.isDirectory(it) }
                 .filter { it.fileName.toString() !in knownSeriesIds }
                 .forEach { dir ->
-                    logger.info("Removing orphaned files for series ${dir.fileName}")
+                    logger.info("Removing orphaned library files for series ${dir.fileName}")
                     dir.toFile().deleteRecursively()
                 }
         }
     }
 
+    fun cleanupOrphanedThumbnails(knownSeriesIds: Set<String>) {
+        if (!Files.isDirectory(thumbnailsPath)) return
+        Files.list(thumbnailsPath).use { stream ->
+            stream.filter { Files.isRegularFile(it) }
+                .filter { it.fileName.toString().substringBeforeLast(".") !in knownSeriesIds }
+                .forEach { file ->
+                    logger.info("Removing orphaned thumbnail for series ${file.fileName}")
+                    Files.deleteIfExists(file)
+                }
+        }
+    }
+
     open fun deleteSeriesFiles(seriesId: String) {
-        val dir = basePath.resolve(seriesId)
+        val dir = libraryPath.resolve(seriesId)
         try {
-            if (Files.exists(dir)) {
-                dir.toFile().deleteRecursively()
-            }
+            if (Files.exists(dir)) dir.toFile().deleteRecursively()
         } catch (e: IOException) {
-            logger.warn("Failed to delete files for series $seriesId: ${e.message}")
+            logger.warn("Failed to delete library files for series $seriesId: ${e.message}")
         }
     }
 

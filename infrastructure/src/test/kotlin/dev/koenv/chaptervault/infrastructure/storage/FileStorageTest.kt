@@ -8,10 +8,13 @@ import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.time.Instant
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import javax.imageio.ImageIO
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -64,8 +67,17 @@ class PageFormatUtilsTest {
 }
 
 class FileStorageTest {
-    private val basePath = Files.createTempDirectory("file-storage-test")
-    private val storage = FileStorage(basePath, ArchiveWriterSelector(emptyList()))
+    private val libraryPath = Files.createTempDirectory("chaptervault-library-test")
+    private val thumbnailsPath = Files.createTempDirectory("chaptervault-thumbnails-test")
+    private val storage = FileStorage(libraryPath, thumbnailsPath, ArchiveWriterSelector(emptyList()))
+
+    private fun minimalPng(): ByteArray {
+        val img = BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB)
+        img.setRGB(0, 0, 0xFF0000)
+        val out = ByteArrayOutputStream()
+        ImageIO.write(img, "png", out)
+        return out.toByteArray()
+    }
 
     private fun chapter(seriesId: String, chapterId: String) = Chapter(
         id = Id.from(chapterId),
@@ -79,7 +91,7 @@ class FileStorageTest {
     )
 
     private fun cbzPath(seriesId: String, chapterId: String) =
-        basePath.resolve(seriesId).resolve("$chapterId.cbz")
+        libraryPath.resolve(seriesId).resolve("$chapterId.cbz")
 
     private fun writeCbz(seriesId: String, chapterId: String, pages: List<Pair<String, ByteArray>>) {
         val path = cbzPath(seriesId, chapterId)
@@ -94,7 +106,7 @@ class FileStorageTest {
     }
 
     private fun writeFolder(seriesId: String, chapterId: String, pages: List<Pair<String, ByteArray>>) {
-        val dir = basePath.resolve(seriesId).resolve(chapterId)
+        val dir = libraryPath.resolve(seriesId).resolve(chapterId)
         Files.createDirectories(dir)
         for ((name, data) in pages) {
             Files.write(dir.resolve(name), data)
@@ -196,9 +208,9 @@ class FileStorageTest {
     // --- deleteSeriesFiles ---
 
     @Test
-    fun `deleteSeriesFiles removes the series directory`() {
+    fun `deleteSeriesFiles removes the series directory from libraryPath`() {
         val seriesId = "30000000-0000-0000-0000-000000000001"
-        val seriesDir = basePath.resolve(seriesId)
+        val seriesDir = libraryPath.resolve(seriesId)
         Files.createDirectories(seriesDir.resolve("chapter-1"))
         Files.write(seriesDir.resolve("chapter-1").resolve("001.jpg"), byteArrayOf(1))
 
@@ -210,6 +222,51 @@ class FileStorageTest {
     @Test
     fun `deleteSeriesFiles does not throw when path does not exist`() {
         storage.deleteSeriesFiles("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
-        // no exception = pass
+    }
+
+    // --- writeCover / readCover ---
+
+    @Test
+    fun `writeCover transcodes to JPEG and writes to thumbnailsPath`() {
+        val seriesId = "40000000-0000-0000-0000-000000000001"
+        storage.writeCover(seriesId, minimalPng())
+        val file = thumbnailsPath.resolve("$seriesId.jpg")
+        assertTrue(Files.isRegularFile(file))
+        val bytes = Files.readAllBytes(file)
+        assertEquals(0xFF.toByte(), bytes[0])
+        assertEquals(0xD8.toByte(), bytes[1])
+        assertEquals(0xFF.toByte(), bytes[2])
+    }
+
+    @Test
+    fun `readCover returns JPEG bytes and image-jpeg MIME type`() {
+        val seriesId = "40000000-0000-0000-0000-000000000002"
+        storage.writeCover(seriesId, minimalPng())
+        val result = storage.readCover(seriesId)
+        assertIs<Result.Success<Pair<ByteArray, String>>>(result)
+        val (_, mimeType) = (result as Result.Success).value
+        assertEquals("image/jpeg", mimeType)
+    }
+
+    @Test
+    fun `readCover returns NotFound when no cover exists`() {
+        val result = storage.readCover("ffffffff-ffff-ffff-ffff-ffffffffffff")
+        assertIs<Result.Failure>(result)
+        assertIs<AppError.NotFound>((result as Result.Failure).error)
+    }
+
+    // --- cleanupOrphanedThumbnails ---
+
+    @Test
+    fun `cleanupOrphanedThumbnails removes thumbnails for series not in the known set`() {
+        val knownId = "50000000-0000-0000-0000-000000000001"
+        val orphanId = "50000000-0000-0000-0000-000000000002"
+        storage.writeCover(knownId, minimalPng())
+        storage.writeCover(orphanId, minimalPng())
+
+        storage.cleanupOrphanedThumbnails(setOf(knownId))
+
+        assertTrue(Files.isRegularFile(thumbnailsPath.resolve("$knownId.jpg")))
+        assertFalse(Files.isRegularFile(thumbnailsPath.resolve("$orphanId.jpg")))
     }
 }

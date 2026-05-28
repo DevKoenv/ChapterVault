@@ -14,13 +14,15 @@ object ConfigValidator {
         if (config.server.port !in 1..65535)
             errors += "server.port ${config.server.port} is not a valid port number"
 
-        val storagePath = Paths.get(config.storage.basePath)
-        try {
-            Files.createDirectories(storagePath)
-            if (!Files.isWritable(storagePath))
-                errors += "storage.basePath '${config.storage.basePath}' is not writable"
-        } catch (e: Exception) {
-            errors += "storage.basePath '${config.storage.basePath}' cannot be created: ${e.message}"
+        for ((label, rawPath) in listOf("libraryPath" to config.storage.libraryPath, "thumbnailsPath" to config.storage.thumbnailsPath)) {
+            val storagePath = Paths.get(rawPath)
+            try {
+                Files.createDirectories(storagePath)
+                if (!Files.isWritable(storagePath))
+                    errors += "storage.$label '$rawPath' is not writable"
+            } catch (e: Exception) {
+                errors += "storage.$label '$rawPath' cannot be created: ${e.message}"
+            }
         }
 
         if (config.database.url.isBlank())
@@ -31,6 +33,6 @@ object ConfigValidator {
             error("Server startup aborted due to ${errors.size} configuration error(s)")
         }
 
-        log.info("Config: port=${config.server.port} db=${config.database.url} storage=${config.storage.basePath} refresh=${config.refresh.intervalHours}h debug=${config.debug}")
+        log.info("Config: port=${config.server.port} db=${config.database.url} library=${config.storage.libraryPath} thumbnails=${config.storage.thumbnailsPath} refresh=${config.refresh.intervalHours}h debug=${config.debug}")
     }
 }

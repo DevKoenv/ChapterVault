@@ -385,7 +385,7 @@ class SeriesRepositoryTest {
 
 private class CapturingFileStorage(
     basePath: Path = Paths.get(System.getProperty("java.io.tmpdir")),
-) : FileStorage(basePath, ArchiveWriterSelector(emptyList())) {
+) : FileStorage(basePath, basePath, ArchiveWriterSelector(emptyList())) {
     val deletedSeries = mutableListOf<String>()
     var shouldFail = false
 

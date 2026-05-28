@@ -55,6 +55,7 @@ class TaskExecutorServiceTest {
     private val taskRepository = TaskRepository()
     private val fileStorage = FileStorage(
         Files.createTempDirectory("executor-test-storage"),
+        Files.createTempDirectory("executor-test-thumbnails"),
         ArchiveWriterSelector(listOf(CbzWriter())),
     )
     private val seriesRepository = SeriesRepository(fileStorage)
@@ -142,7 +143,7 @@ class TaskExecutorServiceTest {
     }
 
     private fun makeExecutor(tempDir: java.nio.file.Path): TaskExecutorService {
-        val fileStorage = FileStorage(tempDir, ArchiveWriterSelector(listOf(CbzWriter())))
+        val fileStorage = FileStorage(tempDir, Files.createTempDirectory("executor-test-thumbnails"), ArchiveWriterSelector(listOf(CbzWriter())))
         return TaskExecutorService(taskQueue, taskRepository, registry, seriesRepository, chapterRepository, fileStorage, HttpClient(), InMemoryEventBus())
     }
 
