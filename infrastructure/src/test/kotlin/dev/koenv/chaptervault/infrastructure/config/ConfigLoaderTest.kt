@@ -48,12 +48,11 @@ class ConfigLoaderTest {
         val file = dir.resolve("application.yaml").toFile()
         file.writeText("""
             storage:
-              basePath: "custom/downloads"
+              libraryPath: "custom/library"
               defaultFormat: "FOLDER"
         """.trimIndent())
-
         val config = ConfigLoader.load(file.absolutePath)
-        assertEquals("custom/downloads", config.storage.basePath)
+        assertEquals("custom/library", config.storage.libraryPath)
         assertEquals("FOLDER", config.storage.defaultFormat.toString())
     }
 
@@ -86,9 +85,9 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `env var overrides storage path`() {
-        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_STORAGE_PATH") "/mnt/data" else null })
-        assertEquals("/mnt/data", config.storage.basePath)
+    fun `env var overrides library path`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_LIBRARY_PATH") "/mnt/data" else null })
+        assertEquals("/mnt/data", config.storage.libraryPath)
     }
 
     @Test
@@ -123,5 +122,37 @@ class ConfigLoaderTest {
         file.writeText("server:\n  port: 9090")
         val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_PORT") "not-a-number" else null })
         assertEquals(9090, config.server.port)
+    }
+
+    @Test
+    fun `parses storage libraryPath and thumbnailsPath from yaml`(@TempDir dir: Path) {
+        val file = dir.resolve("application.yaml").toFile()
+        file.writeText("""
+            storage:
+              libraryPath: "custom/library"
+              thumbnailsPath: "custom/thumbs"
+              defaultFormat: "FOLDER"
+        """.trimIndent())
+        val config = ConfigLoader.load(file.absolutePath)
+        assertEquals("custom/library", config.storage.libraryPath)
+        assertEquals("custom/thumbs", config.storage.thumbnailsPath)
+    }
+
+    @Test
+    fun `CHAPTERVAULT_LIBRARY_PATH overrides library path`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_LIBRARY_PATH") "/mnt/lib" else null })
+        assertEquals("/mnt/lib", config.storage.libraryPath)
+    }
+
+    @Test
+    fun `CHAPTERVAULT_THUMBNAILS_PATH overrides thumbnails path`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_THUMBNAILS_PATH") "/mnt/thumbs" else null })
+        assertEquals("/mnt/thumbs", config.storage.thumbnailsPath)
+    }
+
+    @Test
+    fun `default database url points to db subdirectory`() {
+        val config = ConfigLoader.load("nonexistent.yaml")
+        assertEquals("jdbc:sqlite:data/db/chaptervault.db", config.database.url)
     }
 }

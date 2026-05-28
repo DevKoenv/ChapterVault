@@ -30,12 +30,13 @@ data class ServerConfig(
 
 data class DatabaseConfig(
     val driver: String = "org.sqlite.JDBC",
-    val url: String = "jdbc:sqlite:data/chaptervault.db",
+    val url: String = "jdbc:sqlite:data/db/chaptervault.db",
     val maxPoolSize: Int = 5,
 )
 
 data class StorageConfig(
-    val basePath: String = "downloads",
+    val libraryPath: String = "data/library",
+    val thumbnailsPath: String = "data/thumbnails",
     val defaultFormat: ChapterFormat = ChapterFormat.Cbz,
 )
 
