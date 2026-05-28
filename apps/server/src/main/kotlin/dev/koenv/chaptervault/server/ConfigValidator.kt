@@ -14,25 +14,46 @@ object ConfigValidator {
         if (config.server.port !in 1..65535)
             errors += "server.port ${config.server.port} is not a valid port number"
 
-        for ((label, rawPath) in listOf("libraryPath" to config.storage.libraryPath, "thumbnailsPath" to config.storage.thumbnailsPath)) {
-            val storagePath = Paths.get(rawPath)
-            try {
-                Files.createDirectories(storagePath)
-                if (!Files.isWritable(storagePath))
-                    errors += "storage.$label '$rawPath' is not writable"
-            } catch (e: Exception) {
-                errors += "storage.$label '$rawPath' cannot be created: ${e.message}"
+        val dbUrl = config.database.url
+        if (dbUrl.isBlank()) {
+            errors += "database.url must not be empty"
+        } else if (dbUrl.startsWith("jdbc:sqlite:") && !dbUrl.removePrefix("jdbc:sqlite:").startsWith(":")) {
+            val dbFilePath = dbUrl.removePrefix("jdbc:sqlite:")
+            val dbDir = Paths.get(dbFilePath).parent
+            if (dbDir != null) {
+                try {
+                    Files.createDirectories(dbDir)
+                    if (!Files.isWritable(dbDir))
+                        errors += "database directory '$dbDir' is not writable"
+                } catch (e: Exception) {
+                    errors += "database directory '$dbDir' cannot be created: ${e.message}"
+                }
             }
         }
 
-        if (config.database.url.isBlank())
-            errors += "database.url must not be empty"
+        for ((name, path) in listOf(
+            "storage.libraryPath" to config.storage.libraryPath,
+            "storage.thumbnailsPath" to config.storage.thumbnailsPath,
+        )) {
+            val storagePath = Paths.get(path)
+            try {
+                Files.createDirectories(storagePath)
+                if (!Files.isWritable(storagePath))
+                    errors += "$name '$path' is not writable"
+            } catch (e: Exception) {
+                errors += "$name '$path' cannot be created: ${e.message}"
+            }
+        }
 
         if (errors.isNotEmpty()) {
             errors.forEach { log.error("Configuration error: $it") }
             error("Server startup aborted due to ${errors.size} configuration error(s)")
         }
 
-        log.info("Config: port=${config.server.port} db=${config.database.url} library=${config.storage.libraryPath} thumbnails=${config.storage.thumbnailsPath} refresh=${config.refresh.intervalHours}h debug=${config.debug}")
+        log.info(
+            "Config: port=${config.server.port} db=${config.database.url} " +
+            "library=${config.storage.libraryPath} thumbnails=${config.storage.thumbnailsPath} " +
+            "refresh=${config.refresh.intervalHours}h debug=${config.debug}"
+        )
     }
 }
