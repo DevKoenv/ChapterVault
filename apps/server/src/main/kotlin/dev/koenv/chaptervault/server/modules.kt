@@ -18,6 +18,7 @@ import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
 import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.MangaDexConnector
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
 import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
+import dev.koenv.chaptervault.infrastructure.storage.JpegThumbnailFormat
 import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.infrastructure.storage.FolderWriter
@@ -61,7 +62,14 @@ val infrastructureModule = module {
     single { CbzWriter() }
     single { FolderWriter() }
     single { ArchiveWriterSelector(listOf(get<CbzWriter>(), get<FolderWriter>())) }
-    single { FileStorage(Paths.get(get<AppConfig>().storage.libraryPath), Paths.get(get<AppConfig>().storage.thumbnailsPath), get()) }
+    single {
+        FileStorage(
+            libraryPath = Paths.get(get<AppConfig>().storage.libraryPath),
+            thumbnailsPath = Paths.get(get<AppConfig>().storage.thumbnailsPath),
+            writerSelector = get(),
+            thumbnailFormat = JpegThumbnailFormat,
+        )
+    }
     single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
     single {
         TaskExecutorService(
