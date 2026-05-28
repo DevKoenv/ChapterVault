@@ -15,11 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cover images are now stored as canonical JPEG (`thumbnails/{seriesId}.jpg`), transcoded from source format on write. Previously stored as extension-less files inside the chapter directory.
 - Added `CHAPTERVAULT_THUMBNAILS_PATH` env var to override the thumbnails directory independently of `CHAPTERVAULT_DATA_DIR`.
 
-## [0.5.0] - 2026-05-18
-
 ### Architectural rewrite
 
-Complete rebuild from scratch with strict layered architecture and a kernel-based extension model. Nothing from 0.4.x was carried forward at the code level; the two lines of history will be joined via a merge commit when 0.5.0 is released.
+Complete rebuild from scratch with strict layered architecture and a kernel-based extension model. Nothing from 0.4.x was carried forward at the code level; the two lines of history will be joined via a merge commit on first release.
 
 #### Added
 
@@ -30,26 +28,30 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - **`kernel.api` as sole public surface**: `LibraryReadApi`, `LibraryCommandApi`, `ProgressApi`, `BookmarkApi`, `SystemApi`, `AuthApi`; no duplication with internal service interfaces
 - **`:extensions` connector infrastructure**: `Connector` interface, `ConnectorRegistry` interface + `DefaultConnectorRegistry` (ConcurrentHashMap-backed), `ConnectorContext` interface + `DefaultConnectorContext` (rate-limit buckets, retry, content negotiation), `ConnectorExtensions.getJson<T>()` extension
 - **`MockConnector`**: deterministic fake connector with no HTTP calls; "piece" query returns One Piece + Naruto; blank returns Alpha/Beta/Gamma; 3 chapters per series; 3 mock page URLs per chapter
-- **`:extensions` stubs**: `MangaDexConnector` (all methods return Failure), `OpdsExtension`, `MetadataProvider`, `AniListProvider`, `AdminExtension`
-- **`:infrastructure` repositories**: `SeriesRepository` (getSeries, listSeries, searchLibrary, addToLibrary, removeSeries, updateSeries, updateMetadata), `ChapterRepository` (insertChapter, updateDownloadStatus, listChapters, getChapter), `UserRepository` (bcrypt, session tokens, 30-day TTL), `TaskRepository` (insert, updateStatus, findById, listAll paginated, listByStatus; implements `TaskReadStore`)
-- **`:infrastructure` storage**: `CbzWriter` (ZipOutputStream), `FolderWriter` (Files.write per page), `ArchiveWriterSelector` (dispatches by ChapterFormat), `FileStorage.writeChapter` (delegates to selector)
-- **`TaskExecutorService`**: coroutine dequeue loop; dispatches FETCH_SERIES_METADATA (fetchSeries -> updateMetadata -> enqueue FETCH_CHAPTERS) -> FETCH_CHAPTERS (fetchChapters -> insertChapter -> enqueue DOWNLOAD_CHAPTER if autoDownload) -> DOWNLOAD_CHAPTER (download -> pages -> write archive -> DOWNLOADED status)
+- **`MangaDexConnector`**: full HTTP implementation against MangaDex API v5; search, series metadata, paginated chapter listing, at-home download with 5-min cache; rate-limited API (3/s burst 3) and CDN (3/s burst 5) buckets
+- **`CustomConnector`**: template connector for self-hosted sources; reads from generic `{baseUrl}/api/*` endpoints
+- **`:infrastructure` repositories**: `SeriesRepository` (getSeries, listSeries, searchLibrary, addToLibrary, removeSeries, updateSeries, updateMetadata), `ChapterRepository` (insertChapter, updateDownloadStatus, listChapters, getChapter), `UserRepository` (bcrypt, session tokens, 30-day TTL), `TaskRepository` (insert, updateStatus, findById, listAll paginated, listByStatus; implements `TaskReadStore`), `ProgressRepository` (markRead, markUnread, getProgress), `BookmarkRepository` (create, list by series, delete with ownership check)
+- **`:infrastructure` storage**: `CbzWriter` (ZipOutputStream), `FolderWriter` (Files.write per page), `ArchiveWriterSelector` (dispatches by ChapterFormat), `FileStorage` with cover transcoding (`JpegThumbnailFormat`), page streaming, and orphan cleanup
+- **`TaskExecutorService`**: coroutine dequeue loop with supervisor scope; dispatches FETCH_SERIES_METADATA (fetchSeries -> updateMetadata -> enqueue FETCH_CHAPTERS) -> FETCH_CHAPTERS (fetchChapters -> insertChapter -> enqueue DOWNLOAD_CHAPTER if autoDownload) -> DOWNLOAD_CHAPTER (download -> pages -> write archive -> DOWNLOADED status) -> DOWNLOAD_SERIES (enqueue DOWNLOAD_CHAPTER per available/failed chapter)
+- **Task retry**: up to 3 attempts with exponential backoff (30s, 120s, 600s)
 - **`HttpClientFactory`**: upgraded with ContentNegotiation (JSON ignoreUnknownKeys), DefaultRequest (User-Agent: ChapterVault/1.0), HttpRequestRetry (3 retries, exponential delay, 429+5xx)
-- **`:interfaces` REST routes**: `ConnectorRoutes` (GET /connectors, GET /connectors/{id}/search, GET /connectors/{id}/series/{externalId}, GET /connectors/{id}/series/{externalId}/chapters; all ADMIN-only), `TaskRoutes` (GET /tasks paginated, GET /tasks/{id}, POST /tasks/{id}/cancel ADMIN-only), library write routes (POST /library/series enqueues FETCH_SERIES_METADATA after insert; DELETE/PATCH ADMIN-only)
-- **`:interfaces` DTOs**: `ConnectorDto`, `SeriesSearchResultDto`, `SeriesMetadataDto`, `ChapterMetadataDto`, `TaskDto` (with payload map)
-- **`:apps:server` wiring**: `extensionModule` registers `DefaultConnectorRegistry` + `MockConnector`; `infrastructureModule` registers all repositories, writers, `FileStorage`, `TaskExecutorService`; `ServerBootstrap` launches executor coroutine and mounts connector routes
-- **`AppConfig` / `ConfigLoader`**: SnakeYAML, reads `config/application.yaml`, falls back to defaults
-- **`DatabaseFactory`**: creates all tables on boot; `DatabaseFactory` initialises Exposed connection pool
-- **`Dockerfile`** + **`docker-compose.yml`**: JRE 21 Alpine image; volume mounts for `data/`, `downloads/`, `config/`
+- **`:interfaces` REST routes** (42 endpoints): full library management (series + chapters), connector browsing, task management, per-user progress and bookmarks, page serving with ETag + immutable cache headers, health check, SSE event stream, Swagger UI
+- **OPDS 1.0 feed**: navigation feed, paginated catalog feed, per-series chapter feed, CBZ streaming download endpoint; Basic Auth
+- **`:interfaces` DTOs**: `ConnectorDto`, `SeriesSearchResultDto`, `SeriesMetadataDto`, `ChapterMetadataDto`, `TaskDto` (with payload map), `ReadProgressDto`, `BookmarkDto`, `ErrorResponse`
+- **Auth**: BCrypt password hashing, 48-byte random session tokens (30-day TTL), bearer token auth for REST, basic auth for OPDS, ADMIN/USER role enforcement on all write routes
+- **Real-time events**: `EventProjectionService` subscribes to `EventBus`; emits task state changes and chapter download status changes via SSE at `/events`
+- **Health check** at `/health`: reports `ok` or `degraded` with separate `database` and `executor` sub-checks; returns 503 when degraded
+- **`:apps:server` wiring**: Koin DI across all modules; `ConfigValidator` validates all paths and port on startup; `ServerBootstrap` launches executor and mounts all routes
+- **`AppConfig` / `ConfigLoader`**: SnakeYAML + env-var override layer; all paths derive from `CHAPTERVAULT_DATA_DIR`; explicit vars override per-field
+- **`Dockerfile`** + **`docker-compose.yml`**: JRE 21 Alpine image; single `./data` volume mount
 - **CI workflow**: GitHub Actions build on push/PR
-- **Package root** `dev.koenv.chaptervault.*`
 
 #### Technical details
 
 - Kotlin 2.2.0, Gradle 9.5.1, JVM target 21 (JDK 26 runtime)
 - Ktor 3.0.3 (server + client), Koin 4.0.0, Exposed 0.57.0 + SQLite JDBC 3.47.0.0
 - kotlinx-coroutines 1.9.0, kotlinx-serialization 1.7.3, Logback 1.5.12
-- 82 tests passing
+- 27 tests passing
 
 #### Kernel internals
 
@@ -58,14 +60,6 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - `InMemoryTaskQueue`: channel-backed queue with `enqueue` / `dequeue` / `cancel`
 - `SystemApiImpl`: delegates task queries to `TaskReadStore` (implemented by `TaskRepository`); extension list to `ExtensionRegistry`
 - All bound in `kernelModule`; server boots to `/health`
-
-### Remaining for 0.5.0
-
-- `MangaDexConnector`: real HTTP implementation against MangaDex API v5
-- `ProgressRepository` + progress routes (Phase E)
-- `BookmarkRepository` + bookmark routes (Phase E)
-- OPDS feed via `OpdsExtension` + `OpdsRoutes` (Phase F)
-- Structured error responses, auth rate limiting, WebSocket events (Phase G)
 
 ---
 
@@ -90,7 +84,7 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 
 - **Unified repository models**: `CachedSeries` renamed to `Series`, `CachedChapter` renamed to `Chapter`; nullable fields naturally encode "not yet fetched" - no explicit partial/complete distinction
 - **Unified API DTOs**: `CatalogSeriesDto`, `LibrarySeriesDto`, `CatalogChapterDto`, `LibraryChapterDto` replaced by shared `SeriesDto`, `ChapterDto`, `SeriesDetailResponse` used across all endpoints
-- **Always-fresh detail endpoints**: `GET /api/v1/catalog/series/{id}` and `POST /api/v1/library/series/{id}/refresh` always fetch metadata from the source connector
+- **Always-fresh detail endpoints**: `GET /api/v1/catalog/series/{id}` and `POST /api/v1/catalog/series/{id}/refresh` always fetch metadata from the source connector
 - **Merge semantics on upsert**: `upsert()` and `upsertAllFromSearch()` never downgrade known fields to null - a subsequent search result cannot clear an `author` populated by a full metadata fetch
 - **Library series detail shows all chapters**: `GET /api/v1/library/series/{id}` now returns all chapters with `downloadStatus` field instead of only downloaded chapters
 - **`ChapterDto` includes download fields**: `downloadStatus`, `downloadedAt`, `filePath`, `fileSize` exposed on every chapter response
@@ -232,8 +226,7 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 | 0.2.0   | 2026-02-05 | Library management, caching, stable IDs                      |
 | 0.1.0   | 2026-01-31 | Initial public release                                       |
 
-[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.1...v0.5.0
+[Unreleased]: https://github.com/DevKoenv/ChapterVault/compare/v0.4.1...HEAD
 [0.4.1]: https://github.com/DevKoenv/ChapterVault/compare/v0.3.0...v0.4.1
 [0.3.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/DevKoenv/ChapterVault/compare/v0.1.0...v0.2.0
