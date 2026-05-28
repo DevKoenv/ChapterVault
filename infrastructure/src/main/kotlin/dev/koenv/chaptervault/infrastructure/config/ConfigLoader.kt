@@ -9,50 +9,61 @@ object ConfigLoader {
         configPath: String = "config/application.yaml",
         env: (String) -> String? = System::getenv,
     ): AppConfig {
+        val dataDir = env("CHAPTERVAULT_DATA_DIR") ?: "data"
+
+        // Derived defaults from dataDir — YAML and explicit env vars override these per-field
+        val derived = AppConfig(
+            database = DatabaseConfig(url = "jdbc:sqlite:$dataDir/db/chaptervault.db"),
+            storage = StorageConfig(
+                libraryPath = "$dataDir/library",
+                thumbnailsPath = "$dataDir/thumbnails",
+            ),
+        )
+
         val file = File(configPath)
-        val base = if (!file.exists()) AppConfig() else {
+        val base = if (!file.exists()) derived else {
             @Suppress("UNCHECKED_CAST")
-            val map = Yaml().load<Map<String, Any>>(file.inputStream()) ?: return applyEnv(AppConfig(), env)
+            val map = Yaml().load<Map<String, Any>>(file.inputStream()) ?: return applyEnv(derived, env)
 
             val server = (map["server"] as? Map<*, *>)?.let { s ->
                 @Suppress("UNCHECKED_CAST")
                 val corsOrigins = (s["corsOrigins"] as? List<String>) ?: emptyList()
                 ServerConfig(
-                    port = (s["port"] as? Int) ?: 8080,
-                    host = (s["host"] as? String) ?: "0.0.0.0",
+                    port = (s["port"] as? Int) ?: derived.server.port,
+                    host = (s["host"] as? String) ?: derived.server.host,
                     corsOrigins = corsOrigins,
                 )
-            } ?: ServerConfig()
+            } ?: derived.server
 
             val database = (map["database"] as? Map<*, *>)?.let { d ->
                 DatabaseConfig(
-                    driver = (d["driver"] as? String) ?: "org.sqlite.JDBC",
-                    url = (d["url"] as? String) ?: "jdbc:sqlite:data/db/chaptervault.db",
-                    maxPoolSize = (d["maxPoolSize"] as? Int) ?: 5,
+                    driver = (d["driver"] as? String) ?: derived.database.driver,
+                    url = (d["url"] as? String) ?: derived.database.url,
+                    maxPoolSize = (d["maxPoolSize"] as? Int) ?: derived.database.maxPoolSize,
                 )
-            } ?: DatabaseConfig()
+            } ?: derived.database
 
             val storage = (map["storage"] as? Map<*, *>)?.let { s ->
                 StorageConfig(
-                    libraryPath = (s["libraryPath"] as? String) ?: "data/library",
-                    thumbnailsPath = (s["thumbnailsPath"] as? String) ?: "data/thumbnails",
+                    libraryPath = (s["libraryPath"] as? String) ?: derived.storage.libraryPath,
+                    thumbnailsPath = (s["thumbnailsPath"] as? String) ?: derived.storage.thumbnailsPath,
                     defaultFormat = (s["defaultFormat"] as? String)
                         ?.let { runCatching { ChapterFormat.fromString(it) }.getOrNull() }
-                        ?: ChapterFormat.Cbz,
+                        ?: derived.storage.defaultFormat,
                 )
-            } ?: StorageConfig()
+            } ?: derived.storage
 
             val log = (map["log"] as? Map<*, *>)?.let { l ->
-                LogConfig(level = (l["level"] as? String) ?: "INFO")
-            } ?: LogConfig()
+                LogConfig(level = (l["level"] as? String) ?: derived.log.level)
+            } ?: derived.log
 
             val refresh = (map["refresh"] as? Map<*, *>)?.let { r ->
-                RefreshConfig(intervalHours = (r["intervalHours"] as? Int) ?: 24)
-            } ?: RefreshConfig()
+                RefreshConfig(intervalHours = (r["intervalHours"] as? Int) ?: derived.refresh.intervalHours)
+            } ?: derived.refresh
 
             val debug = (map["debug"] as? Map<*, *>)?.let { d ->
-                DebugConfig(mockConnectorEnabled = (d["mockConnectorEnabled"] as? Boolean) ?: false)
-            } ?: DebugConfig()
+                DebugConfig(mockConnectorEnabled = (d["mockConnectorEnabled"] as? Boolean) ?: derived.debug.mockConnectorEnabled)
+            } ?: derived.debug
 
             AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh, debug = debug)
         }

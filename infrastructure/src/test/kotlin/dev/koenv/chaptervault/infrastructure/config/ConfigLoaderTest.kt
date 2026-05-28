@@ -155,4 +155,35 @@ class ConfigLoaderTest {
         val config = ConfigLoader.load("nonexistent.yaml")
         assertEquals("jdbc:sqlite:data/db/chaptervault.db", config.database.url)
     }
+
+    @Test
+    fun `CHAPTERVAULT_DATA_DIR sets default db url, library path, and thumbnails path`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_DATA_DIR") "mydata" else null })
+        assertEquals("jdbc:sqlite:mydata/db/chaptervault.db", config.database.url)
+        assertEquals("mydata/library", config.storage.libraryPath)
+        assertEquals("mydata/thumbnails", config.storage.thumbnailsPath)
+    }
+
+    @Test
+    fun `explicit CHAPTERVAULT_LIBRARY_PATH overrides CHAPTERVAULT_DATA_DIR derived library path`() {
+        val config = ConfigLoader.load("nonexistent.yaml", env = {
+            when (it) {
+                "CHAPTERVAULT_DATA_DIR" -> "mydata"
+                "CHAPTERVAULT_LIBRARY_PATH" -> "/mnt/library"
+                else -> null
+            }
+        })
+        assertEquals("jdbc:sqlite:mydata/db/chaptervault.db", config.database.url)
+        assertEquals("/mnt/library", config.storage.libraryPath)
+        assertEquals("mydata/thumbnails", config.storage.thumbnailsPath)
+    }
+
+    @Test
+    fun `YAML libraryPath overrides CHAPTERVAULT_DATA_DIR derived library path`(@TempDir dir: Path) {
+        val file = dir.resolve("application.yaml").toFile()
+        file.writeText("storage:\n  libraryPath: \"yaml/library\"")
+        val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_DATA_DIR") "mydata" else null })
+        assertEquals("yaml/library", config.storage.libraryPath)
+        assertEquals("mydata/thumbnails", config.storage.thumbnailsPath)
+    }
 }
