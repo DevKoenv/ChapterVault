@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** Unified data root layout — all persistent data now lives under a single configurable directory (`CHAPTERVAULT_DATA_DIR`, default `./data`). Sub-directories: `db/` (database), `library/` (chapter files), `thumbnails/` (cover images). Docker deployments now need a single volume mount (`./data:/app/data`) instead of separate `data` and `downloads` mounts.
+- **Breaking:** `storage.basePath` YAML key renamed to `storage.libraryPath`. Update `config/application.yaml` if set explicitly.
+- **Breaking:** `CHAPTERVAULT_STORAGE_PATH` env var renamed to `CHAPTERVAULT_LIBRARY_PATH`.
+- Cover images are now stored as canonical JPEG (`thumbnails/{seriesId}.jpg`), transcoded from source format on write. Previously stored as extension-less files inside the chapter directory.
+- Added `CHAPTERVAULT_THUMBNAILS_PATH` env var to override the thumbnails directory independently of `CHAPTERVAULT_DATA_DIR`.
+
 ## [0.5.0] - 2026-05-18
 
 ### Architectural rewrite
