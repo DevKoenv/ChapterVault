@@ -18,7 +18,7 @@ kover {
             }
             xml {
                 onCheck = false
-                xmlFile = layout.buildDirectory.file("reports/kover/report.xml").get().asFile
+                xmlFile.set(layout.buildDirectory.file("reports/kover/report.xml"))
             }
             verify {
                 onCheck = true
@@ -49,5 +49,7 @@ subprojects {
 }
 
 tasks.register("coverage") {
+    group = "verification"
+    description = "Generates HTML and XML coverage reports."
     dependsOn("koverHtmlReport", "koverXmlReport")
 }
