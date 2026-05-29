@@ -16,11 +16,12 @@ class CbzWriterTest {
         runBlocking {
             val tempDir = Files.createTempDirectory("cbz-writer-test")
             val destination = tempDir.resolve("series1").resolve("chapter1.cbz")
-            val pages = listOf(
-                Page(1, byteArrayOf(1, 2, 3)),
-                Page(2, byteArrayOf(4, 5, 6)),
-                Page(3, byteArrayOf(7, 8, 9)),
-            )
+            val pages =
+                listOf(
+                    Page(1, byteArrayOf(1, 2, 3)),
+                    Page(2, byteArrayOf(4, 5, 6)),
+                    Page(3, byteArrayOf(7, 8, 9)),
+                )
 
             writer.write(pages, destination)
 
@@ -33,16 +34,22 @@ class CbzWriterTest {
         runBlocking {
             val tempDir = Files.createTempDirectory("cbz-writer-test")
             val destination = tempDir.resolve("chapter1.cbz")
-            val pages = listOf(
-                Page(1, byteArrayOf(10, 20)),
-                Page(2, byteArrayOf(30, 40)),
-                Page(3, byteArrayOf(50, 60)),
-            )
+            val pages =
+                listOf(
+                    Page(1, byteArrayOf(10, 20)),
+                    Page(2, byteArrayOf(30, 40)),
+                    Page(3, byteArrayOf(50, 60)),
+                )
 
             writer.write(pages, destination)
 
             ZipFile(destination.toFile()).use { zip ->
-                val names = zip.entries().asSequence().map { it.name }.toSet()
+                val names =
+                    zip
+                        .entries()
+                        .asSequence()
+                        .map { it.name }
+                        .toSet()
                 assertEquals(3, names.size)
                 assertTrue("001.jpg" in names)
                 assertTrue("002.jpg" in names)

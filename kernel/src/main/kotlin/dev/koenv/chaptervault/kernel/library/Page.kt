@@ -1,6 +1,10 @@
 package dev.koenv.chaptervault.kernel.library
 
-data class Page(val index: Int, val data: ByteArray, val mimeType: String = "image/jpeg") {
+data class Page(
+    val index: Int,
+    val data: ByteArray,
+    val mimeType: String = "image/jpeg",
+) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Page) return false

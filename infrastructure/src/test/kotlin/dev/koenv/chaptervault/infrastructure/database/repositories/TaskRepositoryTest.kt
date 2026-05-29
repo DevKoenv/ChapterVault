@@ -48,16 +48,17 @@ class TaskRepositoryTest {
     private fun buildTask(
         status: TaskStatus = TaskStatus.PENDING,
         payload: Map<String, String> = emptyMap(),
-    ): Task = Task(
-        id = Id.generate(),
-        type = TaskType.DOWNLOAD_CHAPTER,
-        status = status,
-        targetType = TargetType.CHAPTER,
-        targetId = Id.generate(),
-        payload = payload,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now(),
-    )
+    ): Task =
+        Task(
+            id = Id.generate(),
+            type = TaskType.DOWNLOAD_CHAPTER,
+            status = status,
+            targetType = TargetType.CHAPTER,
+            targetId = Id.generate(),
+            payload = payload,
+            createdAt = Instant.now(),
+            updatedAt = Instant.now(),
+        )
 
     @Test
     fun `insert persists task and returns it`() {

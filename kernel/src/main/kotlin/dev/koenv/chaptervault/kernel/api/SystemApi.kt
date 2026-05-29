@@ -9,7 +9,10 @@ import dev.koenv.chaptervault.shared.utils.Id
 
 interface SystemApi {
     suspend fun listTasks(request: PageRequest): Result<Pagination<Task>>
+
     suspend fun getTask(id: Id): Result<Task>
+
     suspend fun cancelTask(id: Id): Result<Unit>
+
     fun listExtensions(): List<Extension>
 }

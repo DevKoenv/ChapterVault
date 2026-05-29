@@ -23,7 +23,6 @@ class NotificationService(
     private val notificationApi: NotificationApi,
     private val httpClient: HttpClient,
 ) : NotificationDispatchApi {
-
     private val log = LoggerFactory.getLogger(NotificationService::class.java)
 
     fun start() {
@@ -33,7 +32,11 @@ class NotificationService(
         log.info("NotificationService started")
     }
 
-    private data class ChapterInfo(val id: String, val title: String, val index: Double)
+    private data class ChapterInfo(
+        val id: String,
+        val title: String,
+        val index: Double,
+    )
 
     private suspend fun dispatch(event: NewChaptersDiscovered) {
         if (event.chapters.isEmpty()) return
@@ -50,10 +53,11 @@ class NotificationService(
     }
 
     override suspend fun sendTest(targetId: Id): Result<Unit> {
-        val target = when (val r = notificationApi.findTarget(targetId)) {
-            is Result.Failure -> return r
-            is Result.Success -> r.value
-        }
+        val target =
+            when (val r = notificationApi.findTarget(targetId)) {
+                is Result.Failure -> return r
+                is Result.Success -> r.value
+            }
         return runCatching {
             sendToTarget(
                 target,
@@ -88,7 +92,7 @@ class NotificationService(
                     target.token?.let { header("X-Gotify-Key", it) }
                     contentType(ContentType.Application.Json)
                     setBody(
-                        """{"title":"New chapters: ${j(seriesTitle)}","message":"${j(listText)}","priority":5}"""
+                        """{"title":"New chapters: ${j(seriesTitle)}","message":"${j(listText)}","priority":5}""",
                     )
                 }
             }
@@ -97,29 +101,33 @@ class NotificationService(
                 httpClient.post(target.url) {
                     contentType(ContentType.Application.Json)
                     setBody(
-                        """{"embeds":[{"title":"New chapters: ${j(seriesTitle)}","description":"$bullets","color":5814783}]}"""
+                        """{"embeds":[{"title":"New chapters: ${j(seriesTitle)}","description":"$bullets","color":5814783}]}""",
                     )
                 }
             }
             NotificationType.WEBHOOK -> {
-                val chaptersJson = chapters.joinToString(",") {
-                    """{"id":"${it.id}","title":"${j(it.title)}","index":${it.index}}"""
-                }
+                val chaptersJson =
+                    chapters.joinToString(",") {
+                        """{"id":"${it.id}","title":"${j(it.title)}","index":${it.index}}"""
+                    }
                 httpClient.post(target.url) {
                     contentType(ContentType.Application.Json)
                     target.token?.let { header("Authorization", "Bearer $it") }
                     setBody(
-                        """{"event":"new_chapters","seriesId":"$seriesId","seriesTitle":"${j(seriesTitle)}","newChapters":[$chaptersJson]}"""
+                        """{"event":"new_chapters","seriesId":"$seriesId","seriesTitle":"${j(
+                            seriesTitle,
+                        )}","newChapters":[$chaptersJson]}""",
                     )
                 }
             }
         }
     }
 
-    private fun j(s: String): String = s
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
+    private fun j(s: String): String =
+        s
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
 }

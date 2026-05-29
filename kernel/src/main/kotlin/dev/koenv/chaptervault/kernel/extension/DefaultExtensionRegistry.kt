@@ -16,8 +16,7 @@ class DefaultExtensionRegistry : ExtensionRegistry {
 
     override fun all(): List<Extension> = extensions.values.toList()
 
-    override fun withCapability(capability: Capability): List<Extension> =
-        capabilityIndex[capability]?.toList() ?: emptyList()
+    override fun withCapability(capability: Capability): List<Extension> = capabilityIndex[capability]?.toList() ?: emptyList()
 
     override fun findById(id: String): Extension? = extensions[id]
 }

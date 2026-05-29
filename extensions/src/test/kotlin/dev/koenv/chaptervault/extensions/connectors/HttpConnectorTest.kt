@@ -11,11 +11,10 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
-import kotlin.test.assertIs
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class HttpConnectorTest {
-
     private fun makeConnector(
         respondWith: HttpStatusCode = HttpStatusCode.OK,
         configs: Map<BucketKey, BucketConfig> = mapOf(Bucket.API to BucketConfig(requestsPerSecond = 10.0)),
@@ -25,11 +24,25 @@ class HttpConnectorTest {
             override val id = "test"
             override val name = "Test"
             override val bucketConfigs = configs
+
             override fun testContext() = context
-            override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> = TODO()
+
+            override suspend fun search(
+                query: String,
+                request: PageRequest,
+            ): Result<Pagination<SeriesSearchResult>> = TODO()
+
             override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> = TODO()
-            override suspend fun fetchChapters(externalId: String, language: String): Result<List<ChapterMetadata>> = TODO()
-            override suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult> = TODO()
+
+            override suspend fun fetchChapters(
+                externalId: String,
+                language: String,
+            ): Result<List<ChapterMetadata>> = TODO()
+
+            override suspend fun download(
+                chapter: Chapter,
+                format: ChapterFormat,
+            ): Result<DownloadResult> = TODO()
         }
     }
 
@@ -42,9 +55,10 @@ class HttpConnectorTest {
     fun `context uses bucketConfigs to build rate limiters — configured bucket succeeds`() {
         val connector = makeConnector(HttpStatusCode.OK)
 
-        val result = runBlocking {
-            connector.testContext().get("https://example.com", bucket = Bucket.API)
-        }
+        val result =
+            runBlocking {
+                connector.testContext().get("https://example.com", bucket = Bucket.API)
+            }
         // Bucket.API is configured — must not fail with "bucket not configured"
         assertIs<Result.Success<*>>(result)
     }
@@ -53,10 +67,11 @@ class HttpConnectorTest {
     fun `context returns failure for unconfigured bucket`() {
         val connector = makeConnector()
 
-        val result = runBlocking {
-            // Bucket.CDN is NOT in bucketConfigs — should fail immediately
-            connector.testContext().get("https://example.com", bucket = Bucket.CDN)
-        }
+        val result =
+            runBlocking {
+                // Bucket.CDN is NOT in bucketConfigs — should fail immediately
+                connector.testContext().get("https://example.com", bucket = Bucket.CDN)
+            }
         assertIs<Result.Failure>(result)
     }
 
@@ -65,29 +80,47 @@ class HttpConnectorTest {
         var capturedUrl: String? = null
         var capturedReferer: String? = null
 
-        val engine = MockEngine { request ->
-            capturedUrl = request.url.toString()
-            capturedReferer = request.headers["Referer"]
-            respond(byteArrayOf(1, 2, 3), HttpStatusCode.OK)
-        }
-        val connector = object : HttpConnector(HttpClient(engine)), TestConnector {
-            override val id = "test"
-            override val name = "Test"
-            override val bucketConfigs: Map<BucketKey, BucketConfig> = mapOf(
-                Bucket.CDN to BucketConfig(requestsPerSecond = 10.0),
-            )
-            override fun testContext() = context
-            override suspend fun search(q: String, r: PageRequest): Result<Pagination<SeriesSearchResult>> = TODO()
-            override suspend fun fetchSeries(id: String): Result<SeriesMetadata> = TODO()
-            override suspend fun fetchChapters(id: String, lang: String): Result<List<ChapterMetadata>> = TODO()
-            override suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult> = TODO()
-        }
+        val engine =
+            MockEngine { request ->
+                capturedUrl = request.url.toString()
+                capturedReferer = request.headers["Referer"]
+                respond(byteArrayOf(1, 2, 3), HttpStatusCode.OK)
+            }
+        val connector =
+            object : HttpConnector(HttpClient(engine)), TestConnector {
+                override val id = "test"
+                override val name = "Test"
+                override val bucketConfigs: Map<BucketKey, BucketConfig> =
+                    mapOf(
+                        Bucket.CDN to BucketConfig(requestsPerSecond = 10.0),
+                    )
 
-        val page = DownloadPage(
-            url = "https://cdn.example.com/p1.jpg",
-            index = 0,
-            headers = mapOf("Referer" to "https://example.com"),
-        )
+                override fun testContext() = context
+
+                override suspend fun search(
+                    q: String,
+                    r: PageRequest,
+                ): Result<Pagination<SeriesSearchResult>> = TODO()
+
+                override suspend fun fetchSeries(id: String): Result<SeriesMetadata> = TODO()
+
+                override suspend fun fetchChapters(
+                    id: String,
+                    lang: String,
+                ): Result<List<ChapterMetadata>> = TODO()
+
+                override suspend fun download(
+                    chapter: Chapter,
+                    format: ChapterFormat,
+                ): Result<DownloadResult> = TODO()
+            }
+
+        val page =
+            DownloadPage(
+                url = "https://cdn.example.com/p1.jpg",
+                index = 0,
+                headers = mapOf("Referer" to "https://example.com"),
+            )
 
         val result = runBlocking { connector.fetchPage(page) }
 

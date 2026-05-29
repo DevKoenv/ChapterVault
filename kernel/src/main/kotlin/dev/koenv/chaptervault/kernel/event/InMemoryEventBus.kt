@@ -17,9 +17,13 @@ class InMemoryEventBus : EventBus {
         handlers.add(handler)
     }
 
-    override fun <T : DomainEvent> subscribe(eventClass: Class<T>, handler: suspend (T) -> Unit) {
+    override fun <T : DomainEvent> subscribe(
+        eventClass: Class<T>,
+        handler: suspend (T) -> Unit,
+    ) {
         @Suppress("UNCHECKED_CAST")
-        typedHandlers.getOrPut(eventClass) { CopyOnWriteArrayList() }
+        typedHandlers
+            .getOrPut(eventClass) { CopyOnWriteArrayList() }
             .add(handler as suspend (DomainEvent) -> Unit)
     }
 }

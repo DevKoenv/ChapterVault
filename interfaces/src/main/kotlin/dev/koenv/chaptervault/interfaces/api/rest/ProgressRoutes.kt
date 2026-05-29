@@ -15,9 +15,13 @@ import io.ktor.server.routing.post
 fun Route.progressRoutes(progressApi: ProgressApi) {
     get("/library/series/{id}/progress") {
         val principal = call.principal<KtorPrincipal>()!!
-        val seriesId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid series ID"); return@get
-        }
+        val seriesId =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid series ID")
+                return@get
+            }
         when (val result = progressApi.getProgress(principal.user.id, seriesId)) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
             is Result.Failure -> call.respondError(result.error)
@@ -26,9 +30,13 @@ fun Route.progressRoutes(progressApi: ProgressApi) {
 
     post("/library/chapters/{id}/read") {
         val principal = call.principal<KtorPrincipal>()!!
-        val chapterId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid chapter ID"); return@post
-        }
+        val chapterId =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid chapter ID")
+                return@post
+            }
         when (val result = progressApi.markRead(principal.user.id, chapterId)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)
@@ -37,9 +45,13 @@ fun Route.progressRoutes(progressApi: ProgressApi) {
 
     delete("/library/chapters/{id}/read") {
         val principal = call.principal<KtorPrincipal>()!!
-        val chapterId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid chapter ID"); return@delete
-        }
+        val chapterId =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid chapter ID")
+                return@delete
+            }
         when (val result = progressApi.markUnread(principal.user.id, chapterId)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)

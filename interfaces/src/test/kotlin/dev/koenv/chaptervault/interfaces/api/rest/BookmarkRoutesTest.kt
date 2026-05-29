@@ -7,9 +7,15 @@ import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -41,9 +47,11 @@ class BookmarkRoutesTest {
             install(Authentication) {
                 bearer("auth-bearer") {
                     authenticate { cred ->
-                        if (cred.token == "user-token")
+                        if (cred.token == "user-token") {
                             KtorPrincipal(UserPrincipal(userId, "user", setOf(Role.USER)))
-                        else null
+                        } else {
+                            null
+                        }
                     }
                 }
             }
@@ -57,9 +65,13 @@ class BookmarkRoutesTest {
     @Test
     fun `GET bookmarks returns 200 with bookmark list`() {
         testApp(
-            bookmarkApi = object : NoOpBookmarkApi() {
-                override suspend fun list(userId: Id, seriesId: Id) = Result.Success(listOf(fakeBookmark))
-            },
+            bookmarkApi =
+                object : NoOpBookmarkApi() {
+                    override suspend fun list(
+                        userId: Id,
+                        seriesId: Id,
+                    ) = Result.Success(listOf(fakeBookmark))
+                },
         ) {
             val response = client.get("/library/series/$seriesId/bookmarks") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.OK, response.status)
@@ -78,15 +90,21 @@ class BookmarkRoutesTest {
     @Test
     fun `POST bookmark creates bookmark and returns 201`() {
         testApp(
-            bookmarkApi = object : NoOpBookmarkApi() {
-                override suspend fun create(userId: Id, chapterId: Id, page: Int) = Result.Success(fakeBookmark)
-            },
+            bookmarkApi =
+                object : NoOpBookmarkApi() {
+                    override suspend fun create(
+                        userId: Id,
+                        chapterId: Id,
+                        page: Int,
+                    ) = Result.Success(fakeBookmark)
+                },
         ) {
-            val response = client.post("/library/chapters/$chapterId/bookmarks") {
-                bearerAuth("user-token")
-                contentType(ContentType.Application.Json)
-                setBody("""{"page":5}""")
-            }
+            val response =
+                client.post("/library/chapters/$chapterId/bookmarks") {
+                    bearerAuth("user-token")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"page":5}""")
+                }
             assertEquals(HttpStatusCode.Created, response.status)
             assertContains(response.bodyAsText(), bookmarkId.toString())
         }
@@ -95,11 +113,12 @@ class BookmarkRoutesTest {
     @Test
     fun `POST bookmark returns 400 for invalid chapter ID`() {
         testApp(bookmarkApi = NoOpBookmarkApi()) {
-            val response = client.post("/library/chapters/not-a-uuid/bookmarks") {
-                bearerAuth("user-token")
-                contentType(ContentType.Application.Json)
-                setBody("""{"page":5}""")
-            }
+            val response =
+                client.post("/library/chapters/not-a-uuid/bookmarks") {
+                    bearerAuth("user-token")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"page":5}""")
+                }
             assertEquals(HttpStatusCode.BadRequest, response.status)
         }
     }
@@ -107,11 +126,12 @@ class BookmarkRoutesTest {
     @Test
     fun `POST bookmark returns 400 for invalid request body`() {
         testApp(bookmarkApi = NoOpBookmarkApi()) {
-            val response = client.post("/library/chapters/$chapterId/bookmarks") {
-                bearerAuth("user-token")
-                contentType(ContentType.Application.Json)
-                setBody("not json")
-            }
+            val response =
+                client.post("/library/chapters/$chapterId/bookmarks") {
+                    bearerAuth("user-token")
+                    contentType(ContentType.Application.Json)
+                    setBody("not json")
+                }
             assertEquals(HttpStatusCode.BadRequest, response.status)
         }
     }
@@ -119,16 +139,21 @@ class BookmarkRoutesTest {
     @Test
     fun `POST bookmark returns 404 when chapter not found`() {
         testApp(
-            bookmarkApi = object : NoOpBookmarkApi() {
-                override suspend fun create(userId: Id, chapterId: Id, page: Int) =
-                    Result.Failure(AppError.NotFound("Chapter", chapterId.toString()))
-            },
+            bookmarkApi =
+                object : NoOpBookmarkApi() {
+                    override suspend fun create(
+                        userId: Id,
+                        chapterId: Id,
+                        page: Int,
+                    ) = Result.Failure(AppError.NotFound("Chapter", chapterId.toString()))
+                },
         ) {
-            val response = client.post("/library/chapters/$chapterId/bookmarks") {
-                bearerAuth("user-token")
-                contentType(ContentType.Application.Json)
-                setBody("""{"page":5}""")
-            }
+            val response =
+                client.post("/library/chapters/$chapterId/bookmarks") {
+                    bearerAuth("user-token")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"page":5}""")
+                }
             assertEquals(HttpStatusCode.NotFound, response.status)
         }
     }
@@ -144,10 +169,13 @@ class BookmarkRoutesTest {
     @Test
     fun `DELETE bookmark returns 404 when not found`() {
         testApp(
-            bookmarkApi = object : NoOpBookmarkApi() {
-                override suspend fun delete(userId: Id, bookmarkId: Id) =
-                    Result.Failure(AppError.NotFound("Bookmark", bookmarkId.toString()))
-            },
+            bookmarkApi =
+                object : NoOpBookmarkApi() {
+                    override suspend fun delete(
+                        userId: Id,
+                        bookmarkId: Id,
+                    ) = Result.Failure(AppError.NotFound("Bookmark", bookmarkId.toString()))
+                },
         ) {
             val response = client.delete("/library/bookmarks/$bookmarkId") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.NotFound, response.status)
@@ -164,8 +192,19 @@ class BookmarkRoutesTest {
 }
 
 private open class NoOpBookmarkApi : BookmarkApi {
-    override suspend fun create(userId: Id, chapterId: Id, page: Int): Result<Bookmark> =
-        Result.Failure(AppError.InternalError("not implemented"))
-    override suspend fun list(userId: Id, seriesId: Id): Result<List<Bookmark>> = Result.Success(emptyList())
-    override suspend fun delete(userId: Id, bookmarkId: Id): Result<Unit> = Result.Success(Unit)
+    override suspend fun create(
+        userId: Id,
+        chapterId: Id,
+        page: Int,
+    ): Result<Bookmark> = Result.Failure(AppError.InternalError("not implemented"))
+
+    override suspend fun list(
+        userId: Id,
+        seriesId: Id,
+    ): Result<List<Bookmark>> = Result.Success(emptyList())
+
+    override suspend fun delete(
+        userId: Id,
+        bookmarkId: Id,
+    ): Result<Unit> = Result.Success(Unit)
 }

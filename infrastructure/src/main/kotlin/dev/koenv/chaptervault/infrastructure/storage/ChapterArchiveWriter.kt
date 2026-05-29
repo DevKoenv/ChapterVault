@@ -6,5 +6,9 @@ import java.nio.file.Path
 
 interface ChapterArchiveWriter {
     val supportedFormat: ChapterFormat
-    suspend fun write(pages: List<Page>, destination: Path)
+
+    suspend fun write(
+        pages: List<Page>,
+        destination: Path,
+    )
 }

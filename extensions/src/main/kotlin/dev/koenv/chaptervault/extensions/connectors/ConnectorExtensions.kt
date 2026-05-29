@@ -16,10 +16,11 @@ suspend inline fun <reified T> ConnectorContext.getJson(
     bucket: BucketKey = Bucket.API,
     headers: Map<String, String> = emptyMap(),
 ): Result<T> {
-    val response = when (val r = get(url, params, bucket, headers)) {
-        is Result.Failure -> return r
-        is Result.Success -> r.value
-    }
+    val response =
+        when (val r = get(url, params, bucket, headers)) {
+            is Result.Failure -> return r
+            is Result.Success -> r.value
+        }
     return try {
         Result.Success(lenientJson.decodeFromString<T>(response.bodyAsText()))
     } catch (e: Exception) {
@@ -33,10 +34,11 @@ suspend fun ConnectorContext.getDocument(
     bucket: BucketKey = Bucket.API,
     headers: Map<String, String> = emptyMap(),
 ): Result<Document> {
-    val response = when (val r = get(url, params, bucket, headers)) {
-        is Result.Failure -> return r
-        is Result.Success -> r.value
-    }
+    val response =
+        when (val r = get(url, params, bucket, headers)) {
+            is Result.Failure -> return r
+            is Result.Success -> r.value
+        }
     return try {
         Result.Success(Jsoup.parse(response.bodyAsText(), url))
     } catch (e: Exception) {

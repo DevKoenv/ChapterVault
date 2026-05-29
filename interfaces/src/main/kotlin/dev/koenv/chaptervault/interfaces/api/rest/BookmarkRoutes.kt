@@ -17,9 +17,13 @@ import io.ktor.server.routing.post
 fun Route.bookmarkRoutes(bookmarkApi: BookmarkApi) {
     get("/library/series/{id}/bookmarks") {
         val principal = call.principal<KtorPrincipal>()!!
-        val seriesId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid series ID"); return@get
-        }
+        val seriesId =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid series ID")
+                return@get
+            }
         when (val result = bookmarkApi.list(principal.user.id, seriesId)) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.map { it.toDto() })
             is Result.Failure -> call.respondError(result.error)
@@ -28,12 +32,20 @@ fun Route.bookmarkRoutes(bookmarkApi: BookmarkApi) {
 
     post("/library/chapters/{id}/bookmarks") {
         val principal = call.principal<KtorPrincipal>()!!
-        val chapterId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid chapter ID"); return@post
-        }
-        val request = try { call.receive<CreateBookmarkRequest>() } catch (e: Exception) {
-            call.respondBadRequest("Invalid request body"); return@post
-        }
+        val chapterId =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid chapter ID")
+                return@post
+            }
+        val request =
+            try {
+                call.receive<CreateBookmarkRequest>()
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid request body")
+                return@post
+            }
         when (val result = bookmarkApi.create(principal.user.id, chapterId, request.page)) {
             is Result.Success -> call.respond(HttpStatusCode.Created, result.value.toDto())
             is Result.Failure -> call.respondError(result.error)
@@ -42,9 +54,13 @@ fun Route.bookmarkRoutes(bookmarkApi: BookmarkApi) {
 
     delete("/library/bookmarks/{id}") {
         val principal = call.principal<KtorPrincipal>()!!
-        val bookmarkId = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid bookmark ID"); return@delete
-        }
+        val bookmarkId =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid bookmark ID")
+                return@delete
+            }
         when (val result = bookmarkApi.delete(principal.user.id, bookmarkId)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)

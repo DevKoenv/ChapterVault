@@ -19,10 +19,11 @@ object DatabaseFactory {
         DatabaseMigrations.migrate()
     }
 
-    suspend fun ping(): Boolean = try {
-        newSuspendedTransaction(Dispatchers.IO) { exec("SELECT 1") }
-        true
-    } catch (_: Exception) {
-        false
-    }
+    suspend fun ping(): Boolean =
+        try {
+            newSuspendedTransaction(Dispatchers.IO) { exec("SELECT 1") }
+            true
+        } catch (_: Exception) {
+            false
+        }
 }

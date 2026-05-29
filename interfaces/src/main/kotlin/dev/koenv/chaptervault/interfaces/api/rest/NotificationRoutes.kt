@@ -48,17 +48,21 @@ private data class NotificationTargetResponse(
     val createdAt: String,
 )
 
-private fun NotificationTarget.toResponse() = NotificationTargetResponse(
-    id = id.toString(),
-    name = name,
-    type = type.name,
-    url = url,
-    token = token,
-    enabled = enabled,
-    createdAt = createdAt.toString(),
-)
+private fun NotificationTarget.toResponse() =
+    NotificationTargetResponse(
+        id = id.toString(),
+        name = name,
+        type = type.name,
+        url = url,
+        token = token,
+        enabled = enabled,
+        createdAt = createdAt.toString(),
+    )
 
-fun Route.notificationRoutes(notificationApi: NotificationApi, dispatchApi: NotificationDispatchApi) {
+fun Route.notificationRoutes(
+    notificationApi: NotificationApi,
+    dispatchApi: NotificationDispatchApi,
+) {
     get("/notifications") {
         val targets = notificationApi.listTargets()
         call.respond(HttpStatusCode.OK, targets.map { it.toResponse() })
@@ -67,29 +71,39 @@ fun Route.notificationRoutes(notificationApi: NotificationApi, dispatchApi: Noti
     post("/notifications") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden(); return@post
+            call.respondForbidden()
+            return@post
         }
-        val req = try { call.receive<CreateTargetRequest>() } catch (e: Exception) {
-            call.respondBadRequest("Invalid request body"); return@post
-        }
+        val req =
+            try {
+                call.receive<CreateTargetRequest>()
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid request body")
+                return@post
+            }
         if (req.name.isBlank()) {
-            call.respondBadRequest("name must not be blank"); return@post
+            call.respondBadRequest("name must not be blank")
+            return@post
         }
         if (req.url.isBlank()) {
-            call.respondBadRequest("url must not be blank"); return@post
+            call.respondBadRequest("url must not be blank")
+            return@post
         }
-        val type = try {
-            NotificationType.valueOf(req.type)
-        } catch (e: IllegalArgumentException) {
-            call.respondBadRequest("Invalid notification type: ${req.type}"); return@post
-        }
-        val input = NotificationTargetInput(
-            name = req.name,
-            type = type,
-            url = req.url,
-            token = req.token,
-            enabled = req.enabled,
-        )
+        val type =
+            try {
+                NotificationType.valueOf(req.type)
+            } catch (e: IllegalArgumentException) {
+                call.respondBadRequest("Invalid notification type: ${req.type}")
+                return@post
+            }
+        val input =
+            NotificationTargetInput(
+                name = req.name,
+                type = type,
+                url = req.url,
+                token = req.token,
+                enabled = req.enabled,
+            )
         when (val result = notificationApi.createTarget(input)) {
             is Result.Success -> call.respond(HttpStatusCode.Created, result.value.toResponse())
             is Result.Failure -> call.respondError(result.error)
@@ -99,20 +113,30 @@ fun Route.notificationRoutes(notificationApi: NotificationApi, dispatchApi: Noti
     patch("/notifications/{id}") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden(); return@patch
+            call.respondForbidden()
+            return@patch
         }
-        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid notification target ID"); return@patch
-        }
-        val req = try { call.receive<PatchTargetRequest>() } catch (e: Exception) {
-            call.respondBadRequest("Invalid request body"); return@patch
-        }
-        val patch = NotificationTargetPatch(
-            name = req.name,
-            url = req.url,
-            token = req.token,
-            enabled = req.enabled,
-        )
+        val id =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid notification target ID")
+                return@patch
+            }
+        val req =
+            try {
+                call.receive<PatchTargetRequest>()
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid request body")
+                return@patch
+            }
+        val patch =
+            NotificationTargetPatch(
+                name = req.name,
+                url = req.url,
+                token = req.token,
+                enabled = req.enabled,
+            )
         when (val result = notificationApi.updateTarget(id, patch)) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toResponse())
             is Result.Failure -> call.respondError(result.error)
@@ -122,11 +146,16 @@ fun Route.notificationRoutes(notificationApi: NotificationApi, dispatchApi: Noti
     delete("/notifications/{id}") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden(); return@delete
+            call.respondForbidden()
+            return@delete
         }
-        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid notification target ID"); return@delete
-        }
+        val id =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid notification target ID")
+                return@delete
+            }
         when (val result = notificationApi.deleteTarget(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)
@@ -136,11 +165,16 @@ fun Route.notificationRoutes(notificationApi: NotificationApi, dispatchApi: Noti
     post("/notifications/{id}/test") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden(); return@post
+            call.respondForbidden()
+            return@post
         }
-        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid notification target ID"); return@post
-        }
+        val id =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid notification target ID")
+                return@post
+            }
         when (val result = dispatchApi.sendTest(id)) {
             is Result.Success -> call.respond(HttpStatusCode.OK)
             is Result.Failure -> call.respondError(result.error)

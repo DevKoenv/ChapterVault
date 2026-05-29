@@ -54,7 +54,7 @@ class BookmarkRepositoryTest {
         transaction {
             UserTable.insert {
                 it[UserTable.id] = id.toString()
-                it[UserTable.username] = "user-${id}"
+                it[UserTable.username] = "user-$id"
                 it[UserTable.passwordHash] = "hash"
                 it[UserTable.roles] = "USER"
                 it[UserTable.createdAt] = Instant.now().toKotlinInstant()
@@ -82,14 +82,18 @@ class BookmarkRepositoryTest {
         return id
     }
 
-    private fun insertChapter(seriesId: Id, id: Id = Id.generate(), index: Double = 1.0): Id {
+    private fun insertChapter(
+        seriesId: Id,
+        id: Id = Id.generate(),
+        index: Double = 1.0,
+    ): Id {
         transaction {
             ChapterTable.insert {
                 it[ChapterTable.id] = id.toString()
                 it[ChapterTable.seriesId] = seriesId.toString()
                 it[ChapterTable.title] = "Chapter $index"
                 it[ChapterTable.chapterIndex] = index
-                it[ChapterTable.externalId] = "ext-ch-${id}"
+                it[ChapterTable.externalId] = "ext-ch-$id"
                 it[ChapterTable.downloadStatus] = DownloadStatus.PENDING.name
                 it[ChapterTable.addedAt] = Instant.now().toKotlinInstant()
                 it[ChapterTable.updatedAt] = Instant.now().toKotlinInstant()

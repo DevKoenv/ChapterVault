@@ -4,8 +4,9 @@ import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.client.HttpClient
 
-abstract class HttpConnector(private val httpClient: HttpClient) : Connector {
-
+abstract class HttpConnector(
+    private val httpClient: HttpClient,
+) : Connector {
     abstract val bucketConfigs: Map<BucketKey, BucketConfig>
 
     private val buckets by lazy {

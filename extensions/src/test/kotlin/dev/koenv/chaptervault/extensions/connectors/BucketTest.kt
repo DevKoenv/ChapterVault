@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class BucketTest {
-
     @Test
     fun `Bucket API has stable id 'api'`() {
         assertEquals("api", Bucket.API.id)

@@ -23,8 +23,10 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class NotificationServiceTest {
-
-    private fun mockTarget(type: NotificationType, url: String = "https://example.com") = NotificationTarget(
+    private fun mockTarget(
+        type: NotificationType,
+        url: String = "https://example.com",
+    ) = NotificationTarget(
         id = Id.generate(),
         name = "Test",
         type = type,
@@ -38,22 +40,32 @@ class NotificationServiceTest {
         target: NotificationTarget?,
         recordedRequests: MutableList<String> = mutableListOf(),
     ): NotificationDispatchApi {
-        val api = object : NotificationApi {
-            override suspend fun listTargets() = if (target != null) listOf(target) else emptyList()
-            override suspend fun findTarget(id: Id): Result<NotificationTarget> =
-                target?.takeIf { it.id == id }?.let { Result.Success(it) }
-                    ?: Result.Failure(AppError.NotFound("NotificationTarget", id.toString()))
-            override suspend fun createTarget(input: NotificationTargetInput) = Result.Success(mockTarget(NotificationType.WEBHOOK))
-            override suspend fun updateTarget(id: Id, patch: NotificationTargetPatch): Result<NotificationTarget> = Result.Failure(AppError.NotFound("NotificationTarget", id.toString()))
-            override suspend fun deleteTarget(id: Id) = Result.Success(Unit)
-        }
-        val engine = MockEngine { request ->
-            recordedRequests.add("${request.method.value} ${request.url}")
-            respond("", HttpStatusCode.OK)
-        }
-        val client = HttpClient(engine) {
-            install(ContentNegotiation) { json() }
-        }
+        val api =
+            object : NotificationApi {
+                override suspend fun listTargets() = if (target != null) listOf(target) else emptyList()
+
+                override suspend fun findTarget(id: Id): Result<NotificationTarget> =
+                    target?.takeIf { it.id == id }?.let { Result.Success(it) }
+                        ?: Result.Failure(AppError.NotFound("NotificationTarget", id.toString()))
+
+                override suspend fun createTarget(input: NotificationTargetInput) = Result.Success(mockTarget(NotificationType.WEBHOOK))
+
+                override suspend fun updateTarget(
+                    id: Id,
+                    patch: NotificationTargetPatch,
+                ): Result<NotificationTarget> = Result.Failure(AppError.NotFound("NotificationTarget", id.toString()))
+
+                override suspend fun deleteTarget(id: Id) = Result.Success(Unit)
+            }
+        val engine =
+            MockEngine { request ->
+                recordedRequests.add("${request.method.value} ${request.url}")
+                respond("", HttpStatusCode.OK)
+            }
+        val client =
+            HttpClient(engine) {
+                install(ContentNegotiation) { json() }
+            }
         return NotificationService(
             eventBus = InMemoryEventBus(),
             notificationApi = api,
@@ -62,24 +74,27 @@ class NotificationServiceTest {
     }
 
     @Test
-    fun `sendTest returns Success for enabled NTFY target`() = runBlocking {
-        val target = mockTarget(NotificationType.NTFY, "https://ntfy.sh/test")
-        val service = buildService(target)
-        assertIs<Result.Success<Unit>>(service.sendTest(target.id))
-    }
+    fun `sendTest returns Success for enabled NTFY target`() =
+        runBlocking {
+            val target = mockTarget(NotificationType.NTFY, "https://ntfy.sh/test")
+            val service = buildService(target)
+            assertIs<Result.Success<Unit>>(service.sendTest(target.id))
+        }
 
     @Test
-    fun `sendTest returns Failure for unknown target id`() = runBlocking {
-        val service = buildService(null)
-        assertIs<Result.Failure>(service.sendTest(Id.generate()))
-    }
+    fun `sendTest returns Failure for unknown target id`() =
+        runBlocking {
+            val service = buildService(null)
+            assertIs<Result.Failure>(service.sendTest(Id.generate()))
+        }
 
     @Test
-    fun `sendTest fires HTTP request to target url`() = runBlocking {
-        val requests = mutableListOf<String>()
-        val target = mockTarget(NotificationType.WEBHOOK, "https://example.com/hook")
-        val service = buildService(target, requests)
-        service.sendTest(target.id)
-        assertTrue(requests.any { it.contains("example.com") })
-    }
+    fun `sendTest fires HTTP request to target url`() =
+        runBlocking {
+            val requests = mutableListOf<String>()
+            val target = mockTarget(NotificationType.WEBHOOK, "https://example.com/hook")
+            val service = buildService(target, requests)
+            service.sendTest(target.id)
+            assertTrue(requests.any { it.contains("example.com") })
+        }
 }

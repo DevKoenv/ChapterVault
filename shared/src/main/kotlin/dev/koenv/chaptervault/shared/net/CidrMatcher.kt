@@ -2,7 +2,9 @@ package dev.koenv.chaptervault.shared.net
 
 import java.net.InetAddress
 
-class CidrMatcher(cidr: String) {
+class CidrMatcher(
+    cidr: String,
+) {
     private val networkBytes: ByteArray
     private val prefixLength: Int
 
@@ -10,9 +12,10 @@ class CidrMatcher(cidr: String) {
         val parts = cidr.split("/")
         require(parts.size == 2) { "Invalid CIDR notation: $cidr" }
         networkBytes = InetAddress.getByName(parts[0]).address
-        prefixLength = parts[1].toInt().also {
-            require(it in 0..(networkBytes.size * 8)) { "Prefix length out of range: $cidr" }
-        }
+        prefixLength =
+            parts[1].toInt().also {
+                require(it in 0..(networkBytes.size * 8)) { "Prefix length out of range: $cidr" }
+            }
     }
 
     fun matches(ipAddress: String): Boolean {

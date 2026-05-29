@@ -19,26 +19,31 @@ fun Route.taskRoutes(system: SystemApi) {
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
         val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
         when (val result = system.listTasks(PageRequest(page, size.coerceIn(1, 100)))) {
-            is Result.Success -> call.respond(
-                HttpStatusCode.OK,
-                PaginatedResponse(
-                    items = result.value.items.map { it.toDto() },
-                    page = result.value.page,
-                    size = result.value.size,
-                    totalItems = result.value.totalItems,
-                    totalPages = result.value.totalPages,
-                    hasNext = result.value.hasNext,
-                    hasPrevious = result.value.hasPrevious,
+            is Result.Success ->
+                call.respond(
+                    HttpStatusCode.OK,
+                    PaginatedResponse(
+                        items = result.value.items.map { it.toDto() },
+                        page = result.value.page,
+                        size = result.value.size,
+                        totalItems = result.value.totalItems,
+                        totalPages = result.value.totalPages,
+                        hasNext = result.value.hasNext,
+                        hasPrevious = result.value.hasPrevious,
+                    ),
                 )
-            )
             is Result.Failure -> call.respondError(result.error)
         }
     }
 
     get("/tasks/{id}") {
-        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid task ID"); return@get
-        }
+        val id =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid task ID")
+                return@get
+            }
         when (val result = system.getTask(id)) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
             is Result.Failure -> call.respondError(result.error)
@@ -48,11 +53,16 @@ fun Route.taskRoutes(system: SystemApi) {
     post("/tasks/{id}/cancel") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden(); return@post
+            call.respondForbidden()
+            return@post
         }
-        val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-            call.respondBadRequest("Invalid task ID"); return@post
-        }
+        val id =
+            try {
+                Id.from(call.parameters["id"]!!)
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid task ID")
+                return@post
+            }
         when (val result = system.cancelTask(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)

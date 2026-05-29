@@ -52,14 +52,15 @@ class SeriesRefreshScheduler(
                         status = TaskStatus.PENDING,
                         targetType = TargetType.SERIES,
                         targetId = series.id,
-                        payload = mapOf(
-                            "connectorId" to series.connectorId,
-                            "externalId" to series.externalId,
-                            "language" to series.language,
-                        ),
+                        payload =
+                            mapOf(
+                                "connectorId" to series.connectorId,
+                                "externalId" to series.externalId,
+                                "language" to series.language,
+                            ),
                         createdAt = now,
                         updatedAt = now,
-                    )
+                    ),
                 )
                 enqueued++
             }

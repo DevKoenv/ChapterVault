@@ -1,7 +1,7 @@
 package dev.koenv.chaptervault.kernel.library
 
-import dev.koenv.chaptervault.shared.utils.Id
 import dev.koenv.chaptervault.shared.format.ChapterFormat
+import dev.koenv.chaptervault.shared.utils.Id
 import java.time.Instant
 
 data class Chapter(

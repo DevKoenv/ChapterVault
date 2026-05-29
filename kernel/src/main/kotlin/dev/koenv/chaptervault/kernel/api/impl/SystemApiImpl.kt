@@ -20,11 +20,9 @@ class SystemApiImpl(
     private val taskReadStore: TaskReadStore,
     private val eventBus: EventBus,
 ) : SystemApi {
-    override suspend fun listTasks(request: PageRequest): Result<Pagination<Task>> =
-        taskReadStore.listTasks(request)
+    override suspend fun listTasks(request: PageRequest): Result<Pagination<Task>> = taskReadStore.listTasks(request)
 
-    override suspend fun getTask(id: Id): Result<Task> =
-        taskReadStore.findTask(id)
+    override suspend fun getTask(id: Id): Result<Task> = taskReadStore.findTask(id)
 
     override suspend fun cancelTask(id: Id): Result<Unit> {
         val task = taskQueue.getTask(id)

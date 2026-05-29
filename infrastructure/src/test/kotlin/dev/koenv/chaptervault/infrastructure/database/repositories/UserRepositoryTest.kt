@@ -1,6 +1,5 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
-import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.result.AppError
@@ -22,7 +21,6 @@ import kotlin.test.assertIs
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UserRepositoryTest {
-
     private lateinit var repo: UserRepository
 
     @BeforeAll
@@ -151,15 +149,24 @@ class UserRepositoryTest {
     fun `validateSession returns Unauthorized for expired token`() {
         runBlocking {
             repo.register(Credentials("grace", "pass"))
-            val userId = transaction {
-                dev.koenv.chaptervault.infrastructure.database.entities.UserTable.selectAll()
-                    .where { dev.koenv.chaptervault.infrastructure.database.entities.UserTable.username eq "grace" }
-                    .single()[dev.koenv.chaptervault.infrastructure.database.entities.UserTable.id]
-            }
-            val pastExpiry = java.time.Instant.now().minusSeconds(3600).toKotlinInstant()
+            val userId =
+                transaction {
+                    dev.koenv.chaptervault.infrastructure.database.entities.UserTable
+                        .selectAll()
+                        .where { dev.koenv.chaptervault.infrastructure.database.entities.UserTable.username eq "grace" }
+                        .single()[dev.koenv.chaptervault.infrastructure.database.entities.UserTable.id]
+                }
+            val pastExpiry =
+                java.time.Instant
+                    .now()
+                    .minusSeconds(3600)
+                    .toKotlinInstant()
             transaction {
                 dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.insert {
-                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.id] = dev.koenv.chaptervault.shared.utils.Id.generate().toString()
+                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.id] =
+                        dev.koenv.chaptervault.shared.utils.Id
+                            .generate()
+                            .toString()
                     it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.userId] = userId
                     it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.token] = "expired-token-xyz"
                     it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.expiresAt] = pastExpiry

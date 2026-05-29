@@ -25,8 +25,8 @@ class RateLimiter(
         }
     }
 
-    suspend fun tryAcquire(): Long {
-        return mutex.withLock {
+    suspend fun tryAcquire(): Long =
+        mutex.withLock {
             val now = System.currentTimeMillis()
             timestamps.removeAll { it < now - windowMs }
             if (timestamps.size >= burst) {
@@ -36,5 +36,4 @@ class RateLimiter(
                 0L
             }
         }
-    }
 }

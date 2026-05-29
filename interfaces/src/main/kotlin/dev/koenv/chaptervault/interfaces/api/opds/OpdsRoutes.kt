@@ -35,7 +35,10 @@ private fun opdsContentType(call: io.ktor.server.application.ApplicationCall): C
     }
 }
 
-fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageSource) {
+fun Application.opdsRoutes(
+    libraryRead: LibraryReadApi,
+    pageSource: ChapterPageSource,
+) {
     routing {
         authenticate("auth-basic") {
             get("/opds/v1") {
@@ -49,13 +52,14 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageS
                 when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
                     is Result.Success -> {
                         val p = result.value
-                        val feed = feedBuilder.buildCatalogFeed(
-                            series = p.items,
-                            page = page,
-                            size = p.size,
-                            totalItems = p.totalItems,
-                            now = Instant.now().toString(),
-                        )
+                        val feed =
+                            feedBuilder.buildCatalogFeed(
+                                series = p.items,
+                                page = page,
+                                size = p.size,
+                                totalItems = p.totalItems,
+                                now = Instant.now().toString(),
+                            )
                         call.respondText(opdsV1.serialize(feed), opdsContentType(call))
                     }
                     is Result.Failure -> call.respond(HttpStatusCode.InternalServerError)
@@ -63,74 +67,104 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageS
             }
 
             get("/opds/v1/series/{id}") {
-                val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-                    call.respond(HttpStatusCode.BadRequest); return@get
-                }
+                val id =
+                    try {
+                        Id.from(call.parameters["id"]!!)
+                    } catch (e: Exception) {
+                        call.respond(HttpStatusCode.BadRequest)
+                        return@get
+                    }
                 val seriesResult = libraryRead.getSeries(id)
                 if (seriesResult is Result.Failure) {
-                    val status = if (seriesResult.error is AppError.NotFound) HttpStatusCode.NotFound
-                    else HttpStatusCode.InternalServerError
-                    call.respond(status); return@get
+                    val status =
+                        if (seriesResult.error is AppError.NotFound) {
+                            HttpStatusCode.NotFound
+                        } else {
+                            HttpStatusCode.InternalServerError
+                        }
+                    call.respond(status)
+                    return@get
                 }
                 val chaptersResult = libraryRead.listChapters(id)
                 if (chaptersResult is Result.Failure) {
-                    call.respond(HttpStatusCode.InternalServerError); return@get
+                    call.respond(HttpStatusCode.InternalServerError)
+                    return@get
                 }
                 val chapters = (chaptersResult as Result.Success).value
-                val pageInfoByChapterId = chapters
-                    .filter { it.downloadStatus == DownloadStatus.DOWNLOADED }
-                    .mapNotNull { chapter ->
-                        val pageCount = chapter.pageCount ?: when (val r = pageSource.countPages(chapter)) {
-                            is Result.Success -> r.value
-                            is Result.Failure -> return@mapNotNull null
-                        }
-                        chapter.id.toString() to FeedBuilder.ChapterPageInfo(pageCount, "image/jpeg")
-                    }
-                    .toMap()
+                val pageInfoByChapterId =
+                    chapters
+                        .filter { it.downloadStatus == DownloadStatus.DOWNLOADED }
+                        .mapNotNull { chapter ->
+                            val pageCount =
+                                chapter.pageCount ?: when (val r = pageSource.countPages(chapter)) {
+                                    is Result.Success -> r.value
+                                    is Result.Failure -> return@mapNotNull null
+                                }
+                            chapter.id.toString() to FeedBuilder.ChapterPageInfo(pageCount, "image/jpeg")
+                        }.toMap()
                 val now = Instant.now().toString()
-                val feed = feedBuilder.buildSeriesFeed(
-                    series = (seriesResult as Result.Success).value,
-                    chapters = chapters,
-                    now = now,
-                    pageInfoByChapterId = pageInfoByChapterId,
-                )
+                val feed =
+                    feedBuilder.buildSeriesFeed(
+                        series = (seriesResult as Result.Success).value,
+                        chapters = chapters,
+                        now = now,
+                        pageInfoByChapterId = pageInfoByChapterId,
+                    )
                 call.respondText(opdsV1.serialize(feed), opdsContentType(call))
             }
         }
     }
 }
 
-fun Application.opdsPageRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageSource) {
+fun Application.opdsPageRoutes(
+    libraryRead: LibraryReadApi,
+    pageSource: ChapterPageSource,
+) {
     routing {
         authenticate("auth-basic") {
             get("/opds/v1/chapters/{id}/pages/{pageNumber}") {
-                val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
-                    call.respond(HttpStatusCode.BadRequest); return@get
-                }
-                val pageNumber = call.parameters["pageNumber"]?.toIntOrNull()
-                    ?: run { call.respond(HttpStatusCode.BadRequest); return@get }
+                val id =
+                    try {
+                        Id.from(call.parameters["id"]!!)
+                    } catch (e: Exception) {
+                        call.respond(HttpStatusCode.BadRequest)
+                        return@get
+                    }
+                val pageNumber =
+                    call.parameters["pageNumber"]?.toIntOrNull()
+                        ?: run {
+                            call.respond(HttpStatusCode.BadRequest)
+                            return@get
+                        }
 
                 val chapterResult = libraryRead.getChapter(id)
                 if (chapterResult is Result.Failure) {
-                    val status = if (chapterResult.error is AppError.NotFound) HttpStatusCode.NotFound
-                                 else HttpStatusCode.InternalServerError
-                    call.respond(status); return@get
+                    val status =
+                        if (chapterResult.error is AppError.NotFound) {
+                            HttpStatusCode.NotFound
+                        } else {
+                            HttpStatusCode.InternalServerError
+                        }
+                    call.respond(status)
+                    return@get
                 }
                 val chapter = (chapterResult as Result.Success).value
                 if (chapter.downloadStatus != DownloadStatus.DOWNLOADED) {
-                    call.respond(HttpStatusCode.NotFound); return@get
+                    call.respond(HttpStatusCode.NotFound)
+                    return@get
                 }
 
                 when (val pageResult = pageSource.readPage(chapter, pageNumber)) {
                     is Result.Failure -> call.respond(HttpStatusCode.NotFound)
                     is Result.Success -> {
                         val page = pageResult.value
-                        val etag = "\"${sha256("${id}:${chapter.updatedAt.epochSecond}:${pageNumber}")}\""
+                        val etag = "\"${sha256("$id:${chapter.updatedAt.epochSecond}:$pageNumber")}\""
                         call.response.headers.append(HttpHeaders.ETag, etag)
                         call.response.headers.append(HttpHeaders.CacheControl, "max-age=31536000, immutable")
                         val ifNoneMatch = call.request.header(HttpHeaders.IfNoneMatch)
                         if (ifNoneMatch == etag) {
-                            call.respond(HttpStatusCode.NotModified); return@get
+                            call.respond(HttpStatusCode.NotModified)
+                            return@get
                         }
                         call.respondBytes(page.data, ContentType.parse(page.mimeType))
                     }
@@ -142,6 +176,7 @@ fun Application.opdsPageRoutes(libraryRead: LibraryReadApi, pageSource: ChapterP
 
 private fun sha256(input: String): String {
     val digest = MessageDigest.getInstance("SHA-256")
-    return digest.digest(input.toByteArray(Charsets.UTF_8))
+    return digest
+        .digest(input.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 }

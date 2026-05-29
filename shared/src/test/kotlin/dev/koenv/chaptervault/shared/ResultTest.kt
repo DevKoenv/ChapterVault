@@ -54,7 +54,10 @@ class ResultTest {
     fun `getOrElse receives the error in the default lambda`() {
         val error = AppError.NotFound("Chapter", "abc")
         var received: AppError? = null
-        Result.Failure(error).getOrElse { received = it; "x" }
+        Result.Failure(error).getOrElse {
+            received = it
+            "x"
+        }
         assertEquals(error, received)
     }
 }

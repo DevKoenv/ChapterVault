@@ -19,8 +19,9 @@ class InMemoryTaskQueue : TaskQueue {
     override suspend fun dequeue(): Task? = channel.tryReceive().getOrNull()
 
     override suspend fun cancel(taskId: Id): Result<Unit> {
-        val task = store[taskId]
-            ?: return Result.Failure(AppError.NotFound("Task", taskId.toString()))
+        val task =
+            store[taskId]
+                ?: return Result.Failure(AppError.NotFound("Task", taskId.toString()))
         store[taskId] = task.copy(status = TaskStatus.CANCELLED)
         return Result.Success(Unit)
     }

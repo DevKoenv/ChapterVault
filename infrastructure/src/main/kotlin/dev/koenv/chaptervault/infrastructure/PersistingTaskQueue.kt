@@ -13,7 +13,6 @@ class PersistingTaskQueue(
     private val delegate: TaskQueue,
     private val taskRepository: TaskRepository,
 ) : TaskQueue {
-
     override suspend fun enqueue(task: Task): Result<Id> {
         // insert is idempotent — safe to call for tasks already in DB (recover path)
         taskRepository.insert(task)

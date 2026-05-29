@@ -10,7 +10,10 @@ import java.util.zip.ZipOutputStream
 class CbzWriter : ChapterArchiveWriter {
     override val supportedFormat: ChapterFormat = ChapterFormat.Cbz
 
-    override suspend fun write(pages: List<Page>, destination: Path) {
+    override suspend fun write(
+        pages: List<Page>,
+        destination: Path,
+    ) {
         Files.createDirectories(destination.parent)
         ZipOutputStream(Files.newOutputStream(destination)).use { zip ->
             for (page in pages) {

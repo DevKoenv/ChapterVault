@@ -79,7 +79,10 @@ class FileStorageTest {
         return out.toByteArray()
     }
 
-    private fun chapter(seriesId: String, chapterId: String) = Chapter(
+    private fun chapter(
+        seriesId: String,
+        chapterId: String,
+    ) = Chapter(
         id = Id.from(chapterId),
         seriesId = Id.from(seriesId),
         title = "Chapter",
@@ -90,10 +93,16 @@ class FileStorageTest {
         updatedAt = Instant.now(),
     )
 
-    private fun cbzPath(seriesId: String, chapterId: String) =
-        libraryPath.resolve(seriesId).resolve("$chapterId.cbz")
+    private fun cbzPath(
+        seriesId: String,
+        chapterId: String,
+    ) = libraryPath.resolve(seriesId).resolve("$chapterId.cbz")
 
-    private fun writeCbz(seriesId: String, chapterId: String, pages: List<Pair<String, ByteArray>>) {
+    private fun writeCbz(
+        seriesId: String,
+        chapterId: String,
+        pages: List<Pair<String, ByteArray>>,
+    ) {
         val path = cbzPath(seriesId, chapterId)
         Files.createDirectories(path.parent)
         ZipOutputStream(Files.newOutputStream(path)).use { zip ->
@@ -105,7 +114,11 @@ class FileStorageTest {
         }
     }
 
-    private fun writeFolder(seriesId: String, chapterId: String, pages: List<Pair<String, ByteArray>>) {
+    private fun writeFolder(
+        seriesId: String,
+        chapterId: String,
+        pages: List<Pair<String, ByteArray>>,
+    ) {
         val dir = libraryPath.resolve(seriesId).resolve(chapterId)
         Files.createDirectories(dir)
         for ((name, data) in pages) {
@@ -116,94 +129,101 @@ class FileStorageTest {
     // --- readPages ---
 
     @Test
-    fun `readPages on CBZ returns pages sorted by integer index with correct bytes and MIME type`() = runBlocking {
-        val sid = "10000000-0000-0000-0000-000000000001"
-        val cid = "20000000-0000-0000-0000-000000000001"
-        writeCbz(sid, cid, listOf("002.jpg" to byteArrayOf(3), "000.jpg" to byteArrayOf(1), "001.png" to byteArrayOf(2)))
+    fun `readPages on CBZ returns pages sorted by integer index with correct bytes and MIME type`() =
+        runBlocking {
+            val sid = "10000000-0000-0000-0000-000000000001"
+            val cid = "20000000-0000-0000-0000-000000000001"
+            writeCbz(sid, cid, listOf("002.jpg" to byteArrayOf(3), "000.jpg" to byteArrayOf(1), "001.png" to byteArrayOf(2)))
 
-        val result = storage.readPages(chapter(sid, cid))
-        assertIs<Result.Success<List<Page>>>(result)
-        val pages = (result as Result.Success).value
+            val result = storage.readPages(chapter(sid, cid))
+            assertIs<Result.Success<List<Page>>>(result)
+            val pages = (result as Result.Success).value
 
-        assertEquals(3, pages.size)
-        assertEquals(0, pages[0].index)
-        assertContentEquals(byteArrayOf(1), pages[0].data)
-        assertEquals("image/jpeg", pages[0].mimeType)
-        assertEquals(1, pages[1].index)
-        assertContentEquals(byteArrayOf(2), pages[1].data)
-        assertEquals("image/png", pages[1].mimeType)
-        assertEquals(2, pages[2].index)
-        assertContentEquals(byteArrayOf(3), pages[2].data)
-        assertEquals("image/jpeg", pages[2].mimeType)
-    }
-
-    @Test
-    fun `readPages on Folder returns pages sorted by integer index with correct bytes and MIME type`() = runBlocking {
-        val sid = "10000000-0000-0000-0000-000000000002"
-        val cid = "20000000-0000-0000-0000-000000000002"
-        writeFolder(sid, cid, listOf("001.jpg" to byteArrayOf(10, 20), "000.png" to byteArrayOf(5, 6)))
-
-        val result = storage.readPages(chapter(sid, cid))
-        assertIs<Result.Success<List<Page>>>(result)
-        val pages = (result as Result.Success).value
-
-        assertEquals(2, pages.size)
-        assertEquals(0, pages[0].index)
-        assertContentEquals(byteArrayOf(5, 6), pages[0].data)
-        assertEquals("image/png", pages[0].mimeType)
-        assertEquals(1, pages[1].index)
-        assertContentEquals(byteArrayOf(10, 20), pages[1].data)
-        assertEquals("image/jpeg", pages[1].mimeType)
-    }
+            assertEquals(3, pages.size)
+            assertEquals(0, pages[0].index)
+            assertContentEquals(byteArrayOf(1), pages[0].data)
+            assertEquals("image/jpeg", pages[0].mimeType)
+            assertEquals(1, pages[1].index)
+            assertContentEquals(byteArrayOf(2), pages[1].data)
+            assertEquals("image/png", pages[1].mimeType)
+            assertEquals(2, pages[2].index)
+            assertContentEquals(byteArrayOf(3), pages[2].data)
+            assertEquals("image/jpeg", pages[2].mimeType)
+        }
 
     @Test
-    fun `readPages returns NotFound when path does not exist`() = runBlocking {
-        val result = storage.readPages(
-            chapter("ffffffff-0000-0000-0000-000000000000", "ffffffff-0000-0000-0000-000000000001")
-        )
-        assertIs<Result.Failure>(result)
-        assertIs<AppError.NotFound>((result as Result.Failure).error)
-    }
+    fun `readPages on Folder returns pages sorted by integer index with correct bytes and MIME type`() =
+        runBlocking {
+            val sid = "10000000-0000-0000-0000-000000000002"
+            val cid = "20000000-0000-0000-0000-000000000002"
+            writeFolder(sid, cid, listOf("001.jpg" to byteArrayOf(10, 20), "000.png" to byteArrayOf(5, 6)))
+
+            val result = storage.readPages(chapter(sid, cid))
+            assertIs<Result.Success<List<Page>>>(result)
+            val pages = (result as Result.Success).value
+
+            assertEquals(2, pages.size)
+            assertEquals(0, pages[0].index)
+            assertContentEquals(byteArrayOf(5, 6), pages[0].data)
+            assertEquals("image/png", pages[0].mimeType)
+            assertEquals(1, pages[1].index)
+            assertContentEquals(byteArrayOf(10, 20), pages[1].data)
+            assertEquals("image/jpeg", pages[1].mimeType)
+        }
+
+    @Test
+    fun `readPages returns NotFound when path does not exist`() =
+        runBlocking {
+            val result =
+                storage.readPages(
+                    chapter("ffffffff-0000-0000-0000-000000000000", "ffffffff-0000-0000-0000-000000000001"),
+                )
+            assertIs<Result.Failure>(result)
+            assertIs<AppError.NotFound>((result as Result.Failure).error)
+        }
 
     // --- readPage ---
 
     @Test
-    fun `readPage on CBZ returns the page at the given zero-based index`() = runBlocking {
-        val sid = "10000000-0000-0000-0000-000000000003"
-        val cid = "20000000-0000-0000-0000-000000000003"
-        writeCbz(sid, cid, listOf("000.jpg" to byteArrayOf(1), "001.jpg" to byteArrayOf(2), "002.jpg" to byteArrayOf(3)))
+    fun `readPage on CBZ returns the page at the given zero-based index`() =
+        runBlocking {
+            val sid = "10000000-0000-0000-0000-000000000003"
+            val cid = "20000000-0000-0000-0000-000000000003"
+            writeCbz(sid, cid, listOf("000.jpg" to byteArrayOf(1), "001.jpg" to byteArrayOf(2), "002.jpg" to byteArrayOf(3)))
 
-        val result = storage.readPage(chapter(sid, cid), 1)
-        assertIs<Result.Success<Page>>(result)
-        val page = (result as Result.Success).value
-        assertEquals(1, page.index)
-        assertContentEquals(byteArrayOf(2), page.data)
-        assertEquals("image/jpeg", page.mimeType)
-    }
-
-    @Test
-    fun `readPage on Folder returns the page at the given zero-based index`() = runBlocking {
-        val sid = "10000000-0000-0000-0000-000000000004"
-        val cid = "20000000-0000-0000-0000-000000000004"
-        writeFolder(sid, cid, listOf("000.jpg" to byteArrayOf(10), "001.png" to byteArrayOf(20)))
-
-        val result = storage.readPage(chapter(sid, cid), 0)
-        assertIs<Result.Success<Page>>(result)
-        val page = (result as Result.Success).value
-        assertEquals(0, page.index)
-        assertContentEquals(byteArrayOf(10), page.data)
-    }
+            val result = storage.readPage(chapter(sid, cid), 1)
+            assertIs<Result.Success<Page>>(result)
+            val page = (result as Result.Success).value
+            assertEquals(1, page.index)
+            assertContentEquals(byteArrayOf(2), page.data)
+            assertEquals("image/jpeg", page.mimeType)
+        }
 
     @Test
-    fun `readPage returns NotFound when index is out of range`() = runBlocking {
-        val sid = "10000000-0000-0000-0000-000000000005"
-        val cid = "20000000-0000-0000-0000-000000000005"
-        writeCbz(sid, cid, listOf("000.jpg" to byteArrayOf(1)))
+    fun `readPage on Folder returns the page at the given zero-based index`() =
+        runBlocking {
+            val sid = "10000000-0000-0000-0000-000000000004"
+            val cid = "20000000-0000-0000-0000-000000000004"
+            writeFolder(sid, cid, listOf("000.jpg" to byteArrayOf(10), "001.png" to byteArrayOf(20)))
 
-        val result = storage.readPage(chapter(sid, cid), 5)
-        assertIs<Result.Failure>(result)
-        assertIs<AppError.NotFound>((result as Result.Failure).error)
-    }
+            val result = storage.readPage(chapter(sid, cid), 0)
+            assertIs<Result.Success<Page>>(result)
+            val page = (result as Result.Success).value
+            assertEquals(0, page.index)
+            assertContentEquals(byteArrayOf(10), page.data)
+        }
+
+    @Test
+    fun `readPage returns NotFound when index is out of range`() =
+        runBlocking {
+            val sid = "10000000-0000-0000-0000-000000000005"
+            val cid = "20000000-0000-0000-0000-000000000005"
+            writeCbz(sid, cid, listOf("000.jpg" to byteArrayOf(1)))
+
+            val result = storage.readPage(chapter(sid, cid), 5)
+            assertIs<Result.Failure>(result)
+            assertIs<AppError.NotFound>((result as Result.Failure).error)
+        }
 
     // --- deleteSeriesFiles ---
 

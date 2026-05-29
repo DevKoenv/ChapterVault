@@ -14,7 +14,6 @@ import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
@@ -41,9 +40,11 @@ class ProgressRoutesTest {
             install(Authentication) {
                 bearer("auth-bearer") {
                     authenticate { cred ->
-                        if (cred.token == "user-token")
+                        if (cred.token == "user-token") {
                             KtorPrincipal(UserPrincipal(userId, "user", setOf(Role.USER)))
-                        else null
+                        } else {
+                            null
+                        }
                     }
                 }
             }
@@ -57,10 +58,13 @@ class ProgressRoutesTest {
     @Test
     fun `GET progress returns 200 with readCount and totalCount`() {
         testApp(
-            progressApi = object : NoOpProgressApi() {
-                override suspend fun getProgress(userId: Id, seriesId: Id) =
-                    Result.Success(ReadProgress(seriesId, readCount = 3, totalCount = 10))
-            },
+            progressApi =
+                object : NoOpProgressApi() {
+                    override suspend fun getProgress(
+                        userId: Id,
+                        seriesId: Id,
+                    ) = Result.Success(ReadProgress(seriesId, readCount = 3, totalCount = 10))
+                },
         ) {
             val response = client.get("/library/series/$seriesId/progress") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.OK, response.status)
@@ -80,10 +84,13 @@ class ProgressRoutesTest {
     @Test
     fun `GET progress returns 404 when series not found`() {
         testApp(
-            progressApi = object : NoOpProgressApi() {
-                override suspend fun getProgress(userId: Id, seriesId: Id) =
-                    Result.Failure(AppError.NotFound("Series", seriesId.toString()))
-            },
+            progressApi =
+                object : NoOpProgressApi() {
+                    override suspend fun getProgress(
+                        userId: Id,
+                        seriesId: Id,
+                    ) = Result.Failure(AppError.NotFound("Series", seriesId.toString()))
+                },
         ) {
             val response = client.get("/library/series/$seriesId/progress") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.NotFound, response.status)
@@ -109,10 +116,13 @@ class ProgressRoutesTest {
     @Test
     fun `POST read returns 404 when chapter not found`() {
         testApp(
-            progressApi = object : NoOpProgressApi() {
-                override suspend fun markRead(userId: Id, chapterId: Id) =
-                    Result.Failure(AppError.NotFound("Chapter", chapterId.toString()))
-            },
+            progressApi =
+                object : NoOpProgressApi() {
+                    override suspend fun markRead(
+                        userId: Id,
+                        chapterId: Id,
+                    ) = Result.Failure(AppError.NotFound("Chapter", chapterId.toString()))
+                },
         ) {
             val response = client.post("/library/chapters/$chapterId/read") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.NotFound, response.status)
@@ -138,10 +148,13 @@ class ProgressRoutesTest {
     @Test
     fun `DELETE read returns 404 when chapter not found`() {
         testApp(
-            progressApi = object : NoOpProgressApi() {
-                override suspend fun markUnread(userId: Id, chapterId: Id) =
-                    Result.Failure(AppError.NotFound("Chapter", chapterId.toString()))
-            },
+            progressApi =
+                object : NoOpProgressApi() {
+                    override suspend fun markUnread(
+                        userId: Id,
+                        chapterId: Id,
+                    ) = Result.Failure(AppError.NotFound("Chapter", chapterId.toString()))
+                },
         ) {
             val response = client.delete("/library/chapters/$chapterId/read") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.NotFound, response.status)
@@ -150,8 +163,18 @@ class ProgressRoutesTest {
 }
 
 private open class NoOpProgressApi : ProgressApi {
-    override suspend fun markRead(userId: Id, chapterId: Id): Result<Unit> = Result.Success(Unit)
-    override suspend fun markUnread(userId: Id, chapterId: Id): Result<Unit> = Result.Success(Unit)
-    override suspend fun getProgress(userId: Id, seriesId: Id): Result<ReadProgress> =
-        Result.Failure(AppError.NotFound("Series", seriesId.toString()))
+    override suspend fun markRead(
+        userId: Id,
+        chapterId: Id,
+    ): Result<Unit> = Result.Success(Unit)
+
+    override suspend fun markUnread(
+        userId: Id,
+        chapterId: Id,
+    ): Result<Unit> = Result.Success(Unit)
+
+    override suspend fun getProgress(
+        userId: Id,
+        seriesId: Id,
+    ): Result<ReadProgress> = Result.Failure(AppError.NotFound("Series", seriesId.toString()))
 }

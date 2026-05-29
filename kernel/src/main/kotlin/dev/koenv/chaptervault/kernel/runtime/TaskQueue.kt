@@ -5,7 +5,10 @@ import dev.koenv.chaptervault.shared.utils.Id
 
 interface TaskQueue {
     suspend fun enqueue(task: Task): Result<Id>
+
     suspend fun dequeue(): Task?
+
     suspend fun cancel(taskId: Id): Result<Unit>
+
     suspend fun getTask(taskId: Id): Task?
 }

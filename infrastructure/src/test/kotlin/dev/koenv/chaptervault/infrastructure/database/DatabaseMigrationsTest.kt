@@ -11,18 +11,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DatabaseMigrationsTest {
-
     @Test
-    fun `migrate applies all migrations and stores checksums`(@TempDir dir: Path) {
+    fun `migrate applies all migrations and stores checksums`(
+        @TempDir dir: Path,
+    ) {
         val db = Database.connect("jdbc:sqlite:${dir.resolve("test.db")}", "org.sqlite.JDBC")
         DatabaseMigrations.migrate(db)
 
         transaction(db) {
-            val rows = exec("SELECT version, checksum FROM schema_version ORDER BY version") { rs ->
-                buildList {
-                    while (rs.next()) add(rs.getInt("version") to rs.getString("checksum"))
-                }
-            }!!
+            val rows =
+                exec("SELECT version, checksum FROM schema_version ORDER BY version") { rs ->
+                    buildList {
+                        while (rs.next()) add(rs.getInt("version") to rs.getString("checksum"))
+                    }
+                }!!
             assertTrue(rows.isNotEmpty())
             rows.forEach { (_, checksum) -> assertNotNull(checksum) }
             assertEquals(DatabaseMigrations.migrations.size, rows.size)
@@ -30,21 +32,27 @@ class DatabaseMigrationsTest {
     }
 
     @Test
-    fun `migrate is idempotent — running twice does not duplicate rows`(@TempDir dir: Path) {
+    fun `migrate is idempotent — running twice does not duplicate rows`(
+        @TempDir dir: Path,
+    ) {
         val db = Database.connect("jdbc:sqlite:${dir.resolve("test.db")}", "org.sqlite.JDBC")
         DatabaseMigrations.migrate(db)
         DatabaseMigrations.migrate(db)
 
         transaction(db) {
-            val count = exec("SELECT COUNT(*) AS cnt FROM schema_version") { rs ->
-                rs.next(); rs.getInt("cnt")
-            }!!
+            val count =
+                exec("SELECT COUNT(*) AS cnt FROM schema_version") { rs ->
+                    rs.next()
+                    rs.getInt("cnt")
+                }!!
             assertEquals(DatabaseMigrations.migrations.size, count)
         }
     }
 
     @Test
-    fun `migrate aborts when stored checksum does not match`(@TempDir dir: Path) {
+    fun `migrate aborts when stored checksum does not match`(
+        @TempDir dir: Path,
+    ) {
         val db = Database.connect("jdbc:sqlite:${dir.resolve("test.db")}", "org.sqlite.JDBC")
         DatabaseMigrations.migrate(db)
 

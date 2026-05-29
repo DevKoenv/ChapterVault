@@ -13,32 +13,51 @@ import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.server.application.*
-import io.ktor.server.auth.*
-import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.install
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.bearer
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
-import io.ktor.server.testing.*
+import io.ktor.server.testing.ApplicationTestBuilder
+import io.ktor.server.testing.testApplication
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 
 class ConnectorRoutesTest {
     private val registry: ConnectorRegistry = DefaultConnectorRegistry().also { it.register(MockConnector()) }
 
-    private fun stubLibrary(inLibraryIds: Set<String> = emptySet()): LibraryReadApi = object : LibraryReadApi {
-        override suspend fun getSeries(id: Id): Result<Series> = error("not used")
-        override suspend fun listSeries(request: PageRequest): Result<Pagination<Series>> = error("not used")
-        override suspend fun searchLibrary(query: String, request: PageRequest): Result<Pagination<Series>> = error("not used")
-        override suspend fun getChapter(id: Id): Result<Chapter> = error("not used")
-        override suspend fun listChapters(seriesId: Id): Result<List<Chapter>> = error("not used")
-        override suspend fun listChaptersByStatus(seriesId: Id, status: DownloadStatus): Result<List<Chapter>> = error("not used")
-        override suspend fun inLibraryExternalIds(connectorId: String, externalIds: List<String>): Result<Set<String>> =
-            Result.Success(inLibraryIds.intersect(externalIds.toSet()))
-    }
+    private fun stubLibrary(inLibraryIds: Set<String> = emptySet()): LibraryReadApi =
+        object : LibraryReadApi {
+            override suspend fun getSeries(id: Id): Result<Series> = error("not used")
+
+            override suspend fun listSeries(request: PageRequest): Result<Pagination<Series>> = error("not used")
+
+            override suspend fun searchLibrary(
+                query: String,
+                request: PageRequest,
+            ): Result<Pagination<Series>> = error("not used")
+
+            override suspend fun getChapter(id: Id): Result<Chapter> = error("not used")
+
+            override suspend fun listChapters(seriesId: Id): Result<List<Chapter>> = error("not used")
+
+            override suspend fun listChaptersByStatus(
+                seriesId: Id,
+                status: DownloadStatus,
+            ): Result<List<Chapter>> = error("not used")
+
+            override suspend fun inLibraryExternalIds(
+                connectorId: String,
+                externalIds: List<String>,
+            ): Result<Set<String>> = Result.Success(inLibraryIds.intersect(externalIds.toSet()))
+        }
 
     private fun testApp(
         registry: ConnectorRegistry,

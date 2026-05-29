@@ -15,21 +15,22 @@ class DefaultConnectorContext(
     private val httpClient: HttpClient,
     private val buckets: Map<BucketKey, RateLimiter>,
 ) : ConnectorContext {
-
     override suspend fun get(
         url: String,
         params: Map<String, String>,
         bucket: BucketKey,
         headers: Map<String, String>,
     ): Result<HttpResponse> {
-        val limiter = buckets[bucket]
-            ?: return Result.Failure(AppError.InternalError("No rate limiter configured for bucket '${bucket.id}'"))
+        val limiter =
+            buckets[bucket]
+                ?: return Result.Failure(AppError.InternalError("No rate limiter configured for bucket '${bucket.id}'"))
         limiter.acquire()
         return try {
-            val response = httpClient.get(url) {
-                params.forEach { (k, v) -> parameter(k, v) }
-                headers.forEach { (k, v) -> header(k, v) }
-            }
+            val response =
+                httpClient.get(url) {
+                    params.forEach { (k, v) -> parameter(k, v) }
+                    headers.forEach { (k, v) -> header(k, v) }
+                }
             if (!response.status.isSuccess()) {
                 return Result.Failure(AppError.InternalError("HTTP ${response.status.value} from $url"))
             }
@@ -44,13 +45,15 @@ class DefaultConnectorContext(
         bucket: BucketKey,
         headers: Map<String, String>,
     ): Result<ByteArray> {
-        val limiter = buckets[bucket]
-            ?: return Result.Failure(AppError.InternalError("No rate limiter configured for bucket '${bucket.id}'"))
+        val limiter =
+            buckets[bucket]
+                ?: return Result.Failure(AppError.InternalError("No rate limiter configured for bucket '${bucket.id}'"))
         limiter.acquire()
         return try {
-            val response = httpClient.get(url) {
-                headers.forEach { (k, v) -> header(k, v) }
-            }
+            val response =
+                httpClient.get(url) {
+                    headers.forEach { (k, v) -> header(k, v) }
+                }
             if (!response.status.isSuccess()) {
                 return Result.Failure(AppError.InternalError("HTTP ${response.status.value} from $url"))
             }

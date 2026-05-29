@@ -15,11 +15,12 @@ class FolderWriterTest {
         runBlocking {
             val tempDir = Files.createTempDirectory("folder-writer-test")
             val destination = tempDir.resolve("chapter1")
-            val pages = listOf(
-                Page(1, byteArrayOf(1, 2, 3)),
-                Page(2, byteArrayOf(4, 5, 6)),
-                Page(3, byteArrayOf(7, 8, 9)),
-            )
+            val pages =
+                listOf(
+                    Page(1, byteArrayOf(1, 2, 3)),
+                    Page(2, byteArrayOf(4, 5, 6)),
+                    Page(3, byteArrayOf(7, 8, 9)),
+                )
 
             writer.write(pages, destination)
 
@@ -34,11 +35,12 @@ class FolderWriterTest {
         runBlocking {
             val tempDir = Files.createTempDirectory("folder-writer-test")
             val destination = tempDir.resolve("chapter2")
-            val pages = listOf(
-                Page(1, byteArrayOf(10, 20, 30)),
-                Page(2, byteArrayOf(40, 50, 60)),
-                Page(3, byteArrayOf(70, 80, 90)),
-            )
+            val pages =
+                listOf(
+                    Page(1, byteArrayOf(10, 20, 30)),
+                    Page(2, byteArrayOf(40, 50, 60)),
+                    Page(3, byteArrayOf(70, 80, 90)),
+                )
 
             writer.write(pages, destination)
 

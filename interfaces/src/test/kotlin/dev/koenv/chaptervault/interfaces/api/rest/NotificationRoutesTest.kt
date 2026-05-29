@@ -11,9 +11,15 @@ import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -31,15 +37,16 @@ import kotlin.test.assertEquals
 class NotificationRoutesTest {
     private val targetId = Id.from("00000000-0000-0000-0000-000000000001")
 
-    private val fakeTarget = NotificationTarget(
-        id = targetId,
-        name = "My Ntfy",
-        type = NotificationType.NTFY,
-        url = "https://ntfy.sh/mychannel",
-        token = null,
-        enabled = true,
-        createdAt = Instant.EPOCH,
-    )
+    private val fakeTarget =
+        NotificationTarget(
+            id = targetId,
+            name = "My Ntfy",
+            type = NotificationType.NTFY,
+            url = "https://ntfy.sh/mychannel",
+            token = null,
+            enabled = true,
+            createdAt = Instant.EPOCH,
+        )
 
     private fun testApp(
         notificationApi: NotificationApi = NoOpNotificationApi(),
@@ -71,9 +78,10 @@ class NotificationRoutesTest {
     @Test
     fun `GET notifications returns 200 with targets for authenticated user`() {
         testApp(
-            notificationApi = object : NoOpNotificationApi() {
-                override suspend fun listTargets() = listOf(fakeTarget)
-            },
+            notificationApi =
+                object : NoOpNotificationApi() {
+                    override suspend fun listTargets() = listOf(fakeTarget)
+                },
         ) {
             val response = client.get("/notifications") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.OK, response.status)
@@ -83,7 +91,7 @@ class NotificationRoutesTest {
 
     @Test
     fun `GET notifications returns 401 without auth`() {
-        testApp() {
+        testApp {
             val response = client.get("/notifications")
             assertEquals(HttpStatusCode.Unauthorized, response.status)
         }
@@ -92,15 +100,17 @@ class NotificationRoutesTest {
     @Test
     fun `POST notifications returns 201 for ADMIN`() {
         testApp(
-            notificationApi = object : NoOpNotificationApi() {
-                override suspend fun createTarget(input: NotificationTargetInput) = Result.Success(fakeTarget)
-            },
+            notificationApi =
+                object : NoOpNotificationApi() {
+                    override suspend fun createTarget(input: NotificationTargetInput) = Result.Success(fakeTarget)
+                },
         ) {
-            val response = client.post("/notifications") {
-                bearerAuth("admin-token")
-                contentType(ContentType.Application.Json)
-                setBody("""{"name":"My Ntfy","type":"NTFY","url":"https://ntfy.sh/mychannel"}""")
-            }
+            val response =
+                client.post("/notifications") {
+                    bearerAuth("admin-token")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"name":"My Ntfy","type":"NTFY","url":"https://ntfy.sh/mychannel"}""")
+                }
             assertEquals(HttpStatusCode.Created, response.status)
             assertContains(response.bodyAsText(), "My Ntfy")
         }
@@ -108,12 +118,13 @@ class NotificationRoutesTest {
 
     @Test
     fun `POST notifications returns 403 for non-ADMIN user`() {
-        testApp() {
-            val response = client.post("/notifications") {
-                bearerAuth("user-token")
-                contentType(ContentType.Application.Json)
-                setBody("""{"name":"My Ntfy","type":"NTFY","url":"https://ntfy.sh/mychannel"}""")
-            }
+        testApp {
+            val response =
+                client.post("/notifications") {
+                    bearerAuth("user-token")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"name":"My Ntfy","type":"NTFY","url":"https://ntfy.sh/mychannel"}""")
+                }
             assertEquals(HttpStatusCode.Forbidden, response.status)
         }
     }
@@ -121,13 +132,15 @@ class NotificationRoutesTest {
     @Test
     fun `POST notifications test dispatch returns 200 for ADMIN`() {
         testApp(
-            dispatchApi = object : NoOpDispatchApi() {
-                override suspend fun sendTest(targetId: Id) = Result.Success(Unit)
-            },
+            dispatchApi =
+                object : NoOpDispatchApi() {
+                    override suspend fun sendTest(targetId: Id) = Result.Success(Unit)
+                },
         ) {
-            val response = client.post("/notifications/$targetId/test") {
-                bearerAuth("admin-token")
-            }
+            val response =
+                client.post("/notifications/$targetId/test") {
+                    bearerAuth("admin-token")
+                }
             assertEquals(HttpStatusCode.OK, response.status)
         }
     }
@@ -135,13 +148,15 @@ class NotificationRoutesTest {
     @Test
     fun `DELETE notifications returns 204 for ADMIN`() {
         testApp(
-            notificationApi = object : NoOpNotificationApi() {
-                override suspend fun deleteTarget(id: Id) = Result.Success(Unit)
-            },
+            notificationApi =
+                object : NoOpNotificationApi() {
+                    override suspend fun deleteTarget(id: Id) = Result.Success(Unit)
+                },
         ) {
-            val response = client.delete("/notifications/$targetId") {
-                bearerAuth("admin-token")
-            }
+            val response =
+                client.delete("/notifications/$targetId") {
+                    bearerAuth("admin-token")
+                }
             assertEquals(HttpStatusCode.NoContent, response.status)
         }
     }
@@ -149,16 +164,21 @@ class NotificationRoutesTest {
 
 private open class NoOpNotificationApi : NotificationApi {
     override suspend fun listTargets(): List<NotificationTarget> = emptyList()
+
     override suspend fun findTarget(id: Id): Result<NotificationTarget> =
         Result.Failure(AppError.NotFound("NotificationTarget", id.toString()))
+
     override suspend fun createTarget(input: NotificationTargetInput): Result<NotificationTarget> =
         Result.Failure(AppError.InternalError("not implemented"))
-    override suspend fun updateTarget(id: Id, patch: NotificationTargetPatch): Result<NotificationTarget> =
-        Result.Failure(AppError.InternalError("not implemented"))
+
+    override suspend fun updateTarget(
+        id: Id,
+        patch: NotificationTargetPatch,
+    ): Result<NotificationTarget> = Result.Failure(AppError.InternalError("not implemented"))
+
     override suspend fun deleteTarget(id: Id): Result<Unit> = Result.Success(Unit)
 }
 
 private open class NoOpDispatchApi : NotificationDispatchApi {
-    override suspend fun sendTest(targetId: Id): Result<Unit> =
-        Result.Failure(AppError.InternalError("not implemented"))
+    override suspend fun sendTest(targetId: Id): Result<Unit> = Result.Failure(AppError.InternalError("not implemented"))
 }

@@ -7,5 +7,6 @@ import dev.koenv.chaptervault.shared.utils.Id
 
 interface TaskReadStore {
     suspend fun listTasks(request: PageRequest): Result<Pagination<Task>>
+
     suspend fun findTask(id: Id): Result<Task>
 }

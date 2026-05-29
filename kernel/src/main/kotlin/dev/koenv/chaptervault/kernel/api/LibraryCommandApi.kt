@@ -6,9 +6,22 @@ import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 
 interface LibraryCommandApi {
-    suspend fun addToLibrary(connectorId: String, externalId: String, language: String = "en", autoDownload: Boolean = false): Result<Series>
+    suspend fun addToLibrary(
+        connectorId: String,
+        externalId: String,
+        language: String = "en",
+        autoDownload: Boolean = false,
+    ): Result<Series>
+
     suspend fun removeSeries(id: Id): Result<Unit>
+
     suspend fun evictChapter(id: Id): Result<Unit>
+
     suspend fun markChapterPending(id: Id): Result<Unit>
-    suspend fun updateSeries(id: Id, autoDownload: Boolean? = null, defaultFormat: ChapterFormat? = null): Result<Series>
+
+    suspend fun updateSeries(
+        id: Id,
+        autoDownload: Boolean? = null,
+        defaultFormat: ChapterFormat? = null,
+    ): Result<Series>
 }

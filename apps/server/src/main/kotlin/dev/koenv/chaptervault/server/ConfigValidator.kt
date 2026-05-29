@@ -11,8 +11,9 @@ object ConfigValidator {
     fun validate(config: AppConfig) {
         val errors = mutableListOf<String>()
 
-        if (config.server.port !in 1..65535)
+        if (config.server.port !in 1..65535) {
             errors += "server.port ${config.server.port} is not a valid port number"
+        }
 
         val dbUrl = config.database.url
         if (dbUrl.isBlank()) {
@@ -23,8 +24,9 @@ object ConfigValidator {
             if (dbDir != null) {
                 try {
                     Files.createDirectories(dbDir)
-                    if (!Files.isWritable(dbDir))
+                    if (!Files.isWritable(dbDir)) {
                         errors += "database directory '$dbDir' is not writable"
+                    }
                 } catch (e: Exception) {
                     errors += "database directory '$dbDir' cannot be created: ${e.message}"
                 }
@@ -38,8 +40,9 @@ object ConfigValidator {
             val storagePath = Paths.get(path)
             try {
                 Files.createDirectories(storagePath)
-                if (!Files.isWritable(storagePath))
+                if (!Files.isWritable(storagePath)) {
                     errors += "$name '$path' is not writable"
+                }
             } catch (e: Exception) {
                 errors += "$name '$path' cannot be created: ${e.message}"
             }
@@ -47,7 +50,10 @@ object ConfigValidator {
 
         val invalidCidrs = mutableListOf<String>()
         (config.auth.rateLimiting.trustedNetworks + config.auth.rateLimiting.trustedProxies).forEach { cidr ->
-            runCatching { dev.koenv.chaptervault.shared.net.CidrMatcher(cidr) }.onFailure {
+            runCatching {
+                dev.koenv.chaptervault.shared.net
+                    .CidrMatcher(cidr)
+            }.onFailure {
                 invalidCidrs += "auth.rateLimiting CIDR '$cidr' is invalid: ${it.message}"
             }
         }
@@ -60,9 +66,9 @@ object ConfigValidator {
 
         log.info(
             "Config: port=${config.server.port} db=${config.database.url} " +
-            "library=${config.storage.libraryPath} thumbnails=${config.storage.thumbnailsPath} " +
-            "refresh=${config.refresh.intervalHours}h debug=${config.debug} " +
-            "rateLimiting=${config.auth.rateLimiting.enabled}"
+                "library=${config.storage.libraryPath} thumbnails=${config.storage.thumbnailsPath} " +
+                "refresh=${config.refresh.intervalHours}h debug=${config.debug} " +
+                "rateLimiting=${config.auth.rateLimiting.enabled}",
         )
     }
 }

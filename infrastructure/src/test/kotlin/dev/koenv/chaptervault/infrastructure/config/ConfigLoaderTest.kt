@@ -2,7 +2,6 @@ package dev.koenv.chaptervault.infrastructure.config
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.io.File
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -17,13 +16,17 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `parses server port and host from yaml`(@TempDir dir: Path) {
+    fun `parses server port and host from yaml`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
-        file.writeText("""
+        file.writeText(
+            """
             server:
               port: 9090
               host: "localhost"
-        """.trimIndent())
+            """.trimIndent(),
+        )
 
         val config = ConfigLoader.load(file.absolutePath)
         assertEquals(9090, config.server.port)
@@ -31,13 +34,17 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `parses database url from yaml`(@TempDir dir: Path) {
+    fun `parses database url from yaml`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
-        file.writeText("""
+        file.writeText(
+            """
             database:
               url: "jdbc:sqlite:custom.db"
               maxPoolSize: 10
-        """.trimIndent())
+            """.trimIndent(),
+        )
 
         val config = ConfigLoader.load(file.absolutePath)
         assertEquals("jdbc:sqlite:custom.db", config.database.url)
@@ -45,25 +52,33 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `parses storage config from yaml`(@TempDir dir: Path) {
+    fun `parses storage config from yaml`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
-        file.writeText("""
+        file.writeText(
+            """
             storage:
               libraryPath: "custom/library"
               defaultFormat: "FOLDER"
-        """.trimIndent())
+            """.trimIndent(),
+        )
         val config = ConfigLoader.load(file.absolutePath)
         assertEquals("custom/library", config.storage.libraryPath)
         assertEquals("FOLDER", config.storage.defaultFormat.toString())
     }
 
     @Test
-    fun `uses defaults for missing keys`(@TempDir dir: Path) {
+    fun `uses defaults for missing keys`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
-        file.writeText("""
+        file.writeText(
+            """
             server:
               port: 7070
-        """.trimIndent())
+            """.trimIndent(),
+        )
 
         val config = ConfigLoader.load(file.absolutePath)
         assertEquals(7070, config.server.port)
@@ -72,7 +87,9 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `env var overrides port from yaml`(@TempDir dir: Path) {
+    fun `env var overrides port from yaml`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
         file.writeText("server:\n  port: 9090")
         val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_PORT") "7777" else null })
@@ -93,7 +110,16 @@ class ConfigLoaderTest {
 
     @Test
     fun `env var overrides cors origins as comma-separated list`() {
-        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_CORS_ORIGINS") "http://a.com, http://b.com" else null })
+        val config =
+            ConfigLoader.load("nonexistent.yaml", env = {
+                if (it ==
+                    "CHAPTERVAULT_CORS_ORIGINS"
+                ) {
+                    "http://a.com, http://b.com"
+                } else {
+                    null
+                }
+            })
         assertEquals(listOf("http://a.com", "http://b.com"), config.server.corsOrigins)
     }
 
@@ -110,15 +136,28 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `env vars take precedence over yaml values`(@TempDir dir: Path) {
+    fun `env vars take precedence over yaml values`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
         file.writeText("database:\n  url: \"jdbc:sqlite:from-yaml.db\"")
-        val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_DATABASE_URL") "jdbc:sqlite:from-env.db" else null })
+        val config =
+            ConfigLoader.load(file.absolutePath, env = {
+                if (it ==
+                    "CHAPTERVAULT_DATABASE_URL"
+                ) {
+                    "jdbc:sqlite:from-env.db"
+                } else {
+                    null
+                }
+            })
         assertEquals("jdbc:sqlite:from-env.db", config.database.url)
     }
 
     @Test
-    fun `invalid env var port falls back to yaml value`(@TempDir dir: Path) {
+    fun `invalid env var port falls back to yaml value`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
         file.writeText("server:\n  port: 9090")
         val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_PORT") "not-a-number" else null })
@@ -126,14 +165,18 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `parses storage libraryPath and thumbnailsPath from yaml`(@TempDir dir: Path) {
+    fun `parses storage libraryPath and thumbnailsPath from yaml`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
-        file.writeText("""
+        file.writeText(
+            """
             storage:
               libraryPath: "custom/library"
               thumbnailsPath: "custom/thumbs"
               defaultFormat: "FOLDER"
-        """.trimIndent())
+            """.trimIndent(),
+        )
         val config = ConfigLoader.load(file.absolutePath)
         assertEquals("custom/library", config.storage.libraryPath)
         assertEquals("custom/thumbs", config.storage.thumbnailsPath)
@@ -167,20 +210,23 @@ class ConfigLoaderTest {
 
     @Test
     fun `explicit CHAPTERVAULT_LIBRARY_PATH overrides CHAPTERVAULT_DATA_DIR derived library path`() {
-        val config = ConfigLoader.load("nonexistent.yaml", env = {
-            when (it) {
-                "CHAPTERVAULT_DATA_DIR" -> "mydata"
-                "CHAPTERVAULT_LIBRARY_PATH" -> "/mnt/library"
-                else -> null
-            }
-        })
+        val config =
+            ConfigLoader.load("nonexistent.yaml", env = {
+                when (it) {
+                    "CHAPTERVAULT_DATA_DIR" -> "mydata"
+                    "CHAPTERVAULT_LIBRARY_PATH" -> "/mnt/library"
+                    else -> null
+                }
+            })
         assertEquals("jdbc:sqlite:mydata/db/chaptervault.db", config.database.url)
         assertEquals("/mnt/library", config.storage.libraryPath)
         assertEquals("mydata/thumbnails", config.storage.thumbnailsPath)
     }
 
     @Test
-    fun `YAML libraryPath overrides CHAPTERVAULT_DATA_DIR derived library path`(@TempDir dir: Path) {
+    fun `YAML libraryPath overrides CHAPTERVAULT_DATA_DIR derived library path`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("application.yaml").toFile()
         file.writeText("storage:\n  libraryPath: \"yaml/library\"")
         val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_DATA_DIR") "mydata" else null })
@@ -189,8 +235,11 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `load parses auth rate limit section from YAML`(@TempDir dir: Path) {
-        val yaml = """
+    fun `load parses auth rate limit section from YAML`(
+        @TempDir dir: Path,
+    ) {
+        val yaml =
+            """
             auth:
               rateLimiting:
                 enabled: true
@@ -204,9 +253,10 @@ class ConfigLoaderTest {
                 register:
                   maxAttempts: 2
                   windowMinutes: 30
-        """.trimIndent()
+            """.trimIndent()
         val file = dir.resolve("application.yaml")
-        java.nio.file.Files.writeString(file, yaml)
+        java.nio.file.Files
+            .writeString(file, yaml)
         val config = ConfigLoader.load(configPath = file.toString())
         assertEquals(true, config.auth.rateLimiting.enabled)
         assertEquals(listOf("10.0.0.0/8"), config.auth.rateLimiting.trustedNetworks)
@@ -220,7 +270,10 @@ class ConfigLoaderTest {
         val config = ConfigLoader.load(configPath = "nonexistent.yaml")
         assertEquals(true, config.auth.rateLimiting.enabled)
         assertEquals(5, config.auth.rateLimiting.trustedNetworks.size)
-        assertTrue(config.auth.rateLimiting.trustedProxies.isEmpty())
+        assertTrue(
+            config.auth.rateLimiting.trustedProxies
+                .isEmpty(),
+        )
         assertEquals(10, config.auth.rateLimiting.login.maxAttempts)
         assertEquals(15, config.auth.rateLimiting.login.windowMinutes)
         assertEquals(5, config.auth.rateLimiting.register.maxAttempts)
@@ -228,7 +281,9 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `writes default config file when configPath is null and file does not exist`(@TempDir dir: Path) {
+    fun `writes default config file when configPath is null and file does not exist`(
+        @TempDir dir: Path,
+    ) {
         val dataDir = dir.toString()
         val config = ConfigLoader.load(configPath = null, env = { if (it == "CHAPTERVAULT_DATA_DIR") dataDir else null })
         val written = dir.resolve("config.yaml").toFile()
@@ -243,7 +298,9 @@ class ConfigLoaderTest {
     }
 
     @Test
-    fun `does not overwrite existing config file`(@TempDir dir: Path) {
+    fun `does not overwrite existing config file`(
+        @TempDir dir: Path,
+    ) {
         val file = dir.resolve("config.yaml").toFile()
         file.writeText("server:\n  port: 9999")
         val config = ConfigLoader.load(configPath = null, env = { if (it == "CHAPTERVAULT_DATA_DIR") dir.toString() else null })

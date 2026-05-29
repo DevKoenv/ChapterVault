@@ -18,12 +18,12 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepositor
 import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
 import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
-import dev.koenv.chaptervault.kernel.library.Chapter
-import dev.koenv.chaptervault.kernel.library.DownloadStatus
-import dev.koenv.chaptervault.kernel.library.SeriesStatus
 import dev.koenv.chaptervault.kernel.event.DomainEvent
 import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
 import dev.koenv.chaptervault.kernel.event.NewChaptersDiscovered
+import dev.koenv.chaptervault.kernel.library.Chapter
+import dev.koenv.chaptervault.kernel.library.DownloadStatus
+import dev.koenv.chaptervault.kernel.library.SeriesStatus
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
@@ -52,14 +52,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 class TaskExecutorServiceTest {
-
     private val chapterRepository = ChapterRepository()
     private val taskRepository = TaskRepository()
-    private val fileStorage = FileStorage(
-        Files.createTempDirectory("executor-test-storage"),
-        Files.createTempDirectory("executor-test-thumbnails"),
-        ArchiveWriterSelector(listOf(CbzWriter())),
-    )
+    private val fileStorage =
+        FileStorage(
+            Files.createTempDirectory("executor-test-storage"),
+            Files.createTempDirectory("executor-test-thumbnails"),
+            ArchiveWriterSelector(listOf(CbzWriter())),
+        )
     private val seriesRepository = SeriesRepository(fileStorage)
     private val taskQueue = InMemoryTaskQueue()
     private val registry = DefaultConnectorRegistry()
@@ -105,48 +105,75 @@ class TaskExecutorServiceTest {
         return id
     }
 
-    private suspend fun insertChapter(seriesId: Id): Chapter {
-        return (chapterRepository.insertChapter(seriesId, "Chapter 1", 1.0, "ext-ch-001") as Result.Success).value
-    }
+    private suspend fun insertChapter(seriesId: Id): Chapter =
+        (chapterRepository.insertChapter(seriesId, "Chapter 1", 1.0, "ext-ch-001") as Result.Success).value
 
-    private fun makeTask(chapterId: Id, connectorId: String): Task = Task(
-        id = Id.generate(),
-        type = TaskType.DOWNLOAD_CHAPTER,
-        status = TaskStatus.PENDING,
-        targetType = TargetType.CHAPTER,
-        targetId = chapterId,
-        payload = mapOf(
-            "connectorId" to connectorId,
-            "chapterId" to chapterId.toString(),
-            "format" to "Cbz",
-        ),
-        createdAt = Instant.now(),
-        updatedAt = Instant.now(),
-    )
+    private fun makeTask(
+        chapterId: Id,
+        connectorId: String,
+    ): Task =
+        Task(
+            id = Id.generate(),
+            type = TaskType.DOWNLOAD_CHAPTER,
+            status = TaskStatus.PENDING,
+            targetType = TargetType.CHAPTER,
+            targetId = chapterId,
+            payload =
+                mapOf(
+                    "connectorId" to connectorId,
+                    "chapterId" to chapterId.toString(),
+                    "format" to "Cbz",
+                ),
+            createdAt = Instant.now(),
+            updatedAt = Instant.now(),
+        )
 
     private fun makeConnector(
         connectorId: String,
         pages: List<DownloadPage>,
         fetchPageResult: (DownloadPage) -> Result<ByteArray> = { Result.Success(ByteArray(10) { i -> i.toByte() }) },
-    ): HttpConnector {
-        return object : HttpConnector(HttpClient()) {
+    ): HttpConnector =
+        object : HttpConnector(HttpClient()) {
             override val id = connectorId
             override val name = "Test Connector"
-            override val bucketConfigs: Map<BucketKey, BucketConfig> = mapOf(
-                Bucket.CDN to BucketConfig(requestsPerSecond = 100.0),
-            )
+            override val bucketConfigs: Map<BucketKey, BucketConfig> =
+                mapOf(
+                    Bucket.CDN to BucketConfig(requestsPerSecond = 100.0),
+                )
+
             override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> = fetchPageResult(page)
-            override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> = TODO()
+
+            override suspend fun search(
+                query: String,
+                request: PageRequest,
+            ): Result<Pagination<SeriesSearchResult>> = TODO()
+
             override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> = TODO()
-            override suspend fun fetchChapters(externalId: String, language: String): Result<List<ChapterMetadata>> = TODO()
-            override suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult> =
-                Result.Success(DownloadResult(pages = pages))
+
+            override suspend fun fetchChapters(
+                externalId: String,
+                language: String,
+            ): Result<List<ChapterMetadata>> = TODO()
+
+            override suspend fun download(
+                chapter: Chapter,
+                format: ChapterFormat,
+            ): Result<DownloadResult> = Result.Success(DownloadResult(pages = pages))
         }
-    }
 
     private fun makeExecutor(tempDir: java.nio.file.Path): TaskExecutorService {
-        val fileStorage = FileStorage(tempDir, Files.createTempDirectory("executor-test-thumbnails"), ArchiveWriterSelector(listOf(CbzWriter())))
-        return TaskExecutorService(taskQueue, taskRepository, registry, seriesRepository, chapterRepository, fileStorage, HttpClient(), InMemoryEventBus())
+        val fileStorage =
+            FileStorage(tempDir, Files.createTempDirectory("executor-test-thumbnails"), ArchiveWriterSelector(listOf(CbzWriter())))
+        return TaskExecutorService(
+            taskQueue,
+            taskRepository,
+            registry,
+            seriesRepository,
+            chapterRepository,
+            fileStorage,
+            HttpClient(),
+            InMemoryEventBus(),
+        )
     }
 
     @Test
@@ -220,12 +247,14 @@ class TaskExecutorServiceTest {
             val chapter = insertChapter(seriesId)
 
             val pages = List(3) { i -> DownloadPage(url = "https://cdn.example.com/p$i.jpg", index = i) }
-            val connector = makeConnector("partial-fail-connector", pages) { page ->
-                if (page.index == 1)
-                    Result.Failure(AppError.InternalError("simulated fetch failure for page 1"))
-                else
-                    Result.Success(ByteArray(10) { i -> i.toByte() })
-            }
+            val connector =
+                makeConnector("partial-fail-connector", pages) { page ->
+                    if (page.index == 1) {
+                        Result.Failure(AppError.InternalError("simulated fetch failure for page 1"))
+                    } else {
+                        Result.Success(ByteArray(10) { i -> i.toByte() })
+                    }
+                }
             registry.register(connector)
 
             val result = executor.handleDownloadChapter(makeTask(chapter.id, "partial-fail-connector"))
@@ -248,47 +277,73 @@ class TaskExecutorServiceTest {
             eventBus.subscribe { capturedEvents.add(it) }
 
             val tempDir = Files.createTempDirectory("executor-fetch-test-storage")
-            val localFileStorage = FileStorage(
-                tempDir,
-                Files.createTempDirectory("executor-fetch-test-thumbnails"),
-                ArchiveWriterSelector(listOf(CbzWriter())),
-            )
-            val executor = TaskExecutorService(
-                taskQueue, taskRepository, registry, seriesRepository,
-                chapterRepository, localFileStorage, HttpClient(), eventBus,
-            )
+            val localFileStorage =
+                FileStorage(
+                    tempDir,
+                    Files.createTempDirectory("executor-fetch-test-thumbnails"),
+                    ArchiveWriterSelector(listOf(CbzWriter())),
+                )
+            val executor =
+                TaskExecutorService(
+                    taskQueue,
+                    taskRepository,
+                    registry,
+                    seriesRepository,
+                    chapterRepository,
+                    localFileStorage,
+                    HttpClient(),
+                    eventBus,
+                )
 
             val seriesId = insertSeries()
 
-            val fetchConnector = object : HttpConnector(HttpClient()) {
-                override val id = "fetch-connector"
-                override val name = "Fetch Test Connector"
-                override val bucketConfigs: Map<BucketKey, BucketConfig> = mapOf(
-                    Bucket.CDN to BucketConfig(requestsPerSecond = 100.0),
-                )
-                override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> = Result.Success(ByteArray(0))
-                override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> = TODO()
-                override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> = TODO()
-                override suspend fun fetchChapters(externalId: String, language: String): Result<List<ChapterMetadata>> =
-                    Result.Success(listOf(ChapterMetadata(externalId = "ext-ch-001", title = "Chapter 1", chapterIndex = 1.0)))
-                override suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult> = TODO()
-            }
+            val fetchConnector =
+                object : HttpConnector(HttpClient()) {
+                    override val id = "fetch-connector"
+                    override val name = "Fetch Test Connector"
+                    override val bucketConfigs: Map<BucketKey, BucketConfig> =
+                        mapOf(
+                            Bucket.CDN to BucketConfig(requestsPerSecond = 100.0),
+                        )
+
+                    override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> = Result.Success(ByteArray(0))
+
+                    override suspend fun search(
+                        query: String,
+                        request: PageRequest,
+                    ): Result<Pagination<SeriesSearchResult>> = TODO()
+
+                    override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> = TODO()
+
+                    override suspend fun fetchChapters(
+                        externalId: String,
+                        language: String,
+                    ): Result<List<ChapterMetadata>> =
+                        Result.Success(listOf(ChapterMetadata(externalId = "ext-ch-001", title = "Chapter 1", chapterIndex = 1.0)))
+
+                    override suspend fun download(
+                        chapter: Chapter,
+                        format: ChapterFormat,
+                    ): Result<DownloadResult> = TODO()
+                }
             registry.register(fetchConnector)
 
-            val fetchTask = Task(
-                id = Id.generate(),
-                type = TaskType.FETCH_CHAPTERS,
-                status = TaskStatus.PENDING,
-                targetType = TargetType.SERIES,
-                targetId = seriesId,
-                payload = mapOf(
-                    "connectorId" to "fetch-connector",
-                    "externalId" to "ext-001",
-                    "language" to "en",
-                ),
-                createdAt = Instant.now(),
-                updatedAt = Instant.now(),
-            )
+            val fetchTask =
+                Task(
+                    id = Id.generate(),
+                    type = TaskType.FETCH_CHAPTERS,
+                    status = TaskStatus.PENDING,
+                    targetType = TargetType.SERIES,
+                    targetId = seriesId,
+                    payload =
+                        mapOf(
+                            "connectorId" to "fetch-connector",
+                            "externalId" to "ext-001",
+                            "language" to "en",
+                        ),
+                    createdAt = Instant.now(),
+                    updatedAt = Instant.now(),
+                )
 
             val result = executor.handleFetchChapters(fetchTask)
 
@@ -311,11 +366,12 @@ class TaskExecutorServiceTest {
             val chapter = insertChapter(seriesId)
 
             // Connector returns pages in reverse order — executor must sort them
-            val pages = listOf(
-                DownloadPage(url = "https://cdn.example.com/p2.jpg", index = 2),
-                DownloadPage(url = "https://cdn.example.com/p0.jpg", index = 0),
-                DownloadPage(url = "https://cdn.example.com/p1.jpg", index = 1),
-            )
+            val pages =
+                listOf(
+                    DownloadPage(url = "https://cdn.example.com/p2.jpg", index = 2),
+                    DownloadPage(url = "https://cdn.example.com/p0.jpg", index = 0),
+                    DownloadPage(url = "https://cdn.example.com/p1.jpg", index = 1),
+                )
             val connector = makeConnector("unsorted-connector", pages)
             registry.register(connector)
 

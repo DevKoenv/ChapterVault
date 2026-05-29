@@ -5,7 +5,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CidrMatcherTest {
-
     @Test
     fun `matches IPv4 loopback in 127 0 0 0 slash 8`() {
         val m = CidrMatcher("127.0.0.0/8")

@@ -12,5 +12,6 @@ data class SeriesMetadataEnrichment(
 
 interface MetadataProvider {
     val id: String
+
     suspend fun enrich(series: Series): Result<SeriesMetadataEnrichment>
 }

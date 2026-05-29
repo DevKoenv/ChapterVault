@@ -69,12 +69,13 @@ class ChapterRepositoryTest {
     fun `insertChapter creates and returns chapter with AVAILABLE status`() {
         runBlocking {
             val seriesId = insertSeries()
-            val result = repo.insertChapter(
-                seriesId = seriesId,
-                title = "Chapter 1",
-                chapterIndex = 1.0,
-                externalId = "ext-ch-001",
-            )
+            val result =
+                repo.insertChapter(
+                    seriesId = seriesId,
+                    title = "Chapter 1",
+                    chapterIndex = 1.0,
+                    externalId = "ext-ch-001",
+                )
             assertIs<Result.Success<*>>(result)
             val chapter = (result as Result.Success).value
             assertEquals(seriesId, chapter.seriesId)
@@ -89,12 +90,13 @@ class ChapterRepositoryTest {
     fun `insertChapter with non-existent seriesId returns NotFound failure`() {
         runBlocking {
             val nonExistentSeriesId = Id.generate()
-            val result = repo.insertChapter(
-                seriesId = nonExistentSeriesId,
-                title = "Chapter 1",
-                chapterIndex = 1.0,
-                externalId = "ext-ch-001",
-            )
+            val result =
+                repo.insertChapter(
+                    seriesId = nonExistentSeriesId,
+                    title = "Chapter 1",
+                    chapterIndex = 1.0,
+                    externalId = "ext-ch-001",
+                )
             assertIs<Result.Failure>(result)
             assertIs<AppError.NotFound>((result as Result.Failure).error)
         }
@@ -104,12 +106,15 @@ class ChapterRepositoryTest {
     fun `updateDownloadStatus changes status and returns updated chapter`() {
         runBlocking {
             val seriesId = insertSeries()
-            val inserted = (repo.insertChapter(
-                seriesId = seriesId,
-                title = "Chapter 1",
-                chapterIndex = 1.0,
-                externalId = "ext-ch-001",
-            ) as Result.Success).value
+            val inserted =
+                (
+                    repo.insertChapter(
+                        seriesId = seriesId,
+                        title = "Chapter 1",
+                        chapterIndex = 1.0,
+                        externalId = "ext-ch-001",
+                    ) as Result.Success
+                ).value
 
             val result = repo.updateDownloadStatus(inserted.id, DownloadStatus.DOWNLOADED)
             assertIs<Result.Success<*>>(result)
@@ -169,12 +174,15 @@ class ChapterRepositoryTest {
     fun `getChapter returns chapter after insert`() {
         runBlocking {
             val seriesId = insertSeries()
-            val inserted = (repo.insertChapter(
-                seriesId = seriesId,
-                title = "Chapter 5",
-                chapterIndex = 5.0,
-                externalId = "ext-ch-005",
-            ) as Result.Success).value
+            val inserted =
+                (
+                    repo.insertChapter(
+                        seriesId = seriesId,
+                        title = "Chapter 5",
+                        chapterIndex = 5.0,
+                        externalId = "ext-ch-005",
+                    ) as Result.Success
+                ).value
 
             val result = repo.getChapter(inserted.id)
             assertIs<Result.Success<*>>(result)
