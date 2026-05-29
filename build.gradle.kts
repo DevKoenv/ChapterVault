@@ -67,3 +67,9 @@ tasks.register("coverage") {
     description = "Generates HTML and XML coverage reports."
     dependsOn("koverHtmlReport", "koverXmlReport")
 }
+
+tasks.register("check") {
+    group = "verification"
+    description = "Run all checks including detekt analysis."
+    dependsOn("detekt")
+}
