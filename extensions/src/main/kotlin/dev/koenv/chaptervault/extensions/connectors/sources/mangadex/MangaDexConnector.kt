@@ -34,7 +34,6 @@ import kotlinx.coroutines.sync.withLock
 
 class MangaDexConnector(
     httpClient: HttpClient,
-    private val language: String = "en",
 ) : HttpConnector(httpClient) {
 
     override val id = "mangadex"
