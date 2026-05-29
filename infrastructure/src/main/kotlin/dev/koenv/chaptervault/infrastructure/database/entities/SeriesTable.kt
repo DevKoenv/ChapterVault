@@ -13,7 +13,7 @@ object SeriesTable : Table("series") {
     val defaultFormat = varchar("default_format", 20).nullable()
     val coverUrl = varchar("cover_url", 1000).nullable()
     val description = text("description").nullable()
-    val language = varchar("language", 20).default("")
+    val language = varchar("language", 32).default("en")
     val addedAt = timestamp("added_at")
     val updatedAt = timestamp("updated_at")
 

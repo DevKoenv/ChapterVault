@@ -9,7 +9,7 @@ data class Series(
     val title: String,
     val connectorId: String,
     val externalId: String,
-    val language: String = "",
+    val language: String = "en",
     val status: SeriesStatus,
     val autoDownload: Boolean = false,
     val defaultFormat: ChapterFormat? = null,
