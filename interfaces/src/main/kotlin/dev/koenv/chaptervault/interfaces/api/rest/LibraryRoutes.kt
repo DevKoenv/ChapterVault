@@ -37,6 +37,7 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import java.time.Instant
 
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 fun Route.libraryRoutes(
     libraryRead: LibraryReadApi,
     libraryCommand: LibraryCommandApi,

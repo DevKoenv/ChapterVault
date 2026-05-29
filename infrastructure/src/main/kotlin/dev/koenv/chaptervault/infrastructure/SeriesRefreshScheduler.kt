@@ -36,6 +36,7 @@ class SeriesRefreshScheduler(
     private suspend fun enqueueRefreshTasks() {
         var page = 0
         var enqueued = 0
+        @Suppress("LoopWithTooManyJumpStatements")
         while (true) {
             val result = libraryRead.listSeries(PageRequest(page, 100))
             if (result !is Result.Success) {

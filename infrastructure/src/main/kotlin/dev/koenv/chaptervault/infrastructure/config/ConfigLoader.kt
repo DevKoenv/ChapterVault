@@ -5,6 +5,7 @@ import org.yaml.snakeyaml.Yaml
 import java.io.File
 
 object ConfigLoader {
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "NestedBlockDepth")
     fun load(
         configPath: String? = null,
         env: (String) -> String? = System::getenv,

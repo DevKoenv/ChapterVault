@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package dev.koenv.chaptervault.server
 
 import dev.koenv.chaptervault.infrastructure.config.EndpointLimitConfig

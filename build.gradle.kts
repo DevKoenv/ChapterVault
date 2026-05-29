@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.ktlint) apply false
+    alias(libs.plugins.detekt)
 }
 
 val coverageThreshold = 65 // raise this as test coverage improves
@@ -29,6 +30,17 @@ kover {
             }
         }
     }
+}
+
+detekt {
+    config.setFrom("$rootDir/detekt.yml")
+    buildUponDefaultConfig = true
+    source.setFrom(
+        fileTree(rootDir) {
+            include("**/src/main/kotlin/**/*.kt", "**/src/main/kotlin/**/*.kts")
+            exclude("**/build/**")
+        },
+    )
 }
 
 subprojects {

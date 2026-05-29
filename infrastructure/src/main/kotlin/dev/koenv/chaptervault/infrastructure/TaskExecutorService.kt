@@ -65,6 +65,7 @@ class TaskExecutorService(
 
     suspend fun start() {
         supervisorScope {
+            @Suppress("LoopWithTooManyJumpStatements")
             while (true) {
                 lastHeartbeatMs.set(System.currentTimeMillis())
                 val task = taskQueue.dequeue()
