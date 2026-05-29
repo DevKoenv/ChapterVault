@@ -15,6 +15,7 @@ import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
+import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -174,7 +175,7 @@ class OpdsRoutesTest {
         val body = res.bodyAsText()
         assertContains(body, "vaemendis.net/opds-pse/ns")
         assertContains(body, "pse:count=\"5\"")
-        assertContains(body, "image/png")
+        assertContains(body, "type=\"image/png\"")
     }
 
     @Test
@@ -183,6 +184,8 @@ class OpdsRoutesTest {
         val body = res.bodyAsText()
         assertContains(body, "Chapter 1")
         assertTrue(!body.contains("/opds/v1/download/$chapterId"), "undownloaded chapter should have no download link")
+        assertTrue(!body.contains("/opds/v1/chapters/$chapterId/pages/{pageNumber}"),
+            "undownloaded chapter should have no PSE link")
     }
 
     @Test
@@ -195,8 +198,7 @@ class OpdsRoutesTest {
     @Test
     fun `download endpoint returns 404 when route not wired in test scope`() = testApp {
         val res = client.get("/opds/v1/download/$downloadedChapterId") { basicAuth("user", "pass") }
-        assertTrue(res.status == HttpStatusCode.NotFound || res.status == HttpStatusCode.OK,
-            "Expected 404 or 200, got ${res.status}")
+        assertEquals(HttpStatusCode.NotFound, res.status)
     }
 
     @Test
@@ -210,7 +212,7 @@ class OpdsRoutesTest {
         val res = client.get("/opds/v1/chapters/$downloadedChapterId/pages/0") { basicAuth("user", "pass") }
         assertEquals(HttpStatusCode.OK, res.status)
         assertEquals(fakePageMime, res.contentType()?.toString()?.substringBefore(";")?.trim())
-        assertTrue(res.readRawBytes().contentEquals(fakePageBytes))
+        assertTrue(res.body<ByteArray>().contentEquals(fakePageBytes))
     }
 
     @Test
