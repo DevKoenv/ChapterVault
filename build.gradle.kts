@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.kover)
 }
 
-val coverageThreshold = 30 // raise this as test coverage improves
+val coverageThreshold = 65 // raise this as test coverage improves
 
 kover {
     merge {
