@@ -13,16 +13,20 @@ tags:
     description: Authentication
   - name: library
     description: Library — series and chapters
+  - name: reading-status
+    description: Per-user reading status for series
   - name: tasks
     description: Background task queue
   - name: connectors
     description: External source connectors (ADMIN only)
+  - name: notifications
+    description: Push notification targets and dispatch (ADMIN only)
   - name: admin
     description: Server administration
   - name: system
     description: System utilities
   - name: opds
-    description: OPDS v1 feed (Basic Auth)
+    description: OPDS v1 feed (Basic Auth) with Page Streaming Extension (PSE)
 
 components:
   securitySchemes:
@@ -58,14 +62,16 @@ components:
     SeriesDto:
       type: object
       properties:
-        id:          { type: string, format: uuid }
-        title:       { type: string }
-        connectorId: { type: string }
-        externalId:  { type: string }
-        status:      { type: string, enum: [IN_LIBRARY, REMOVED] }
-        autoDownload: { type: boolean }
-        coverUrl:    { type: string, nullable: true }
-        description: { type: string, nullable: true }
+        id:            { type: string, format: uuid }
+        title:         { type: string }
+        connectorId:   { type: string }
+        externalId:    { type: string }
+        language:      { type: string, example: en, description: "BCP 47 language tag; defaults to 'en'" }
+        status:        { type: string, enum: [IN_LIBRARY, REMOVED] }
+        autoDownload:  { type: boolean }
+        coverUrl:      { type: string, nullable: true }
+        description:   { type: string, nullable: true }
+        readingStatus: { type: string, nullable: true, enum: [PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD], description: "Current user's reading status; null if not set" }
 
     ChapterDto:
       type: object
@@ -176,7 +182,43 @@ components:
       properties:
         connectorId:  { type: string, example: mock }
         externalId:   { type: string, example: series-1 }
+        language:     { type: string, default: en, example: en, description: "BCP 47 language tag; must be supported by the connector" }
         autoDownload: { type: boolean, default: false }
+
+    SetReadingStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD] }
+
+    NotificationTargetResponse:
+      type: object
+      properties:
+        id:        { type: string, format: uuid }
+        name:      { type: string }
+        type:      { type: string, enum: [NTFY, GOTIFY, DISCORD, WEBHOOK] }
+        url:       { type: string }
+        token:     { type: string, nullable: true, description: "API token or auth header value; null when not required by the target type" }
+        enabled:   { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreateNotificationTargetRequest:
+      type: object
+      required: [name, type, url]
+      properties:
+        name:    { type: string, example: "My NTFY server" }
+        type:    { type: string, enum: [NTFY, GOTIFY, DISCORD, WEBHOOK] }
+        url:     { type: string, example: "https://ntfy.sh/mymangaupdates" }
+        token:   { type: string, nullable: true, description: "Optional API token; required by Gotify; optional for NTFY/Webhook" }
+        enabled: { type: boolean, default: true }
+
+    PatchNotificationTargetRequest:
+      type: object
+      properties:
+        name:    { type: string, nullable: true }
+        url:     { type: string, nullable: true }
+        token:   { type: string, nullable: true }
+        enabled: { type: boolean, nullable: true }
 
     UpdateSeriesRequest:
       type: object
@@ -305,6 +347,10 @@ paths:
               schema: { $ref: "#/components/schemas/UserResponse" }
         "400": { description: Invalid request body }
         "409": { description: Username already taken }
+        "429":
+          description: Too many registration attempts from this IP; rate limit exceeded
+          headers:
+            Retry-After: { schema: { type: integer }, description: Seconds until the rate limit window resets }
 
   /auth/login:
     post:
@@ -323,6 +369,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/LoginResponse" }
         "401": { description: Invalid credentials }
+        "429":
+          description: Too many login attempts from this IP; rate limit exceeded
+          headers:
+            Retry-After: { schema: { type: integer }, description: Seconds until the rate limit window resets }
 
   /auth/logout:
     post:
@@ -365,6 +415,13 @@ paths:
         - in: query
           name: size
           schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+        - in: query
+          name: readingStatus
+          required: false
+          schema:
+            type: string
+            enum: [PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD]
+          description: Filter series by the current user's reading status; omit to return all series
       responses:
         "200":
           description: Paginated series list
@@ -431,6 +488,33 @@ paths:
         "204": { description: Series removed }
         "403": { description: Requires ADMIN role }
         "404": { description: Series not found }
+
+  /library/series/{id}/status:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+
+    put:
+      tags: [reading-status]
+      summary: Set reading status for a series (current user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetReadingStatusRequest" }
+      responses:
+        "204": { description: Status set }
+        "400": { description: Invalid status value or request body }
+        "401": { description: Not authenticated }
+
+    delete:
+      tags: [reading-status]
+      summary: Clear reading status for a series (current user)
+      responses:
+        "204": { description: Status cleared }
+        "401": { description: Not authenticated }
 
   /library/series/{id}/chapters:
     get:
@@ -656,6 +740,86 @@ paths:
         "204": { description: Bookmark deleted }
         "404": { description: Bookmark not found }
 
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: List all notification targets
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NotificationTargetResponse" }
+        "401": { description: Not authenticated }
+
+    post:
+      tags: [notifications]
+      summary: Create a notification target (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateNotificationTargetRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationTargetResponse" }
+        "400": { description: Invalid request body or unsupported type }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+
+  /notifications/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+
+    patch:
+      tags: [notifications]
+      summary: Update a notification target (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PatchNotificationTargetRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationTargetResponse" }
+        "400": { description: Invalid request body }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Notification target not found }
+
+    delete:
+      tags: [notifications]
+      summary: Delete a notification target (ADMIN)
+      responses:
+        "204": { description: Target deleted }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Notification target not found }
+
+  /notifications/{id}/test:
+    post:
+      tags: [notifications]
+      summary: Send a test notification to a target (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Test notification dispatched successfully }
+        "400": { description: Dispatch failed (bad URL, auth error, etc.) }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Notification target not found }
+
   /tasks:
     get:
       tags: [tasks]
@@ -857,7 +1021,11 @@ paths:
   /opds/v1/series/{id}:
     get:
       tags: [opds]
-      summary: OPDS v1 series feed (chapter list with download links)
+      summary: OPDS v1 series feed (chapter list with download and PSE links)
+      description: |
+        Returns an Atom XML feed listing chapters for the series. Downloaded chapters include:
+        - An acquisition link (`rel=http://opds-spec.org/acquisition`) for CBZ download.
+        - A PSE streaming link (`rel=http://vaemendis.net/opds-pse/ns`) with `pse:count` set to the chapter's page count. OPDS clients that support the Page Streaming Extension can use this to stream individual pages instead of downloading the full CBZ.
       security:
         - basicAuth: []
       parameters:
@@ -891,3 +1059,47 @@ paths:
             application/x-cbz:
               schema: { type: string, format: binary }
         "404": { description: Chapter not found or not downloaded }
+
+  /opds/v1/chapters/{id}/pages/{pageNumber}:
+    get:
+      tags: [opds]
+      summary: Stream a single page from a downloaded chapter (OPDS PSE, Basic Auth)
+      description: |
+        Part of the OPDS Page Streaming Extension (PSE). The chapter's series feed entry
+        contains a PSE link with `href` template `/opds/v1/chapters/{id}/pages/{pageNumber}`
+        and `pse:count` equal to the chapter's page count. Page numbers are zero-based.
+
+        Responses include:
+        - `ETag`: stable hash of chapter ID, page number, and chapter `updatedAt`; changes on re-download.
+        - `Cache-Control: max-age=31536000, immutable`: safe to cache aggressively since pages do not change after download.
+        - `304 Not Modified`: returned when `If-None-Match` matches the current ETag.
+      security:
+        - basicAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+          description: Chapter ID
+        - in: path
+          name: pageNumber
+          required: true
+          schema: { type: integer, minimum: 0 }
+          description: Zero-based page index
+      responses:
+        "200":
+          description: Page image bytes
+          headers:
+            ETag:          { schema: { type: string }, description: "Stable page hash, quoted (e.g. \"abc123\")" }
+            Cache-Control: { schema: { type: string }, description: "max-age=31536000, immutable" }
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        "304": { description: Not modified (ETag match) }
+        "400": { description: Invalid chapter ID or non-integer page number }
+        "401": { description: Not authenticated }
+        "404": { description: Chapter not found, not downloaded, or page index out of range }

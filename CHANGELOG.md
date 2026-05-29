@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Reading status tracking**: Users can set a per-series reading status (`PLAN_TO_READ`, `READING`, `COMPLETED`, `DROPPED`, `ON_HOLD`) via `PUT /library/series/{id}/status` and clear it via `DELETE /library/series/{id}/status`. The current user's status is returned as `readingStatus` on all `SeriesDto` responses. `GET /library/series` accepts a `readingStatus` query parameter to filter the list.
+- **Push notifications**: New `/notifications` endpoints (ADMIN) manage notification targets. Supported types: `NTFY`, `Gotify`, `Discord` (webhook), and generic `WEBHOOK`. When new chapters are discovered after a series refresh, a notification is dispatched to all enabled targets. Test dispatch available via `POST /notifications/{id}/test`.
+- **Auth rate limiting**: `POST /auth/login` and `POST /auth/register` are rate-limited per IP address. Defaults: 10 login attempts per 15 minutes, 5 register attempts per 60 minutes. Trusted networks (RFC 1918 + loopback) are exempt. Configurable via the `auth.rateLimiting` YAML section. Blocked requests receive `429 Too Many Requests` with a `Retry-After` header.
+- **OPDS Page Streaming Extension (PSE)**: The OPDS series feed now includes a PSE `<link>` element for each downloaded chapter, allowing OPDS clients to stream individual pages without downloading the full CBZ. New endpoint: `GET /opds/v1/chapters/{id}/pages/{pageNumber}` (Basic Auth) serves page images with `ETag` and `Cache-Control: immutable` headers and supports `304 Not Modified` conditional requests.
+- **Series language**: Series now carry a `language` field (BCP 47 tag, default `en`). `POST /library/series` accepts `language` in the request body. The language is validated against the connector's supported languages before the series is added.
+- **MangaDex connector language support**: `MangaDexConnector` exposes 30 supported languages and uses the series language when fetching chapters.
+
 ### Changed
 
 - **Breaking:** Unified data root layout — all persistent data now lives under a single configurable directory (`CHAPTERVAULT_DATA_DIR`, default `./data`). Sub-directories: `db/` (database), `library/` (chapter files), `thumbnails/` (cover images). Docker deployments now need a single volume mount (`./data:/app/data`) instead of separate `data` and `downloads` mounts.
