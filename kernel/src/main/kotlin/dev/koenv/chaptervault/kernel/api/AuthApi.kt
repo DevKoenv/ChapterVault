@@ -12,6 +12,7 @@ data class Session(val id: Id, val userId: Id, val token: String, val expiresAt:
 interface AuthApi {
     suspend fun register(credentials: Credentials, role: Role = Role.USER): Result<UserPrincipal>
     suspend fun authenticate(credentials: Credentials): Result<Pair<UserPrincipal, Session>>
+    suspend fun validateCredentials(credentials: Credentials): Result<UserPrincipal>
     suspend fun validateSession(token: String): Result<UserPrincipal>
     suspend fun invalidateSession(token: String): Result<Unit>
 }

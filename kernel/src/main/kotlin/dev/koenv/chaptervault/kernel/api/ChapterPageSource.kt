@@ -6,4 +6,5 @@ import dev.koenv.chaptervault.shared.result.Result
 
 interface ChapterPageSource {
     suspend fun readPage(chapter: Chapter, index: Int): Result<Page>
+    suspend fun countPages(chapter: Chapter): Result<Int>
 }

@@ -41,6 +41,7 @@ class AuthRoutesTest {
             Result.Success(fakePrincipal)
         override suspend fun authenticate(credentials: Credentials) =
             Result.Success(fakePrincipal to fakeSession)
+        override suspend fun validateCredentials(credentials: Credentials) = Result.Success(fakePrincipal)
         override suspend fun validateSession(token: String) = Result.Success(fakePrincipal)
         override suspend fun invalidateSession(token: String) = Result.Success(Unit)
     }
@@ -49,6 +50,8 @@ class AuthRoutesTest {
         override suspend fun register(credentials: Credentials, role: Role) =
             Result.Failure(AppError.Conflict("Username taken"))
         override suspend fun authenticate(credentials: Credentials) =
+            Result.Failure(AppError.Unauthorized())
+        override suspend fun validateCredentials(credentials: Credentials) =
             Result.Failure(AppError.Unauthorized())
         override suspend fun validateSession(token: String) =
             Result.Failure(AppError.Unauthorized())

@@ -27,8 +27,10 @@ object DependencyInjection {
 
         // Register connectors post-boot (after all Koin bindings are resolved)
         val connectorRegistry = GlobalContext.get().get<ConnectorRegistry>()
-        if (config.debug.mockConnectorEnabled) connectorRegistry.register(GlobalContext.get().get<MockConnector>())
-        connectorRegistry.register(GlobalContext.get().get<CustomConnector>())
+        if (config.debug.mockConnectorEnabled) {
+            connectorRegistry.register(GlobalContext.get().get<CustomConnector>())
+            connectorRegistry.register(GlobalContext.get().get<MockConnector>())
+        }
         connectorRegistry.register(GlobalContext.get().get<MangaDexConnector>())
 
         // Register default admin on first boot; silently ignored if admin already exists

@@ -23,16 +23,24 @@ import io.ktor.server.routing.routing
 import java.security.MessageDigest
 import java.time.Instant
 
-private val OPDS_CONTENT_TYPE = ContentType.parse("application/atom+xml;charset=utf-8")
 private val feedBuilder = FeedBuilder()
 private val opdsV1 = OpdsV1()
+
+private fun opdsContentType(call: io.ktor.server.application.ApplicationCall): ContentType {
+    val accept = call.request.header(HttpHeaders.Accept) ?: ""
+    return if (accept.contains("text/html")) {
+        ContentType.parse("text/xml;charset=utf-8")
+    } else {
+        ContentType.parse("application/atom+xml;charset=utf-8")
+    }
+}
 
 fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageSource) {
     routing {
         authenticate("auth-basic") {
             get("/opds/v1") {
                 val feed = feedBuilder.buildNavigationFeed(Instant.now().toString())
-                call.respondText(opdsV1.serialize(feed), OPDS_CONTENT_TYPE)
+                call.respondText(opdsV1.serialize(feed), opdsContentType(call))
             }
 
             get("/opds/v1/catalog") {
@@ -48,7 +56,7 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageS
                             totalItems = p.totalItems,
                             now = Instant.now().toString(),
                         )
-                        call.respondText(opdsV1.serialize(feed), OPDS_CONTENT_TYPE)
+                        call.respondText(opdsV1.serialize(feed), opdsContentType(call))
                     }
                     is Result.Failure -> call.respond(HttpStatusCode.InternalServerError)
                 }
@@ -70,13 +78,13 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageS
                 }
                 val chapters = (chaptersResult as Result.Success).value
                 val pageInfoByChapterId = chapters
-                    .filter { it.downloadStatus == DownloadStatus.DOWNLOADED && it.pageCount != null }
-                    .map { chapter ->
-                        val mimeType = when (val r = pageSource.readPage(chapter, 0)) {
-                            is Result.Success -> r.value.mimeType
-                            is Result.Failure -> "image/*"
+                    .filter { it.downloadStatus == DownloadStatus.DOWNLOADED }
+                    .mapNotNull { chapter ->
+                        val pageCount = chapter.pageCount ?: when (val r = pageSource.countPages(chapter)) {
+                            is Result.Success -> r.value
+                            is Result.Failure -> return@mapNotNull null
                         }
-                        chapter.id.toString() to FeedBuilder.ChapterPageInfo(chapter.pageCount!!, mimeType)
+                        chapter.id.toString() to FeedBuilder.ChapterPageInfo(pageCount, "image/jpeg")
                     }
                     .toMap()
                 val now = Instant.now().toString()
@@ -86,7 +94,7 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageS
                     now = now,
                     pageInfoByChapterId = pageInfoByChapterId,
                 )
-                call.respondText(opdsV1.serialize(feed), OPDS_CONTENT_TYPE)
+                call.respondText(opdsV1.serialize(feed), opdsContentType(call))
             }
         }
     }

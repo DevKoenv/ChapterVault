@@ -107,6 +107,10 @@ class OpdsRoutesTest {
             if (index < 0 || index >= (chapter.pageCount ?: 0)) return Result.Failure(AppError.NotFound("Page", index.toString()))
             return Result.Success(Page(index, fakePageBytes, fakePageMime))
         }
+        override suspend fun countPages(chapter: Chapter): Result<Int> {
+            if (chapter.downloadStatus != DownloadStatus.DOWNLOADED) return Result.Failure(AppError.NotFound("Chapter", chapter.id.toString()))
+            return Result.Success(chapter.pageCount ?: 0)
+        }
     }
 
     private fun testApp(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
@@ -173,9 +177,10 @@ class OpdsRoutesTest {
     fun `series feed includes PSE link for downloaded chapter with pageCount`() = testApp {
         val res = client.get("/opds/v1/series/$seriesId") { basicAuth("user", "pass") }
         val body = res.bodyAsText()
-        assertContains(body, "vaemendis.net/opds-pse/ns")
+        assertContains(body, "rel=\"http://vaemendis.net/opds-pse/stream\"")
         assertContains(body, "pse:count=\"5\"")
-        assertContains(body, "type=\"image/png\"")
+        assertContains(body, "xmlns:pse=\"http://vaemendis.net/opds-pse/ns\"")
+        assertContains(body, "type=\"image/jpeg\"")
     }
 
     @Test

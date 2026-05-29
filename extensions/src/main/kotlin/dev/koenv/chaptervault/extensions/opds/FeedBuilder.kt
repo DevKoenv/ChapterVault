@@ -11,6 +11,7 @@ class FeedBuilder {
         title = "ChapterVault",
         updated = now,
         selfHref = "/opds/v1",
+        kind = "navigation",
         entries = listOf(
             OpdsEntry(
                 id = "urn:chaptervault:catalog",
@@ -35,6 +36,7 @@ class FeedBuilder {
             title = "ChapterVault Library",
             updated = now,
             selfHref = "/opds/v1/catalog?page=$page&size=$size",
+            kind = "acquisition",
             nextHref = if (page + 1 < totalPages) "/opds/v1/catalog?page=${page + 1}&size=$size" else null,
             prevHref = if (page > 0) "/opds/v1/catalog?page=${page - 1}&size=$size" else null,
             totalResults = totalItems,
@@ -54,7 +56,9 @@ class FeedBuilder {
         title = series.title,
         updated = now,
         selfHref = "/opds/v1/series/${series.id}",
-        entries = chapters.map { buildChapterEntry(it, now, pageInfoByChapterId[it.id.toString()]) },
+        kind = "acquisition",
+        coverHref = series.coverUrl,
+        entries = chapters.map { buildChapterEntry(it, now, pageInfoByChapterId[it.id.toString()], series.coverUrl) },
     )
 
     private fun buildSeriesEntry(series: Series, now: String): OpdsEntry {
@@ -71,25 +75,47 @@ class FeedBuilder {
         )
     }
 
-    internal fun buildChapterEntry(chapter: Chapter, now: String, pageInfo: ChapterPageInfo? = null): OpdsEntry {
+    internal fun buildChapterEntry(
+        chapter: Chapter,
+        now: String,
+        pageInfo: ChapterPageInfo? = null,
+        coverUrl: String? = null,
+    ): OpdsEntry {
         val links = mutableListOf<OpdsLink>()
+        var summary: String? = null
+        var content: String? = null
+
         if (chapter.downloadStatus == DownloadStatus.DOWNLOADED) {
-            links.add(OpdsLink(rel = REL_ACQUISITION, href = "/opds/v1/download/${chapter.id}", type = TYPE_CBZ))
+            summary = "File Type: CBZ"
+            content = TYPE_CBZ
+            val thumbHref = "/opds/v1/chapters/${chapter.id}/pages/0"
+            links.add(OpdsLink(rel = REL_IMAGE, href = thumbHref, type = "image/jpeg"))
+            links.add(OpdsLink(rel = REL_IMAGE_THUMBNAIL, href = thumbHref, type = "image/jpeg"))
+            links.add(OpdsLink(
+                rel = REL_ACQUISITION,
+                href = "/opds/v1/download/${chapter.id}",
+                type = TYPE_CBZ,
+                pseCount = pageInfo?.pageCount,
+            ))
             if (pageInfo != null) {
-                links.add(
-                    OpdsLink(
-                        rel = REL_PSE,
-                        href = "/opds/v1/chapters/${chapter.id}/pages/{pageNumber}",
-                        type = pageInfo.firstPageMimeType,
-                        pseCount = pageInfo.pageCount,
-                    )
-                )
+                links.add(OpdsLink(
+                    rel = REL_PSE,
+                    href = "/opds/v1/chapters/${chapter.id}/pages/{pageNumber}",
+                    type = pageInfo.firstPageMimeType,
+                    pseCount = pageInfo.pageCount,
+                ))
             }
+        } else if (coverUrl != null) {
+            links.add(OpdsLink(rel = REL_IMAGE, href = coverUrl, type = "image/jpeg"))
+            links.add(OpdsLink(rel = REL_IMAGE_THUMBNAIL, href = coverUrl, type = "image/jpeg"))
         }
+
         return OpdsEntry(
             id = "urn:chaptervault:chapter:${chapter.id}",
             title = chapter.title,
             updated = now,
+            summary = summary,
+            content = content,
             links = links,
         )
     }
@@ -101,7 +127,8 @@ class FeedBuilder {
         const val TYPE_ACQUISITION = "application/atom+xml;profile=opds-catalog;kind=acquisition"
         const val TYPE_CBZ = "application/x-cbz"
         const val REL_IMAGE = "http://opds-spec.org/image"
-        const val REL_ACQUISITION = "http://opds-spec.org/acquisition"
-        const val REL_PSE = "http://vaemendis.net/opds-pse/ns"
+        const val REL_IMAGE_THUMBNAIL = "http://opds-spec.org/image/thumbnail"
+        const val REL_ACQUISITION = "http://opds-spec.org/acquisition/open-access"
+        const val REL_PSE = "http://vaemendis.net/opds-pse/stream"
     }
 }

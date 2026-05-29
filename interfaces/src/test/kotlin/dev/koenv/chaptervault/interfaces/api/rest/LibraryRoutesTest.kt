@@ -105,6 +105,7 @@ class LibraryRoutesTest {
             fileStorage = object : ChapterPageSource {
                 override suspend fun readPage(chapter: Chapter, index: Int) =
                     Result.Success(Page(index, byteArrayOf(1, 2, 3), "image/jpeg"))
+                override suspend fun countPages(chapter: Chapter) = Result.Success(1)
             },
         ) {
             val response = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/0") {
@@ -129,6 +130,7 @@ class LibraryRoutesTest {
             fileStorage = object : ChapterPageSource {
                 override suspend fun readPage(chapter: Chapter, index: Int) =
                     Result.Success(Page(index, byteArrayOf(1, 2, 3), "image/jpeg"))
+                override suspend fun countPages(chapter: Chapter) = Result.Success(1)
             },
         ) {
             val firstResponse = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/0") {
@@ -209,6 +211,7 @@ class LibraryRoutesTest {
             fileStorage = object : ChapterPageSource {
                 override suspend fun readPage(chapter: Chapter, index: Int) =
                     Result.Failure(AppError.NotFound("Page", index.toString()))
+                override suspend fun countPages(chapter: Chapter) = Result.Success(0)
             },
         ) {
             val response = client.get("/library/chapters/00000000-0000-0000-0000-000000000002/pages/999") {
@@ -737,6 +740,8 @@ private class NoOpCommandApi : LibraryCommandApi {
 private class NoOpPageSource : ChapterPageSource {
     override suspend fun readPage(chapter: Chapter, index: Int): Result<Page> =
         Result.Failure(AppError.NotFound("Page", index.toString()))
+    override suspend fun countPages(chapter: Chapter): Result<Int> =
+        Result.Failure(AppError.NotFound("Chapter", chapter.id.toString()))
 }
 
 private class NoOpTaskQueue : TaskQueue {

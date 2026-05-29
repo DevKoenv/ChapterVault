@@ -62,8 +62,18 @@ import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 
 private val log = LoggerFactory.getLogger("ServerBootstrap")
+
+private val basicAuthCache = ConcurrentHashMap<String, Pair<KtorPrincipal, Long>>()
+private const val BASIC_AUTH_CACHE_TTL_MS = 60_000L
+
+private fun basicAuthCacheKey(name: String, password: String): String =
+    MessageDigest.getInstance("SHA-256")
+        .digest("$name:$password".toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
 
 fun Application.bootstrap() {
     val config by inject<dev.koenv.chaptervault.infrastructure.config.AppConfig>()
@@ -138,8 +148,15 @@ fun Application.bootstrap() {
         basic("auth-basic") {
             realm = "ChapterVault"
             validate { credential ->
-                when (val result = auth.authenticate(Credentials(credential.name, credential.password))) {
-                    is Result.Success -> KtorPrincipal(result.value.first)
+                val key = basicAuthCacheKey(credential.name, credential.password)
+                val cached = basicAuthCache[key]
+                if (cached != null && cached.second > System.currentTimeMillis()) {
+                    return@validate cached.first
+                }
+                when (val result = auth.validateCredentials(Credentials(credential.name, credential.password))) {
+                    is Result.Success -> KtorPrincipal(result.value).also {
+                        basicAuthCache[key] = it to (System.currentTimeMillis() + BASIC_AUTH_CACHE_TTL_MS)
+                    }
                     is Result.Failure -> null
                 }
             }

@@ -63,6 +63,19 @@ class UserRepository : AuthApi {
         Result.Success(principal to session)
     }
 
+    override suspend fun validateCredentials(credentials: Credentials): Result<UserPrincipal> = dbQuery {
+        val row = UserTable.selectAll()
+            .where { UserTable.username eq credentials.username }
+            .singleOrNull()
+            ?: return@dbQuery Result.Failure(AppError.Unauthorized())
+
+        if (!BCrypt.checkpw(credentials.password, row[UserTable.passwordHash])) {
+            return@dbQuery Result.Failure(AppError.Unauthorized())
+        }
+
+        Result.Success(row.toPrincipal())
+    }
+
     override suspend fun validateSession(token: String): Result<UserPrincipal> = dbQuery {
         val sessionRow = SessionTable.selectAll()
             .where { SessionTable.token eq token }

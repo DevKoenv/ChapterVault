@@ -61,6 +61,7 @@ class ChapterRepository {
     suspend fun updateDownloadStatus(
         id: Id,
         status: DownloadStatus,
+        pageCount: Int? = null,
     ): Result<Chapter> = dbQuery {
         val count = ChapterTable.selectAll()
             .where { ChapterTable.id eq id.toString() }
@@ -69,6 +70,7 @@ class ChapterRepository {
 
         ChapterTable.update({ ChapterTable.id eq id.toString() }) {
             it[ChapterTable.downloadStatus] = status.name
+            if (pageCount != null) it[ChapterTable.pageCount] = pageCount
             it[ChapterTable.updatedAt] = Instant.now().toKotlinInstant()
         }
 

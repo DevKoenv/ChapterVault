@@ -5,6 +5,8 @@ data class OpdsFeed(
     val title: String,
     val updated: String,
     val selfHref: String,
+    val kind: String,
+    val coverHref: String? = null,
     val nextHref: String? = null,
     val prevHref: String? = null,
     val totalResults: Long? = null,

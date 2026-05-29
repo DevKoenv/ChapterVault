@@ -10,7 +10,11 @@ object DatabaseFactory {
         Database.connect(
             url = config.url,
             driver = config.driver,
-            setupConnection = { it.createStatement().execute("PRAGMA foreign_keys = ON") },
+            setupConnection = { conn ->
+                conn.createStatement().use { it.execute("PRAGMA foreign_keys = ON") }
+                conn.createStatement().use { it.execute("PRAGMA busy_timeout = 5000") }
+                conn.createStatement().use { it.execute("PRAGMA journal_mode = WAL") }
+            },
         )
         DatabaseMigrations.migrate()
     }

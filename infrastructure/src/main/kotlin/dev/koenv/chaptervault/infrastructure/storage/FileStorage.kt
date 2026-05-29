@@ -91,6 +91,24 @@ open class FileStorage(
         }
     }
 
+    override suspend fun countPages(chapter: Chapter): Result<Int> {
+        val path = chapterPath(chapter)
+        return when {
+            Files.isDirectory(path) -> {
+                val filenames = Files.list(path).use { it.map { f -> f.fileName.toString() }.toList() }
+                Result.Success(PageFormatUtils.buildPageIndex(filenames).size)
+            }
+            Files.isRegularFile(path) -> {
+                val entryNames = mutableListOf<String>()
+                ZipFile(path.toFile()).use { zip ->
+                    zip.entries().asSequence().mapTo(entryNames) { it.name }
+                }
+                Result.Success(PageFormatUtils.buildPageIndex(entryNames).size)
+            }
+            else -> Result.Failure(AppError.NotFound("Chapter files", chapter.id.toString()))
+        }
+    }
+
     fun deleteChapterFiles(seriesId: String, chapterId: String) {
         val base = resolvePath(seriesId, chapterId)
         val cbz = base.resolveSibling(base.fileName.toString() + ".cbz")

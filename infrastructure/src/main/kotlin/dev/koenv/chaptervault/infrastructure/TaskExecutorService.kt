@@ -325,7 +325,7 @@ class TaskExecutorService(
                 is Result.Success -> Unit
             }
 
-            setChapterStatus(chapter, DownloadStatus.DOWNLOADED)
+            setChapterStatus(chapter, DownloadStatus.DOWNLOADED, pages.size)
             return Result.Success(Unit)
         } catch (e: Throwable) {
             setChapterStatus(chapter, DownloadStatus.FAILED)
@@ -333,8 +333,8 @@ class TaskExecutorService(
         }
     }
 
-    private suspend fun setChapterStatus(chapter: Chapter, status: DownloadStatus) {
-        chapterRepository.updateDownloadStatus(chapter.id, status)
+    private suspend fun setChapterStatus(chapter: Chapter, status: DownloadStatus, pageCount: Int? = null) {
+        chapterRepository.updateDownloadStatus(chapter.id, status, pageCount)
         eventBus.publish(ChapterEvents.DownloadStatusChanged(chapter.id, chapter.seriesId, status, Instant.now()))
     }
 }
