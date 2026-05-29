@@ -34,3 +34,6 @@ ktlint_standard_chain-method-continuation = enabled
 ktlint_standard_multiline-expression-wrapping = enabled
 ktlint_standard_nullable-type-spacing = enabled
 ktlint_standard_spacing-between-declarations-with-comments = enabled
+
+[*.md]
+trim_trailing_whitespace = false
