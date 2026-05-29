@@ -10,6 +10,7 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesReposit
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.event.EventBus
+import dev.koenv.chaptervault.kernel.event.NewChaptersDiscovered
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.ChapterEvents
 import dev.koenv.chaptervault.kernel.library.Page
@@ -168,7 +169,7 @@ class TaskExecutorService(
         return Result.Success(Unit)
     }
 
-    private suspend fun handleFetchChapters(task: Task): Result<Unit> {
+    internal suspend fun handleFetchChapters(task: Task): Result<Unit> {
         val connectorId = task.payload["connectorId"] ?: ""
         val externalId = task.payload["externalId"] ?: ""
         val language = task.payload["language"].orEmpty().ifBlank { "en" }
@@ -192,6 +193,10 @@ class TaskExecutorService(
         val series = when (val r = seriesRepository.getSeries(task.targetId)) {
             is Result.Success -> r.value
             is Result.Failure -> return Result.Success(Unit)
+        }
+
+        if (insertedChapters.isNotEmpty()) {
+            eventBus.publish(NewChaptersDiscovered(series = series, chapters = insertedChapters))
         }
 
         if (series.autoDownload) {

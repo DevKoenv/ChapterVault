@@ -21,7 +21,9 @@ import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
+import dev.koenv.chaptervault.kernel.event.DomainEvent
 import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
+import dev.koenv.chaptervault.kernel.event.NewChaptersDiscovered
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
@@ -235,6 +237,67 @@ class TaskExecutorServiceTest {
 
             val file = tempDir.resolve(chapter.seriesId.toString()).resolve(chapter.id.toString())
             assertFalse(Files.exists(file), "No file should be written when a page fetch fails")
+        }
+    }
+
+    @Test
+    fun `handleFetchChapters publishes NewChaptersDiscovered when new chapters are inserted`() {
+        runBlocking {
+            val capturedEvents = mutableListOf<DomainEvent>()
+            val eventBus = InMemoryEventBus()
+            eventBus.subscribe { capturedEvents.add(it) }
+
+            val tempDir = Files.createTempDirectory("executor-fetch-test-storage")
+            val localFileStorage = FileStorage(
+                tempDir,
+                Files.createTempDirectory("executor-fetch-test-thumbnails"),
+                ArchiveWriterSelector(listOf(CbzWriter())),
+            )
+            val executor = TaskExecutorService(
+                taskQueue, taskRepository, registry, seriesRepository,
+                chapterRepository, localFileStorage, HttpClient(), eventBus,
+            )
+
+            val seriesId = insertSeries()
+
+            val fetchConnector = object : HttpConnector(HttpClient()) {
+                override val id = "fetch-connector"
+                override val name = "Fetch Test Connector"
+                override val bucketConfigs: Map<BucketKey, BucketConfig> = mapOf(
+                    Bucket.CDN to BucketConfig(requestsPerSecond = 100.0),
+                )
+                override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> = Result.Success(ByteArray(0))
+                override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> = TODO()
+                override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> = TODO()
+                override suspend fun fetchChapters(externalId: String, language: String): Result<List<ChapterMetadata>> =
+                    Result.Success(listOf(ChapterMetadata(externalId = "ext-ch-001", title = "Chapter 1", chapterIndex = 1.0)))
+                override suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult> = TODO()
+            }
+            registry.register(fetchConnector)
+
+            val fetchTask = Task(
+                id = Id.generate(),
+                type = TaskType.FETCH_CHAPTERS,
+                status = TaskStatus.PENDING,
+                targetType = TargetType.SERIES,
+                targetId = seriesId,
+                payload = mapOf(
+                    "connectorId" to "fetch-connector",
+                    "externalId" to "ext-001",
+                    "language" to "en",
+                ),
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+            )
+
+            val result = executor.handleFetchChapters(fetchTask)
+
+            assertIs<Result.Success<Unit>>(result)
+
+            val discovered = capturedEvents.filterIsInstance<NewChaptersDiscovered>()
+            assertEquals(1, discovered.size, "Expected exactly one NewChaptersDiscovered event")
+            assertEquals(1, discovered[0].chapters.size, "Expected one chapter in the event")
+            assertEquals(seriesId, discovered[0].series.id)
         }
     }
 
