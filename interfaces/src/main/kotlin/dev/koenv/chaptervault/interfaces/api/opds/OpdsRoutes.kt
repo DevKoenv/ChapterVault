@@ -10,15 +10,17 @@ import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticate
-import io.ktor.server.response.header
+import io.ktor.server.request.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import java.security.MessageDigest
 import java.time.Instant
 
 private val OPDS_CONTENT_TYPE = ContentType.parse("application/atom+xml;charset=utf-8")
@@ -102,7 +104,9 @@ fun Application.opdsPageRoutes(libraryRead: LibraryReadApi, pageSource: ChapterP
 
                 val chapterResult = libraryRead.getChapter(id)
                 if (chapterResult is Result.Failure) {
-                    call.respond(HttpStatusCode.NotFound); return@get
+                    val status = if (chapterResult.error is AppError.NotFound) HttpStatusCode.NotFound
+                                 else HttpStatusCode.InternalServerError
+                    call.respond(status); return@get
                 }
                 val chapter = (chapterResult as Result.Success).value
                 if (chapter.downloadStatus != DownloadStatus.DOWNLOADED) {
@@ -113,9 +117,13 @@ fun Application.opdsPageRoutes(libraryRead: LibraryReadApi, pageSource: ChapterP
                     is Result.Failure -> call.respond(HttpStatusCode.NotFound)
                     is Result.Success -> {
                         val page = pageResult.value
-                        val etag = "\"${sha256("${id}:${pageNumber}")}\""
-                        call.response.header("ETag", etag)
-                        call.response.header("Cache-Control", "max-age=31536000, immutable")
+                        val etag = "\"${sha256("${id}:${chapter.updatedAt.epochSecond}:${pageNumber}")}\""
+                        call.response.headers.append(HttpHeaders.ETag, etag)
+                        call.response.headers.append(HttpHeaders.CacheControl, "max-age=31536000, immutable")
+                        val ifNoneMatch = call.request.header(HttpHeaders.IfNoneMatch)
+                        if (ifNoneMatch == etag) {
+                            call.respond(HttpStatusCode.NotModified); return@get
+                        }
                         call.respondBytes(page.data, ContentType.parse(page.mimeType))
                     }
                 }
@@ -125,7 +133,7 @@ fun Application.opdsPageRoutes(libraryRead: LibraryReadApi, pageSource: ChapterP
 }
 
 private fun sha256(input: String): String {
-    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    val digest = MessageDigest.getInstance("SHA-256")
     return digest.digest(input.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 }
