@@ -17,6 +17,7 @@ import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
+import dev.koenv.chaptervault.interfaces.api.opds.opdsPageRoutes
 import dev.koenv.chaptervault.interfaces.api.opds.opdsRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
@@ -164,6 +165,7 @@ fun Application.bootstrap() {
 
     // OPDS feeds (Basic Auth)
     opdsRoutes(libraryRead, fileStorage)
+    opdsPageRoutes(libraryRead, fileStorage)
 
     // OPDS chapter download (Basic Auth — in server module to access FileStorage)
     routing {

@@ -13,7 +13,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticate
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
@@ -86,4 +88,44 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageS
             }
         }
     }
+}
+
+fun Application.opdsPageRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageSource) {
+    routing {
+        authenticate("auth-basic") {
+            get("/opds/v1/chapters/{id}/pages/{pageNumber}") {
+                val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
+                    call.respond(HttpStatusCode.BadRequest); return@get
+                }
+                val pageNumber = call.parameters["pageNumber"]?.toIntOrNull()
+                    ?: run { call.respond(HttpStatusCode.BadRequest); return@get }
+
+                val chapterResult = libraryRead.getChapter(id)
+                if (chapterResult is Result.Failure) {
+                    call.respond(HttpStatusCode.NotFound); return@get
+                }
+                val chapter = (chapterResult as Result.Success).value
+                if (chapter.downloadStatus != DownloadStatus.DOWNLOADED) {
+                    call.respond(HttpStatusCode.NotFound); return@get
+                }
+
+                when (val pageResult = pageSource.readPage(chapter, pageNumber)) {
+                    is Result.Failure -> call.respond(HttpStatusCode.NotFound)
+                    is Result.Success -> {
+                        val page = pageResult.value
+                        val etag = "\"${sha256("${id}:${pageNumber}")}\""
+                        call.response.header("ETag", etag)
+                        call.response.header("Cache-Control", "max-age=31536000, immutable")
+                        call.respondBytes(page.data, ContentType.parse(page.mimeType))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun sha256(input: String): String {
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    return digest.digest(input.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
 }
