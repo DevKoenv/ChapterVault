@@ -45,6 +45,14 @@ object ConfigValidator {
             }
         }
 
+        val invalidCidrs = mutableListOf<String>()
+        (config.auth.rateLimiting.trustedNetworks + config.auth.rateLimiting.trustedProxies).forEach { cidr ->
+            runCatching { dev.koenv.chaptervault.shared.net.CidrMatcher(cidr) }.onFailure {
+                invalidCidrs += "auth.rateLimiting CIDR '$cidr' is invalid: ${it.message}"
+            }
+        }
+        errors.addAll(invalidCidrs)
+
         if (errors.isNotEmpty()) {
             errors.forEach { log.error("Configuration error: $it") }
             error("Server startup aborted due to ${errors.size} configuration error(s)")
@@ -53,7 +61,8 @@ object ConfigValidator {
         log.info(
             "Config: port=${config.server.port} db=${config.database.url} " +
             "library=${config.storage.libraryPath} thumbnails=${config.storage.thumbnailsPath} " +
-            "refresh=${config.refresh.intervalHours}h debug=${config.debug}"
+            "refresh=${config.refresh.intervalHours}h debug=${config.debug} " +
+            "rateLimiting=${config.auth.rateLimiting.enabled}"
         )
     }
 }

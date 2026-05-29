@@ -104,6 +104,10 @@ fun Application.bootstrap() {
         allowMethod(HttpMethod.Patch)
     }
     install(SSE)
+    val appRateLimitConfig = config.auth.rateLimiting
+    install(AuthRateLimiting) {
+        this.config = appRateLimitConfig
+    }
 
     val libraryRead by inject<LibraryReadApi>()
     val libraryCommand by inject<LibraryCommandApi>()
