@@ -45,6 +45,12 @@ class MangaDexConnector(
         Bucket.CDN to BucketConfig(requestsPerSecond = 3.0, burst = 5),
     )
 
+    override fun supportedLanguages(): List<String> = listOf(
+        "en", "fr", "es", "es-la", "pt", "pt-br", "de", "it", "ru", "pl",
+        "tr", "nl", "ar", "zh", "zh-hk", "ja", "ja-ro", "ko", "ko-ro",
+        "id", "vi", "th", "uk", "hu", "cs", "ro", "bg", "hr", "sr",
+    )
+
     private data class AtHomeCache(
         val baseUrl: String,
         val hash: String,
@@ -96,7 +102,7 @@ class MangaDexConnector(
 
     override suspend fun fetchChapters(externalId: String, language: String): Result<List<ChapterMetadata>> {
         val allChapters = mutableListOf<MangaDexChapterData>()
-        val lang = this.language
+        val lang = language.ifBlank { "en" }
         var offset = 0
 
         while (true) {
