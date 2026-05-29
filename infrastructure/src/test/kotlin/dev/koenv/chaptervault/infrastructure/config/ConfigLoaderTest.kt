@@ -226,4 +226,28 @@ class ConfigLoaderTest {
         assertEquals(5, config.auth.rateLimiting.register.maxAttempts)
         assertEquals(60, config.auth.rateLimiting.register.windowMinutes)
     }
+
+    @Test
+    fun `writes default config file when configPath is null and file does not exist`(@TempDir dir: Path) {
+        val dataDir = dir.toString()
+        val config = ConfigLoader.load(configPath = null, env = { if (it == "CHAPTERVAULT_DATA_DIR") dataDir else null })
+        val written = dir.resolve("config.yaml").toFile()
+        assertTrue(written.exists(), "config.yaml should be written on first boot")
+        val content = written.readText()
+        assertTrue(content.contains("port: 8080"))
+        assertTrue(content.contains("trustedNetworks"))
+        assertTrue(content.contains("intervalHours: 24"))
+        // Config values are still correct defaults
+        assertEquals(8080, config.server.port)
+        assertEquals(24, config.refresh.intervalHours)
+    }
+
+    @Test
+    fun `does not overwrite existing config file`(@TempDir dir: Path) {
+        val file = dir.resolve("config.yaml").toFile()
+        file.writeText("server:\n  port: 9999")
+        val config = ConfigLoader.load(configPath = null, env = { if (it == "CHAPTERVAULT_DATA_DIR") dir.toString() else null })
+        assertEquals(9999, config.server.port)
+        assertEquals("server:\n  port: 9999", file.readText())
+    }
 }

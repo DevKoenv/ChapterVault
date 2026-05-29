@@ -6,7 +6,7 @@ import java.io.File
 
 object ConfigLoader {
     fun load(
-        configPath: String = "config/application.yaml",
+        configPath: String? = null,
         env: (String) -> String? = System::getenv,
     ): AppConfig {
         val dataDir = env("CHAPTERVAULT_DATA_DIR") ?: "data"
@@ -20,7 +20,14 @@ object ConfigLoader {
             ),
         )
 
-        val file = File(configPath)
+        val resolvedPath = configPath ?: "$dataDir/config.yaml"
+        val file = File(resolvedPath)
+
+        if (configPath == null && !file.exists()) {
+            file.parentFile?.mkdirs()
+            file.writeText(defaultConfigContent())
+        }
+
         val base = if (!file.exists()) derived else {
             @Suppress("UNCHECKED_CAST")
             val map = Yaml().load<Map<String, Any>>(file.inputStream()) ?: return applyEnv(derived, env)
@@ -101,6 +108,53 @@ object ConfigLoader {
 
         return applyEnv(base, env)
     }
+
+    fun defaultConfigContent(): String = """
+        # ChapterVault configuration
+        # Edit this file and restart the server to apply changes.
+        # All values shown are the defaults.
+        # Environment variables (CHAPTERVAULT_*) override these settings.
+
+        server:
+          port: 8080
+          # Bind address — 0.0.0.0 accepts connections on all interfaces.
+          host: "0.0.0.0"
+          # Allowed CORS origins. Empty = allow all origins (fine for local use).
+          # corsOrigins:
+          #   - "http://192.168.1.10:3000"
+
+        storage:
+          # How downloaded chapters are stored on disk.
+          # CBZ    — single zip archive per chapter (default, space-efficient)
+          # FOLDER — one image file per page inside a directory
+          defaultFormat: CBZ
+
+        refresh:
+          # Hours between automatic library refreshes. 0 to disable.
+          intervalHours: 24
+
+        auth:
+          rateLimiting:
+            enabled: true
+            # Addresses and subnets that bypass rate limiting entirely.
+            # Defaults cover localhost and all RFC-1918 private networks.
+            trustedNetworks:
+              - "127.0.0.0/8"
+              - "::1/128"
+              - "10.0.0.0/8"
+              - "172.16.0.0/12"
+              - "192.168.0.0/16"
+            # If running behind a reverse proxy, list its IP(s) here so the real
+            # client address is read from X-Forwarded-For rather than the socket.
+            # trustedProxies:
+            #   - "172.18.0.1"
+            login:
+              maxAttempts: 10
+              windowMinutes: 15
+            register:
+              maxAttempts: 5
+              windowMinutes: 60
+    """.trimIndent() + "\n"
 
     // Env vars take precedence over YAML. All vars are prefixed CHAPTERVAULT_.
     // CHAPTERVAULT_DATA_DIR sets the default root for db/, library/, thumbnails/ (Task 3).
