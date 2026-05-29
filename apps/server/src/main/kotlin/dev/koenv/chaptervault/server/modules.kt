@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.PersistingTaskQueue
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
@@ -7,6 +8,7 @@ import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.config.ConfigLoader
 import dev.koenv.chaptervault.infrastructure.database.repositories.BookmarkRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.NotificationRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
@@ -28,6 +30,8 @@ import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.BookmarkApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.NotificationApi
+import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
@@ -62,6 +66,10 @@ val infrastructureModule = module {
     single<BookmarkApi> { get<BookmarkRepository>() }
     single { UserSeriesStatusRepository() }
     single<ReadingStatusApi> { get<UserSeriesStatusRepository>() }
+    single { NotificationRepository() }
+    single<NotificationApi> { get<NotificationRepository>() }
+    single { NotificationService(get(), get(), get()) }
+    single<NotificationDispatchApi> { get<NotificationService>() }
     single { createHttpClient() }
     single { CbzWriter() }
     single { FolderWriter() }

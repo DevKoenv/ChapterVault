@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.server
 
+import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
@@ -9,6 +10,8 @@ import dev.koenv.chaptervault.kernel.api.BookmarkApi
 import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.NotificationApi
+import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
@@ -20,6 +23,7 @@ import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.readingStatusRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
@@ -113,6 +117,9 @@ fun Application.bootstrap() {
     val progressApi by inject<ProgressApi>()
     val bookmarkApi by inject<BookmarkApi>()
     val readingStatusApi by inject<ReadingStatusApi>()
+    val notificationService by inject<NotificationService>()
+    val notificationApi by inject<NotificationApi>()
+    val notificationDispatch by inject<NotificationDispatchApi>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -146,6 +153,7 @@ fun Application.bootstrap() {
             progressRoutes(progressApi)
             bookmarkRoutes(bookmarkApi)
             readingStatusRoutes(readingStatusApi)
+            notificationRoutes(notificationApi, notificationDispatch)
             sseRoutes(projectionService)
         }
     }
@@ -191,6 +199,8 @@ fun Application.bootstrap() {
             }
         }
     }
+
+    notificationService.start()
 
     launch { projectionService.start() }
     launch { executor.recoverOnBoot(); executor.start() }
