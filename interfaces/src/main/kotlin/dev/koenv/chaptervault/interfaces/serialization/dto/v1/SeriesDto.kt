@@ -13,4 +13,5 @@ data class SeriesDto(
     val autoDownload: Boolean,
     val coverUrl: String? = null,
     val description: String? = null,
+    val readingStatus: String? = null,
 )

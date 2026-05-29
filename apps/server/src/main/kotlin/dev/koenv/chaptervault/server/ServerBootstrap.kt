@@ -10,6 +10,7 @@ import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
+import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
@@ -20,6 +21,7 @@ import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.readingStatusRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.interfaces.api.sse.sseRoutes
@@ -110,6 +112,7 @@ fun Application.bootstrap() {
     val refreshScheduler by inject<SeriesRefreshScheduler>()
     val progressApi by inject<ProgressApi>()
     val bookmarkApi by inject<BookmarkApi>()
+    val readingStatusApi by inject<ReadingStatusApi>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -137,11 +140,12 @@ fun Application.bootstrap() {
     // Bearer-protected routes
     routing {
         authenticate("auth-bearer") {
-            libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage, connectorRegistry)
+            libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage, connectorRegistry, readingStatusApi)
             taskRoutes(system)
             connectorRoutes(connectorRegistry, libraryRead)
             progressRoutes(progressApi)
             bookmarkRoutes(bookmarkApi)
+            readingStatusRoutes(readingStatusApi)
             sseRoutes(projectionService)
         }
     }

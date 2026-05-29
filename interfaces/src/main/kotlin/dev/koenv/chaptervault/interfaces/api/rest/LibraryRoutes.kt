@@ -9,8 +9,10 @@ import dev.koenv.chaptervault.interfaces.serialization.mappers.v1.toDto
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
+import dev.koenv.chaptervault.kernel.library.ReadingStatus
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
@@ -41,17 +43,22 @@ fun Route.libraryRoutes(
     taskQueue: TaskQueue,
     fileStorage: ChapterPageSource,
     connectorRegistry: ConnectorRegistry,
+    readingStatusApi: ReadingStatusApi,
 ) {
     // GET routes are accessible to any authenticated user
     get("/library/series/search") {
         val q = call.request.queryParameters["q"] ?: ""
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
         val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+        val principal = call.principal<KtorPrincipal>()
         when (val result = libraryRead.searchLibrary(q, PageRequest(page, size.coerceIn(1, 100)))) {
             is Result.Success -> call.respond(
                 HttpStatusCode.OK,
                 PaginatedResponse(
-                    items = result.value.items.map { it.toDto() },
+                    items = result.value.items.map { series ->
+                        val readingStatus = principal?.let { p -> readingStatusApi.getStatus(p.user.id, series.id) }
+                        series.toDto(readingStatus)
+                    },
                     page = result.value.page,
                     size = result.value.size,
                     totalItems = result.value.totalItems,
@@ -67,19 +74,32 @@ fun Route.libraryRoutes(
     get("/library/series") {
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
         val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+        val statusFilter = call.request.queryParameters["readingStatus"]?.let { s ->
+            runCatching { ReadingStatus.valueOf(s.uppercase()) }.getOrNull()
+        }
+        val principal = call.principal<KtorPrincipal>()
         when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
-            is Result.Success -> call.respond(
-                HttpStatusCode.OK,
-                PaginatedResponse(
-                    items = result.value.items.map { it.toDto() },
-                    page = result.value.page,
-                    size = result.value.size,
-                    totalItems = result.value.totalItems,
-                    totalPages = result.value.totalPages,
-                    hasNext = result.value.hasNext,
-                    hasPrevious = result.value.hasPrevious,
+            is Result.Success -> {
+                val items = result.value.items.map { series ->
+                    val readingStatus = principal?.let { p -> readingStatusApi.getStatus(p.user.id, series.id) }
+                    series.toDto(readingStatus)
+                }.let { dtos ->
+                    if (statusFilter != null) dtos.filter { it.readingStatus == statusFilter.name }
+                    else dtos
+                }
+                call.respond(
+                    HttpStatusCode.OK,
+                    PaginatedResponse(
+                        items = items,
+                        page = result.value.page,
+                        size = result.value.size,
+                        totalItems = result.value.totalItems,
+                        totalPages = result.value.totalPages,
+                        hasNext = result.value.hasNext,
+                        hasPrevious = result.value.hasPrevious,
+                    )
                 )
-            )
+            }
             is Result.Failure -> call.respondError(result.error)
         }
     }
@@ -88,8 +108,12 @@ fun Route.libraryRoutes(
         val id = try { Id.from(call.parameters["id"]!!) } catch (e: Exception) {
             call.respondBadRequest("Invalid series ID"); return@get
         }
+        val principal = call.principal<KtorPrincipal>()
         when (val result = libraryRead.getSeries(id)) {
-            is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
+            is Result.Success -> {
+                val readingStatus = principal?.let { p -> readingStatusApi.getStatus(p.user.id, id) }
+                call.respond(HttpStatusCode.OK, result.value.toDto(readingStatus))
+            }
             is Result.Failure -> call.respondError(result.error)
         }
     }

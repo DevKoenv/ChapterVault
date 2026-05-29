@@ -11,6 +11,7 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepos
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.UserSeriesStatusRepository
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
@@ -28,6 +29,7 @@ import dev.koenv.chaptervault.kernel.api.BookmarkApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
+import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.api.impl.SystemApiImpl
 import dev.koenv.chaptervault.kernel.event.EventBus
@@ -58,6 +60,8 @@ val infrastructureModule = module {
     single<ProgressApi> { get<ProgressRepository>() }
     single { BookmarkRepository() }
     single<BookmarkApi> { get<BookmarkRepository>() }
+    single { UserSeriesStatusRepository() }
+    single<ReadingStatusApi> { get<UserSeriesStatusRepository>() }
     single { createHttpClient() }
     single { CbzWriter() }
     single { FolderWriter() }

@@ -5,6 +5,8 @@ import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
+import dev.koenv.chaptervault.kernel.library.ReadingStatus
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.library.Chapter
@@ -66,6 +68,7 @@ class LibraryRoutesTest {
         taskQueue: TaskQueue = NoOpTaskQueue(),
         fileStorage: ChapterPageSource = NoOpPageSource(),
         connectorRegistry: ConnectorRegistry = StubConnectorRegistry(),
+        readingStatusApi: ReadingStatusApi = NoOpReadingStatusApi(),
         block: suspend ApplicationTestBuilder.() -> Unit,
     ) = testApplication {
         application {
@@ -83,7 +86,7 @@ class LibraryRoutesTest {
             }
             routing {
                 authenticate("auth-bearer") {
-                    libraryRoutes(readApi, commandApi, taskQueue, fileStorage, connectorRegistry)
+                    libraryRoutes(readApi, commandApi, taskQueue, fileStorage, connectorRegistry, readingStatusApi)
                 }
             }
         }
@@ -759,6 +762,14 @@ private class StubConnectorRegistry : ConnectorRegistry {
     override fun register(connector: Connector) = Unit
     override fun findById(id: String): Connector? = StubConnector(id)
     override fun all(): List<Connector> = emptyList()
+}
+
+private class NoOpReadingStatusApi : ReadingStatusApi {
+    override suspend fun setStatus(userId: Id, seriesId: Id, status: ReadingStatus) =
+        dev.koenv.chaptervault.shared.result.Result.Success(Unit)
+    override suspend fun clearStatus(userId: Id, seriesId: Id) =
+        dev.koenv.chaptervault.shared.result.Result.Success(Unit)
+    override suspend fun getStatus(userId: Id, seriesId: Id): ReadingStatus? = null
 }
 
 private class StubConnector(override val id: String) : Connector {
