@@ -171,7 +171,7 @@ class TaskExecutorService(
     private suspend fun handleFetchChapters(task: Task): Result<Unit> {
         val connectorId = task.payload["connectorId"] ?: ""
         val externalId = task.payload["externalId"] ?: ""
-        val language = task.payload["language"] ?: ""
+        val language = task.payload["language"].orEmpty().ifBlank { "en" }
 
         val connector = connectorRegistry.findById(connectorId)
             ?: return Result.Failure(AppError.InternalError("Connector not found: $connectorId"))

@@ -137,7 +137,7 @@ fun Application.bootstrap() {
     // Bearer-protected routes
     routing {
         authenticate("auth-bearer") {
-            libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage)
+            libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage, connectorRegistry)
             taskRoutes(system)
             connectorRoutes(connectorRegistry, libraryRead)
             progressRoutes(progressApi)

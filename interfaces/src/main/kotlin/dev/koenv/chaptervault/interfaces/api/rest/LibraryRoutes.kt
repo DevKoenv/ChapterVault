@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
+import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.AddSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
@@ -39,6 +40,7 @@ fun Route.libraryRoutes(
     libraryCommand: LibraryCommandApi,
     taskQueue: TaskQueue,
     fileStorage: ChapterPageSource,
+    connectorRegistry: ConnectorRegistry,
 ) {
     // GET routes are accessible to any authenticated user
     get("/library/series/search") {
@@ -150,6 +152,15 @@ fun Route.libraryRoutes(
         }
         val request = try { call.receive<AddSeriesRequest>() } catch (e: Exception) {
             call.respondBadRequest("Invalid request body"); return@post
+        }
+        val connector = connectorRegistry.findById(request.connectorId)
+            ?: run { call.respondBadRequest("Unknown connector: ${request.connectorId}"); return@post }
+        if (request.language !in connector.supportedLanguages()) {
+            call.respondBadRequest(
+                "Language '${request.language}' not supported by connector '${request.connectorId}'. " +
+                    "Supported: ${connector.supportedLanguages().joinToString()}"
+            )
+            return@post
         }
         when (val result = libraryCommand.addToLibrary(request.connectorId, request.externalId, request.language, request.autoDownload)) {
             is Result.Success -> {

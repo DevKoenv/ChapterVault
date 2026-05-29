@@ -1,5 +1,7 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
+import dev.koenv.chaptervault.extensions.connectors.Connector
+import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
@@ -63,6 +65,7 @@ class LibraryRoutesTest {
         commandApi: LibraryCommandApi,
         taskQueue: TaskQueue = NoOpTaskQueue(),
         fileStorage: ChapterPageSource = NoOpPageSource(),
+        connectorRegistry: ConnectorRegistry = StubConnectorRegistry(),
         block: suspend ApplicationTestBuilder.() -> Unit,
     ) = testApplication {
         application {
@@ -80,7 +83,7 @@ class LibraryRoutesTest {
             }
             routing {
                 authenticate("auth-bearer") {
-                    libraryRoutes(readApi, commandApi, taskQueue, fileStorage)
+                    libraryRoutes(readApi, commandApi, taskQueue, fileStorage, connectorRegistry)
                 }
             }
         }
@@ -749,4 +752,24 @@ private class CapturingTaskQueue : TaskQueue {
     override suspend fun dequeue(): Task? = null
     override suspend fun cancel(taskId: Id): Result<Unit> = Result.Success(Unit)
     override suspend fun getTask(taskId: Id): Task? = null
+}
+
+/** Returns a stub connector that supports "en" for any requested connectorId. */
+private class StubConnectorRegistry : ConnectorRegistry {
+    override fun register(connector: Connector) = Unit
+    override fun findById(id: String): Connector? = StubConnector(id)
+    override fun all(): List<Connector> = emptyList()
+}
+
+private class StubConnector(override val id: String) : Connector {
+    override val name: String = id
+    override suspend fun search(query: String, request: PageRequest) =
+        Result.Failure(AppError.InternalError("stub"))
+    override suspend fun fetchSeries(externalId: String) =
+        Result.Failure(AppError.InternalError("stub"))
+    override suspend fun fetchChapters(externalId: String, language: String) =
+        Result.Failure(AppError.InternalError("stub"))
+    override suspend fun download(chapter: Chapter, format: ChapterFormat) =
+        Result.Failure(AppError.InternalError("stub"))
+    override fun supportedLanguages(): List<String> = listOf("en")
 }
