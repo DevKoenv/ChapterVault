@@ -64,10 +64,10 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageS
                 if (chaptersResult is Result.Failure) {
                     call.respond(HttpStatusCode.InternalServerError); return@get
                 }
-                val downloadedChapters = (chaptersResult as Result.Success).value
-                val pageInfoByChapterId = downloadedChapters
+                val chapters = (chaptersResult as Result.Success).value
+                val pageInfoByChapterId = chapters
                     .filter { it.downloadStatus == DownloadStatus.DOWNLOADED && it.pageCount != null }
-                    .mapNotNull { chapter ->
+                    .map { chapter ->
                         val mimeType = when (val r = pageSource.readPage(chapter, 0)) {
                             is Result.Success -> r.value.mimeType
                             is Result.Failure -> "image/*"
@@ -78,7 +78,7 @@ fun Application.opdsRoutes(libraryRead: LibraryReadApi, pageSource: ChapterPageS
                 val now = Instant.now().toString()
                 val feed = feedBuilder.buildSeriesFeed(
                     series = (seriesResult as Result.Success).value,
-                    chapters = downloadedChapters,
+                    chapters = chapters,
                     now = now,
                     pageInfoByChapterId = pageInfoByChapterId,
                 )

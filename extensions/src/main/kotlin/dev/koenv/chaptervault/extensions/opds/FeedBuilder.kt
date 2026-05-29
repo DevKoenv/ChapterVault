@@ -71,14 +71,14 @@ class FeedBuilder {
         )
     }
 
-    fun buildChapterEntry(chapter: Chapter, now: String, pageInfo: ChapterPageInfo? = null): OpdsEntry {
+    internal fun buildChapterEntry(chapter: Chapter, now: String, pageInfo: ChapterPageInfo? = null): OpdsEntry {
         val links = mutableListOf<OpdsLink>()
         if (chapter.downloadStatus == DownloadStatus.DOWNLOADED) {
             links.add(OpdsLink(rel = REL_ACQUISITION, href = "/opds/v1/download/${chapter.id}", type = TYPE_CBZ))
             if (pageInfo != null) {
                 links.add(
                     OpdsLink(
-                        rel = "http://vaemendis.net/opds-pse/ns",
+                        rel = REL_PSE,
                         href = "/opds/v1/chapters/${chapter.id}/pages/{pageNumber}",
                         type = pageInfo.firstPageMimeType,
                         pseCount = pageInfo.pageCount,
@@ -102,5 +102,6 @@ class FeedBuilder {
         const val TYPE_CBZ = "application/x-cbz"
         const val REL_IMAGE = "http://opds-spec.org/image"
         const val REL_ACQUISITION = "http://opds-spec.org/acquisition"
+        const val REL_PSE = "http://vaemendis.net/opds-pse/ns"
     }
 }
