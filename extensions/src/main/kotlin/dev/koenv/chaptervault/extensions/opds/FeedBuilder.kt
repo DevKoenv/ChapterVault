@@ -44,12 +44,17 @@ class FeedBuilder {
         )
     }
 
-    fun buildSeriesFeed(series: Series, chapters: List<Chapter>, now: String): OpdsFeed = OpdsFeed(
+    fun buildSeriesFeed(
+        series: Series,
+        chapters: List<Chapter>,
+        now: String,
+        pageInfoByChapterId: Map<String, ChapterPageInfo> = emptyMap(),
+    ): OpdsFeed = OpdsFeed(
         id = "urn:chaptervault:series:${series.id}",
         title = series.title,
         updated = now,
         selfHref = "/opds/v1/series/${series.id}",
-        entries = chapters.map { buildChapterEntry(it, now) },
+        entries = chapters.map { buildChapterEntry(it, now, pageInfoByChapterId[it.id.toString()]) },
     )
 
     private fun buildSeriesEntry(series: Series, now: String): OpdsEntry {
@@ -66,10 +71,20 @@ class FeedBuilder {
         )
     }
 
-    private fun buildChapterEntry(chapter: Chapter, now: String): OpdsEntry {
+    fun buildChapterEntry(chapter: Chapter, now: String, pageInfo: ChapterPageInfo? = null): OpdsEntry {
         val links = mutableListOf<OpdsLink>()
         if (chapter.downloadStatus == DownloadStatus.DOWNLOADED) {
             links.add(OpdsLink(rel = REL_ACQUISITION, href = "/opds/v1/download/${chapter.id}", type = TYPE_CBZ))
+            if (pageInfo != null) {
+                links.add(
+                    OpdsLink(
+                        rel = "http://vaemendis.net/opds-pse/ns",
+                        href = "/opds/v1/chapters/${chapter.id}/pages/{pageNumber}",
+                        type = pageInfo.firstPageMimeType,
+                        pseCount = pageInfo.pageCount,
+                    )
+                )
+            }
         }
         return OpdsEntry(
             id = "urn:chaptervault:chapter:${chapter.id}",
@@ -78,6 +93,8 @@ class FeedBuilder {
             links = links,
         )
     }
+
+    data class ChapterPageInfo(val pageCount: Int, val firstPageMimeType: String)
 
     companion object {
         const val TYPE_NAVIGATION = "application/atom+xml;profile=opds-catalog;kind=navigation"

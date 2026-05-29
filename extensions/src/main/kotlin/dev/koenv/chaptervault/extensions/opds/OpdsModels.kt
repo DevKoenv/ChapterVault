@@ -26,4 +26,5 @@ data class OpdsLink(
     val rel: String,
     val href: String,
     val type: String,
+    val pseCount: Int? = null,
 )

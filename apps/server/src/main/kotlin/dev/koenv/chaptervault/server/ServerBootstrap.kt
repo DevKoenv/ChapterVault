@@ -163,7 +163,7 @@ fun Application.bootstrap() {
     }
 
     // OPDS feeds (Basic Auth)
-    opdsRoutes(libraryRead)
+    opdsRoutes(libraryRead, fileStorage)
 
     // OPDS chapter download (Basic Auth — in server module to access FileStorage)
     routing {

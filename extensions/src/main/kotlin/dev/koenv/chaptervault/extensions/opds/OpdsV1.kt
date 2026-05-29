@@ -6,7 +6,8 @@ class OpdsV1 {
         append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
         append("<feed xmlns=\"http://www.w3.org/2005/Atom\"")
         append(" xmlns:opds=\"http://opds-spec.org/2010/catalog\"")
-        append(" xmlns:os=\"http://a9.com/-/spec/opensearch/1.1/\">\n")
+        append(" xmlns:os=\"http://a9.com/-/spec/opensearch/1.1/\"")
+        append(" xmlns:pse=\"http://vaemendis.net/opds-pse/ns\">\n")
         append("<id>${esc(feed.id)}</id>\n")
         append("<title>${esc(feed.title)}</title>\n")
         append("<updated>${feed.updated}</updated>\n")
@@ -30,7 +31,11 @@ class OpdsV1 {
             entry.summary?.let { append("<summary>${esc(it)}</summary>\n") }
             entry.content?.let { append("<content type=\"text\">${esc(it)}</content>\n") }
             for (link in entry.links) {
-                append("<link rel=\"${esc(link.rel)}\" href=\"${esc(link.href)}\" type=\"${esc(link.type)}\"/>\n")
+                if (link.pseCount != null) {
+                    append("<link rel=\"${esc(link.rel)}\" href=\"${esc(link.href)}\" type=\"${esc(link.type)}\" pse:count=\"${link.pseCount}\"/>\n")
+                } else {
+                    append("<link rel=\"${esc(link.rel)}\" href=\"${esc(link.href)}\" type=\"${esc(link.type)}\"/>\n")
+                }
             }
             append("</entry>\n")
         }
