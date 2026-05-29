@@ -15,4 +15,5 @@ dependencies {
     implementation(libs.jbcrypt)
 
     testImplementation(libs.bundles.testing)
+    testImplementation(libs.ktor.client.mock)
 }
