@@ -9,6 +9,7 @@ data class AppConfig(
     val log: LogConfig = LogConfig(),
     val refresh: RefreshConfig = RefreshConfig(),
     val debug: DebugConfig = DebugConfig(),
+    val auth: AuthConfig = AuthConfig(),
 )
 
 // Enable only during local development — never expose mock connectors in production
@@ -42,4 +43,23 @@ data class StorageConfig(
 
 data class LogConfig(
     val level: String = "INFO",
+)
+
+data class AuthConfig(
+    val rateLimiting: RateLimitConfig = RateLimitConfig(),
+)
+
+data class RateLimitConfig(
+    val enabled: Boolean = true,
+    val trustedNetworks: List<String> = listOf(
+        "127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"
+    ),
+    val trustedProxies: List<String> = emptyList(),
+    val login: EndpointLimitConfig = EndpointLimitConfig(maxAttempts = 10, windowMinutes = 15),
+    val register: EndpointLimitConfig = EndpointLimitConfig(maxAttempts = 5, windowMinutes = 60),
+)
+
+data class EndpointLimitConfig(
+    val maxAttempts: Int,
+    val windowMinutes: Int,
 )

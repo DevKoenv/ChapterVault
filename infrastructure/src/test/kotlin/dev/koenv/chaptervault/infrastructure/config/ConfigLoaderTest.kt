@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Path
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ConfigLoaderTest {
     @Test
@@ -185,5 +186,44 @@ class ConfigLoaderTest {
         val config = ConfigLoader.load(file.absolutePath, env = { if (it == "CHAPTERVAULT_DATA_DIR") "mydata" else null })
         assertEquals("yaml/library", config.storage.libraryPath)
         assertEquals("mydata/thumbnails", config.storage.thumbnailsPath)
+    }
+
+    @Test
+    fun `load parses auth rate limit section from YAML`(@TempDir dir: Path) {
+        val yaml = """
+            auth:
+              rateLimiting:
+                enabled: true
+                trustedNetworks:
+                  - "10.0.0.0/8"
+                trustedProxies:
+                  - "172.18.0.0/16"
+                login:
+                  maxAttempts: 5
+                  windowMinutes: 10
+                register:
+                  maxAttempts: 2
+                  windowMinutes: 30
+        """.trimIndent()
+        val file = dir.resolve("application.yaml")
+        java.nio.file.Files.writeString(file, yaml)
+        val config = ConfigLoader.load(configPath = file.toString())
+        assertEquals(true, config.auth.rateLimiting.enabled)
+        assertEquals(listOf("10.0.0.0/8"), config.auth.rateLimiting.trustedNetworks)
+        assertEquals(listOf("172.18.0.0/16"), config.auth.rateLimiting.trustedProxies)
+        assertEquals(5, config.auth.rateLimiting.login.maxAttempts)
+        assertEquals(30, config.auth.rateLimiting.register.windowMinutes)
+    }
+
+    @Test
+    fun `load uses auth defaults when section absent`() {
+        val config = ConfigLoader.load(configPath = "nonexistent.yaml")
+        assertEquals(true, config.auth.rateLimiting.enabled)
+        assertEquals(5, config.auth.rateLimiting.trustedNetworks.size)
+        assertTrue(config.auth.rateLimiting.trustedProxies.isEmpty())
+        assertEquals(10, config.auth.rateLimiting.login.maxAttempts)
+        assertEquals(15, config.auth.rateLimiting.login.windowMinutes)
+        assertEquals(5, config.auth.rateLimiting.register.maxAttempts)
+        assertEquals(60, config.auth.rateLimiting.register.windowMinutes)
     }
 }

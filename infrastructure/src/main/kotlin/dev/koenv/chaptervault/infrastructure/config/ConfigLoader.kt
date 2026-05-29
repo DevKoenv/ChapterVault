@@ -65,7 +65,38 @@ object ConfigLoader {
                 DebugConfig(mockConnectorEnabled = (d["mockConnectorEnabled"] as? Boolean) ?: derived.debug.mockConnectorEnabled)
             } ?: derived.debug
 
-            AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh, debug = debug)
+            val auth = (map["auth"] as? Map<*, *>)?.let { a ->
+                val rl = (a["rateLimiting"] as? Map<*, *>)?.let { r ->
+                    @Suppress("UNCHECKED_CAST")
+                    val trustedNetworks = (r["trustedNetworks"] as? List<String>)
+                        ?: derived.auth.rateLimiting.trustedNetworks
+                    @Suppress("UNCHECKED_CAST")
+                    val trustedProxies = (r["trustedProxies"] as? List<String>)
+                        ?: derived.auth.rateLimiting.trustedProxies
+                    val login = (r["login"] as? Map<*, *>)?.let { l ->
+                        EndpointLimitConfig(
+                            maxAttempts = (l["maxAttempts"] as? Int) ?: derived.auth.rateLimiting.login.maxAttempts,
+                            windowMinutes = (l["windowMinutes"] as? Int) ?: derived.auth.rateLimiting.login.windowMinutes,
+                        )
+                    } ?: derived.auth.rateLimiting.login
+                    val register = (r["register"] as? Map<*, *>)?.let { reg ->
+                        EndpointLimitConfig(
+                            maxAttempts = (reg["maxAttempts"] as? Int) ?: derived.auth.rateLimiting.register.maxAttempts,
+                            windowMinutes = (reg["windowMinutes"] as? Int) ?: derived.auth.rateLimiting.register.windowMinutes,
+                        )
+                    } ?: derived.auth.rateLimiting.register
+                    RateLimitConfig(
+                        enabled = (r["enabled"] as? Boolean) ?: derived.auth.rateLimiting.enabled,
+                        trustedNetworks = trustedNetworks,
+                        trustedProxies = trustedProxies,
+                        login = login,
+                        register = register,
+                    )
+                } ?: derived.auth.rateLimiting
+                AuthConfig(rateLimiting = rl)
+            } ?: derived.auth
+
+            AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh, debug = debug, auth = auth)
         }
 
         return applyEnv(base, env)
