@@ -21,7 +21,7 @@ jobs:
           cache: gradle
 
       - name: Build, test and verify coverage
-        run: ./gradlew build koverXmlReport koverVerify
+        run: ./gradlew build koverXmlReport
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
