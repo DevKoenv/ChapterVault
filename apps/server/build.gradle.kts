@@ -2,6 +2,10 @@ plugins {
     application
 }
 
+kover {
+    disable()
+}
+
 val fatJar by tasks.registering(Jar::class) {
     archiveBaseName.set("server")
     archiveClassifier.set("fat")
