@@ -1,59 +1,36 @@
-# EditorConfig is awesome: https://EditorConfig.org
-
-# Top-most EditorConfig file
 root = true
 
-# Default settings for all files
 [*]
 charset = utf-8
 end_of_line = lf
-indent_style = space
-indent_size = 4
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-# Kotlin files
 [*.{kt,kts}]
 indent_size = 4
-max_line_length = 120
+max_line_length = 140
+ktlint_code_style = ktlint_official
+ij_kotlin_code_style_defaults = KOTLIN_OFFICIAL
 
-# Gradle files
-[*.gradle]
-indent_size = 4
+# Import ordering and wildcard prevention
+ij_kotlin_imports_layout = *,java.**,javax.**,kotlin.**,^
+ij_kotlin_name_count_to_use_star_import = 999
+ij_kotlin_name_count_to_use_star_import_for_members = 999
+ij_kotlin_packages_to_use_import_on_demand = unset
+ktlint_standard_no-wildcard-imports = enabled
 
-# Gradle Kotlin DSL
-[*.gradle.kts]
-indent_size = 4
+# Trailing commas (modern Kotlin style, cleaner diffs)
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
 
-# YAML files
-[*.{yml,yaml}]
-indent_size = 2
+# Naming conventions (@Test-annotated functions are exempt from function-naming)
+ktlint_standard_filename = enabled
+ktlint_standard_property-naming = enabled
+ktlint_standard_function-naming = enabled
 
-# JSON files
-[*.json]
-indent_size = 2
-
-# XML files
-[*.xml]
-indent_size = 2
-
-# Markdown files
-[*.md]
-trim_trailing_whitespace = false
-max_line_length = off
-
-# Shell scripts
-[*.sh]
-indent_size = 2
-
-# Batch files (Windows line endings)
-[*.{bat,cmd}]
-end_of_line = crlf
-
-# Makefiles require tabs
-[Makefile]
-indent_style = tab
-
-# Git config files
-[.git*]
-indent_size = 4
+# Formatting consistency
+ktlint_standard_argument-list-wrapping = enabled
+ktlint_standard_chain-method-continuation = enabled
+ktlint_standard_multiline-expression-wrapping = enabled
+ktlint_standard_nullable-type-spacing = enabled
+ktlint_standard_spacing-between-declarations-with-comments = enabled
