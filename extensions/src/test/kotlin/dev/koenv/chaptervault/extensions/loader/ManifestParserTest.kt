@@ -95,4 +95,46 @@ class ManifestParserTest {
         assertNotNull(manifest)
         assertEquals(listOf("connector", "metadata_enricher"), manifest.capabilities)
     }
+
+    @Test
+    fun `returns null when capabilities is missing`() {
+        val yaml = """
+            id: "test.extension"
+            name: "Test"
+            version: "1.0.0"
+            minServerVersion: "1.0.0"
+            description: "desc"
+            author: "Author"
+            entryPoint: "test.Extension"
+        """.trimIndent()
+        assertNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `returns null when description is missing`() {
+        val yaml = """
+            id: "test.extension"
+            name: "Test"
+            version: "1.0.0"
+            minServerVersion: "1.0.0"
+            author: "Author"
+            capabilities: []
+            entryPoint: "test.Extension"
+        """.trimIndent()
+        assertNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `returns null when author is missing`() {
+        val yaml = """
+            id: "test.extension"
+            name: "Test"
+            version: "1.0.0"
+            minServerVersion: "1.0.0"
+            description: "desc"
+            capabilities: []
+            entryPoint: "test.Extension"
+        """.trimIndent()
+        assertNull(ManifestParser.parse(yaml))
+    }
 }

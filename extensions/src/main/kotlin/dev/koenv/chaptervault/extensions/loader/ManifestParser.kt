@@ -15,11 +15,11 @@ object ManifestParser {
             val name = map["name"] as? String ?: return null
             val version = map["version"] as? String ?: return null
             val minServerVersion = map["minServerVersion"] as? String ?: return null
-            val description = map["description"] as? String ?: ""
-            val author = map["author"] as? String ?: ""
+            val description = map["description"] as? String ?: return null
+            val author = map["author"] as? String ?: return null
             val priority = (map["priority"] as? Int) ?: 100
             @Suppress("UNCHECKED_CAST")
-            val capabilities = (map["capabilities"] as? List<String>) ?: emptyList()
+            val capabilities = (map["capabilities"] as? List<String>) ?: return null
             val entryPoint = map["entryPoint"] as? String ?: return null
             ExtensionManifest(
                 id = id,
