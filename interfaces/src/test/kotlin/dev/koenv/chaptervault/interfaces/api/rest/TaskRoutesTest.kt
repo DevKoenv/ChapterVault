@@ -3,7 +3,7 @@ package dev.koenv.chaptervault.interfaces.api.rest
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
-import dev.koenv.chaptervault.kernel.extension.Extension
+import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
@@ -166,5 +166,5 @@ private fun fakeSystem(
 
         override suspend fun cancelTask(id: Id) = cancelResult
 
-        override fun listExtensions(): List<Extension> = emptyList()
+        override fun listExtensions(): List<ExtensionEntry> = emptyList()
     }

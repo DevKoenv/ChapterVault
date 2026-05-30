@@ -2,7 +2,7 @@ package dev.koenv.chaptervault.kernel.api.impl
 
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.event.EventBus
-import dev.koenv.chaptervault.kernel.extension.Extension
+import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskEvents
@@ -33,5 +33,5 @@ class SystemApiImpl(
         }
     }
 
-    override fun listExtensions(): List<Extension> = registry.all()
+    override fun listExtensions(): List<ExtensionEntry> = registry.all()
 }

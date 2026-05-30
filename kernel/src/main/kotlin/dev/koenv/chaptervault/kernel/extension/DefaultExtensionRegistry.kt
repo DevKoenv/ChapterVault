@@ -1,22 +1,32 @@
 package dev.koenv.chaptervault.kernel.extension
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 
 class DefaultExtensionRegistry : ExtensionRegistry {
-    private val extensions = ConcurrentHashMap<String, Extension>()
-    private val capabilityIndex = ConcurrentHashMap<Capability, CopyOnWriteArrayList<Extension>>()
+    private val entries = ConcurrentHashMap<String, ExtensionEntry>()
 
-    override fun register(extension: Extension) {
-        extensions[extension.id] = extension
-        extension.capabilities.forEach { cap ->
-            capabilityIndex.getOrPut(cap) { CopyOnWriteArrayList() }.add(extension)
+    override fun register(entry: ExtensionEntry) {
+        entries[entry.extension.id] = entry
+    }
+
+    override fun updateStatus(
+        id: String,
+        status: ExtensionStatus,
+        errorMessage: String?,
+    ) {
+        entries.computeIfPresent(id) { _, entry ->
+            entry.copy(status = status, errorMessage = errorMessage)
         }
     }
 
-    override fun all(): List<Extension> = extensions.values.toList()
+    override fun unregister(id: String) {
+        entries.remove(id)
+    }
 
-    override fun withCapability(capability: Capability): List<Extension> = capabilityIndex[capability]?.toList() ?: emptyList()
+    override fun all(): List<ExtensionEntry> = entries.values.toList()
 
-    override fun findById(id: String): Extension? = extensions[id]
+    override fun findById(id: String): ExtensionEntry? = entries[id]
+
+    override fun enabledWithCapability(capability: Capability): List<ExtensionEntry> =
+        entries.values.filter { it.status == ExtensionStatus.ENABLED && capability in it.extension.capabilities() }
 }

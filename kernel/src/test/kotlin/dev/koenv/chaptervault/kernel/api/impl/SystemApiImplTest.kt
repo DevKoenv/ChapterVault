@@ -4,7 +4,11 @@ import dev.koenv.chaptervault.kernel.event.DomainEvent
 import dev.koenv.chaptervault.kernel.event.EventBus
 import dev.koenv.chaptervault.kernel.extension.Capability
 import dev.koenv.chaptervault.kernel.extension.Extension
+import dev.koenv.chaptervault.kernel.extension.ExtensionContext
+import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
+import dev.koenv.chaptervault.kernel.extension.ExtensionSource
+import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
@@ -64,23 +68,43 @@ private class FakeTaskReadStore(
             ?: Result.Failure(AppError.NotFound("Task", id.toString()))
 }
 
-private data class FakeExtension(
+private class FakeExtension(
     override val id: String,
     override val name: String = "Fake",
     override val version: String = "1.0.0",
-    override val capabilities: Set<Capability> = emptySet(),
-) : Extension
+) : Extension {
+    override fun capabilities(): Set<Capability> = emptySet()
+
+    override fun onEnable(context: ExtensionContext) {}
+
+    override fun onDisable() {}
+}
+
+private fun fakeEntry(id: String) =
+    ExtensionEntry(
+        extension = FakeExtension(id),
+        status = ExtensionStatus.ENABLED,
+        source = ExtensionSource.BUNDLED,
+    )
 
 private class FakeExtensionRegistry(
-    private val extensions: List<Extension> = emptyList(),
+    private val entries: List<ExtensionEntry> = emptyList(),
 ) : ExtensionRegistry {
-    override fun register(extension: Extension) {}
+    override fun register(entry: ExtensionEntry) {}
 
-    override fun all(): List<Extension> = extensions
+    override fun updateStatus(
+        id: String,
+        status: ExtensionStatus,
+        errorMessage: String?,
+    ) {}
 
-    override fun withCapability(capability: Capability): List<Extension> = emptyList()
+    override fun unregister(id: String) {}
 
-    override fun findById(id: String): Extension? = extensions.find { it.id == id }
+    override fun all(): List<ExtensionEntry> = entries
+
+    override fun findById(id: String): ExtensionEntry? = entries.find { it.extension.id == id }
+
+    override fun enabledWithCapability(capability: Capability): List<ExtensionEntry> = emptyList()
 }
 
 class SystemApiImplTest {
@@ -142,9 +166,9 @@ class SystemApiImplTest {
 
     @Test
     fun `listExtensions delegates to registry all()`() {
-        val ext = FakeExtension("ext-1")
-        val result = api(registry = FakeExtensionRegistry(listOf(ext))).listExtensions()
-        assertEquals(listOf(ext), result)
+        val entry = fakeEntry("ext-1")
+        val result = api(registry = FakeExtensionRegistry(listOf(entry))).listExtensions()
+        assertEquals(listOf(entry), result)
     }
 
     @Test

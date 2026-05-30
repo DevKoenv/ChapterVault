@@ -1,11 +1,19 @@
 package dev.koenv.chaptervault.kernel.extension
 
 interface ExtensionRegistry {
-    fun register(extension: Extension)
+    fun register(entry: ExtensionEntry)
 
-    fun all(): List<Extension>
+    fun updateStatus(
+        id: String,
+        status: ExtensionStatus,
+        errorMessage: String? = null,
+    )
 
-    fun withCapability(capability: Capability): List<Extension>
+    fun unregister(id: String)
 
-    fun findById(id: String): Extension?
+    fun all(): List<ExtensionEntry>
+
+    fun findById(id: String): ExtensionEntry?
+
+    fun enabledWithCapability(capability: Capability): List<ExtensionEntry>
 }

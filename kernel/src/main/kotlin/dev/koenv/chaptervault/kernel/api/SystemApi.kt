@@ -1,6 +1,6 @@
 package dev.koenv.chaptervault.kernel.api
 
-import dev.koenv.chaptervault.kernel.extension.Extension
+import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
@@ -14,5 +14,5 @@ interface SystemApi {
 
     suspend fun cancelTask(id: Id): Result<Unit>
 
-    fun listExtensions(): List<Extension>
+    fun listExtensions(): List<ExtensionEntry>
 }
