@@ -18,8 +18,9 @@ object ManifestParser {
             val description = map["description"] as? String ?: return null
             val author = map["author"] as? String ?: return null
             val priority = (map["priority"] as? Int) ?: 100
-            @Suppress("UNCHECKED_CAST")
-            val capabilities = (map["capabilities"] as? List<String>) ?: return null
+            val capabilities = (map["capabilities"] as? List<*>)
+                ?.filterIsInstance<String>()
+                ?.takeIf { it.isNotEmpty() } ?: return null
             val entryPoint = map["entryPoint"] as? String ?: return null
             ExtensionManifest(
                 id = id,

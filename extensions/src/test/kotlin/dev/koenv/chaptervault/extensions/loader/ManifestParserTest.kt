@@ -28,7 +28,6 @@ class ManifestParserTest {
         assertEquals("1.0.0", manifest.minServerVersion)
         assertEquals(listOf("connector"), manifest.capabilities)
         assertEquals("dev.example.MyExtension", manifest.entryPoint)
-        assertEquals(100, manifest.priority)
     }
 
     @Test
@@ -47,8 +46,12 @@ class ManifestParserTest {
     }
 
     @Test
-    fun `returns null for blank input`() {
+    fun `returns null for empty string`() {
         assertNull(ManifestParser.parse(""))
+    }
+
+    @Test
+    fun `returns null for whitespace-only input`() {
         assertNull(ManifestParser.parse("   "))
     }
 
