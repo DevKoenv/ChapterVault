@@ -19,7 +19,9 @@ import io.ktor.client.call.body
 import io.ktor.client.request.basicAuth
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.application.install
@@ -155,6 +157,29 @@ class OpdsRoutesTest {
                 return Result.Success(chapter.pageCount ?: 0)
             }
         }
+
+    private fun testAppWith(
+        libraryRead: LibraryReadApi,
+        block: suspend ApplicationTestBuilder.() -> Unit,
+    ) = testApplication {
+        application {
+            install(Authentication) {
+                basic("auth-basic") {
+                    realm = "ChapterVault"
+                    validate { cred ->
+                        if (cred.name == "user" && cred.password == "pass") {
+                            KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                        } else {
+                            null
+                        }
+                    }
+                }
+            }
+            opdsRoutes(libraryRead, fakePageSource)
+            opdsPageRoutes(libraryRead, fakePageSource)
+        }
+        block()
+    }
 
     private fun testApp(block: suspend ApplicationTestBuilder.() -> Unit) =
         testApplication {
@@ -318,4 +343,168 @@ class OpdsRoutesTest {
             val res = client.get("/library/chapters/$chapterId/pages/0") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.Unauthorized, res.status)
         }
+
+    // Feed structure
+
+    @Test
+    fun `navigation feed contains self link start link and catalog subsection link`() {
+        testApp {
+            val body = client.get("/opds/v1") { basicAuth("user", "pass") }.bodyAsText()
+            assertContains(body, "rel=\"self\"")
+            assertContains(body, "rel=\"start\"")
+            assertContains(body, "rel=\"subsection\"")
+            assertContains(body, "/opds/v1/catalog")
+        }
+    }
+
+    @Test
+    fun `catalog feed includes OpenSearch total results and items per page`() {
+        testApp {
+            val body = client.get("/opds/v1/catalog?page=0&size=20") { basicAuth("user", "pass") }.bodyAsText()
+            assertContains(body, "<os:totalResults>1</os:totalResults>")
+            assertContains(body, "<os:itemsPerPage>20</os:itemsPerPage>")
+            assertContains(body, "<os:startIndex>1</os:startIndex>")
+        }
+    }
+
+    @Test
+    fun `catalog feed returns 200 with no entries when library is empty`() {
+        val emptyLibrary =
+            object : LibraryReadApi {
+                override suspend fun getSeries(id: Id) = Result.Failure(AppError.NotFound("Series", id.toString()))
+
+                override suspend fun listSeries(request: PageRequest) =
+                    Result.Success(Pagination(items = emptyList<Series>(), page = 0, size = 20, totalItems = 0L))
+
+                override suspend fun searchLibrary(
+                    query: String,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(items = emptyList<Series>(), page = 0, size = 20, totalItems = 0L))
+
+                override suspend fun getChapter(id: Id) = Result.Failure(AppError.NotFound("Chapter", id.toString()))
+
+                override suspend fun listChapters(seriesId: Id) = Result.Success(emptyList<Chapter>())
+
+                override suspend fun listChaptersByStatus(
+                    seriesId: Id,
+                    status: DownloadStatus,
+                ) = Result.Success(emptyList<Chapter>())
+
+                override suspend fun inLibraryExternalIds(
+                    connectorId: String,
+                    externalIds: List<String>,
+                ) = Result.Success(emptySet<String>())
+            }
+        testAppWith(emptyLibrary) {
+            val res = client.get("/opds/v1/catalog") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "<os:totalResults>0</os:totalResults>")
+            assertTrue(!body.contains("<entry>"), "expected no entries in empty catalog")
+        }
+    }
+
+    @Test
+    fun `catalog feed includes next link when total items exceed page size`() {
+        val paginatedLibrary =
+            object : LibraryReadApi {
+                override suspend fun getSeries(id: Id) = Result.Success(fakeSeries)
+
+                override suspend fun listSeries(request: PageRequest) =
+                    Result.Success(
+                        Pagination(items = List(request.size) { fakeSeries }, page = request.page, size = request.size, totalItems = 25L),
+                    )
+
+                override suspend fun searchLibrary(
+                    query: String,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(items = emptyList<Series>(), page = 0, size = 20, totalItems = 0L))
+
+                override suspend fun getChapter(id: Id) = fakeLibraryRead.getChapter(id)
+
+                override suspend fun listChapters(seriesId: Id) = fakeLibraryRead.listChapters(seriesId)
+
+                override suspend fun listChaptersByStatus(
+                    seriesId: Id,
+                    status: DownloadStatus,
+                ) = Result.Success(emptyList<Chapter>())
+
+                override suspend fun inLibraryExternalIds(
+                    connectorId: String,
+                    externalIds: List<String>,
+                ) = Result.Success(emptySet<String>())
+            }
+        testAppWith(paginatedLibrary) {
+            val res = client.get("/opds/v1/catalog?page=0&size=20") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertContains(res.bodyAsText(), "rel=\"next\"")
+        }
+    }
+
+    // Input validation
+
+    @Test
+    fun `series feed returns 400 for malformed series ID`() {
+        testApp {
+            val res = client.get("/opds/v1/series/not-a-uuid") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.BadRequest, res.status)
+        }
+    }
+
+    @Test
+    fun `PSE page endpoint returns 400 for malformed chapter ID`() {
+        testApp {
+            val res = client.get("/opds/v1/chapters/not-a-uuid/pages/0") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.BadRequest, res.status)
+        }
+    }
+
+    // Page access edge cases
+
+    @Test
+    fun `PSE page endpoint returns 404 for non-downloaded chapter`() {
+        testApp {
+            val res = client.get("/opds/v1/chapters/$chapterId/pages/0") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.NotFound, res.status)
+        }
+    }
+
+    @Test
+    fun `PSE page endpoint returns 404 for unknown chapter ID`() {
+        testApp {
+            val res = client.get("/opds/v1/chapters/${Id.generate()}/pages/0") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.NotFound, res.status)
+        }
+    }
+
+    // Caching
+
+    @Test
+    fun `PSE page endpoint returns 304 when If-None-Match matches ETag`() {
+        testApp {
+            val first = client.get("/opds/v1/chapters/$downloadedChapterId/pages/0") { basicAuth("user", "pass") }
+            val etag = first.headers[HttpHeaders.ETag]!!
+            val second =
+                client.get("/opds/v1/chapters/$downloadedChapterId/pages/0") {
+                    basicAuth("user", "pass")
+                    header(HttpHeaders.IfNoneMatch, etag)
+                }
+            assertEquals(HttpStatusCode.NotModified, second.status)
+        }
+    }
+
+    // Content-type negotiation
+
+    @Test
+    fun `navigation feed returns text-xml content type when Accept header is text-html`() {
+        testApp {
+            val res =
+                client.get("/opds/v1") {
+                    basicAuth("user", "pass")
+                    header(HttpHeaders.Accept, "text/html")
+                }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertTrue(res.contentType()?.match("text/xml") == true)
+        }
+    }
 }
