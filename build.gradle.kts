@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
-val coverageThreshold = 65 // raise this as test coverage improves
+val coverageThreshold = 70 // raise this as test coverage improves
 
 kover {
     merge {
