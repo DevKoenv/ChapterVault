@@ -982,6 +982,8 @@ private class StubConnectorRegistry : ConnectorRegistry {
     override fun findById(id: String): Connector? = StubConnector(id)
 
     override fun all(): List<Connector> = emptyList()
+
+    override fun unregister(id: String) = Unit
 }
 
 private class NoOpReadingStatusApi : ReadingStatusApi {
