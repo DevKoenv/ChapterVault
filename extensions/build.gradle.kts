@@ -9,6 +9,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)
     implementation(libs.jsoup)
+    implementation(libs.snakeyaml)
 
     testImplementation(libs.bundles.testing)
     testImplementation(libs.ktor.client.cio)
