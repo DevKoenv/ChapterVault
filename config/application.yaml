@@ -1,15 +1,16 @@
+# This file is included in the Docker image as a build-time fallback.
+# The authoritative config is auto-generated at data/config.yaml on first boot.
+# Edit data/config.yaml (persisted via the Docker volume) to customise your deployment.
+
 server:
   port: 8080
   host: "0.0.0.0"
 
-database:
-  driver: "org.sqlite.JDBC"
-  url: "jdbc:sqlite:data/chaptervault.db"
-  maxPoolSize: 5
-
 storage:
-  basePath: "downloads"
-  defaultFormat: "CBZ"
+  defaultFormat: CBZ
+
+refresh:
+  intervalHours: 24
 
 log:
   level: "INFO"
