@@ -25,7 +25,7 @@ object DependencyInjection {
         DatabaseFactory.init(config.database)
         runBlocking { GlobalContext.get().get<SeriesRepository>().cleanupOrphanedFiles() }
 
-        // Register connectors post-boot (after all Koin bindings are resolved)
+        // register connectors post-boot, after all Koin bindings are resolved
         val connectorRegistry = GlobalContext.get().get<ConnectorRegistry>()
         if (config.debug.mockConnectorEnabled) {
             connectorRegistry.register(GlobalContext.get().get<CustomConnector>())
@@ -33,7 +33,7 @@ object DependencyInjection {
         }
         connectorRegistry.register(GlobalContext.get().get<MangaDexConnector>())
 
-        // Register default admin on first boot; silently ignored if admin already exists
+        // register default admin on first boot, silently ignored if admin already exists
         val authApi = GlobalContext.get().get<AuthApi>()
         val adminUser = System.getenv("CHAPTERVAULT_ADMIN_USER") ?: "admin"
         val adminPass = System.getenv("CHAPTERVAULT_ADMIN_PASS") ?: "changeme"
@@ -41,7 +41,7 @@ object DependencyInjection {
             try {
                 authApi.register(Credentials(adminUser, adminPass), Role.ADMIN)
             } catch (_: Exception) {
-                // best-effort; Conflict is returned as Result.Failure, not thrown
+                // best-effort, Conflict is returned as Result.Failure not thrown
             }
         }
     }

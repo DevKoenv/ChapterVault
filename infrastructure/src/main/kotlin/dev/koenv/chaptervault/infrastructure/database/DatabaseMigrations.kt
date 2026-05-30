@@ -117,7 +117,7 @@ object DatabaseMigrations {
                 "INSERT INTO schema_version (version, name, applied_at, checksum) VALUES " +
                     "(${migration.version}, '${migration.name}', datetime('now'), '${migration.checksum}')",
             )
-            log.info("Migration V${migration.version} applied — checksum: ${migration.checksum}")
+            log.info("Migration V${migration.version} applied, checksum: ${migration.checksum}")
         }
     }
 }

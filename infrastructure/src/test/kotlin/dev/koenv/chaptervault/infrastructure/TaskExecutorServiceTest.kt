@@ -365,7 +365,7 @@ class TaskExecutorServiceTest {
             val seriesId = insertSeries()
             val chapter = insertChapter(seriesId)
 
-            // Connector returns pages in reverse order — executor must sort them
+            // connector returns pages in reverse order, executor must sort them
             val pages =
                 listOf(
                     DownloadPage(url = "https://cdn.example.com/p2.jpg", index = 2),

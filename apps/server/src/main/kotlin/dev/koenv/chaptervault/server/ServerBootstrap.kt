@@ -168,10 +168,8 @@ fun Application.bootstrap() {
         }
     }
 
-    // Public routes (no auth required)
     authRoutes(auth)
 
-    // Bearer-protected routes
     routing {
         authenticate("auth-bearer") {
             libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage, connectorRegistry, readingStatusApi)
@@ -185,11 +183,10 @@ fun Application.bootstrap() {
         }
     }
 
-    // OPDS feeds (Basic Auth)
     opdsRoutes(libraryRead, fileStorage)
     opdsPageRoutes(libraryRead, fileStorage)
 
-    // OPDS chapter download (Basic Auth — in server module to access FileStorage)
+    // here rather than :interfaces because it needs FileStorage directly
     routing {
         authenticate("auth-basic") {
             get("/opds/v1/download/{chapterId}") {
@@ -220,7 +217,7 @@ fun Application.bootstrap() {
         }
     }
 
-    // Cover images are served without auth — they're thumbnails, not content
+    // cover images are served without auth, they're thumbnails not content
     routing {
         get("/library/series/{id}/cover") {
             val id =
@@ -253,7 +250,7 @@ fun Application.bootstrap() {
         swaggerUI(path = "swagger", swaggerFile = "openapi/documentation.yaml")
     }
 
-    // /health must be last
+    // /health last, after all services are started
     routing {
         get("/health") {
             val dbOk = DatabaseFactory.ping()

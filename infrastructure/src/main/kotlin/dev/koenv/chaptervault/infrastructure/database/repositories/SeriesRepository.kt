@@ -298,8 +298,8 @@ class SeriesRepository(
             updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
         )
 
-    // Removes storage directories that have no corresponding series in the DB.
-    // Called on startup to recover from a crash between DB delete and file delete.
+    // removes storage dirs with no matching DB entry
+    // called on startup to cover crash window between DB delete and file delete
     suspend fun cleanupOrphanedFiles() {
         val knownIds =
             dbQuery {

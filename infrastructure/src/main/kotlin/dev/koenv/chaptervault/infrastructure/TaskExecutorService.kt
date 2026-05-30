@@ -75,12 +75,12 @@ class TaskExecutorService(
                 }
                 // skip tasks cancelled between enqueue and dequeue
                 if (taskQueue.getTask(task.id)?.status == TaskStatus.CANCELLED) {
-                    log.info("Task ${task.id} [${task.type}] skipped — cancelled while queued")
+                    log.info("Task ${task.id} [${task.type}] skipped, cancelled while queued")
                     continue
                 }
                 taskRepository.updateStatus(task.id, TaskStatus.RUNNING)
                 eventBus.publish(TaskEvents.TaskStarted(task.id, task.type, task.targetId, Instant.now()))
-                log.info("Task ${task.id} [${task.type}] started — target=${task.targetId}")
+                log.info("Task ${task.id} [${task.type}] started, target=${task.targetId}")
                 val result =
                     runCatching { dispatch(task) }.getOrElse { e ->
                         log.error("Task ${task.id} [${task.type}] threw uncaught exception", e)
@@ -282,7 +282,7 @@ class TaskExecutorService(
     internal suspend fun handleDownloadChapter(task: Task): Result<Unit> {
         val connectorId = task.payload["connectorId"] ?: ""
 
-        // Chapter has not been fetched yet at this point, so we cannot update its download status to FAILED here.
+        // `chapter` not yet in scope, can't mark FAILED if connector missing
         val connector =
             connectorRegistry.findById(connectorId)
                 ?: return Result.Failure(AppError.InternalError("Connector not found: $connectorId"))

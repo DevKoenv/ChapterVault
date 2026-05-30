@@ -12,7 +12,7 @@ data class AppConfig(
     val auth: AuthConfig = AuthConfig(),
 )
 
-// Enable only during local development — never expose mock connectors in production
+// local dev only, never enable in production
 data class DebugConfig(
     val mockConnectorEnabled: Boolean = false,
 )
@@ -25,7 +25,7 @@ data class RefreshConfig(
 data class ServerConfig(
     val port: Int = 8080,
     val host: String = "0.0.0.0",
-    // empty = anyHost() for local dev; set explicit origins to restrict in production
+    // empty = anyHost() in dev, restrict with explicit origins in production
     val corsOrigins: List<String> = emptyList(),
 )
 

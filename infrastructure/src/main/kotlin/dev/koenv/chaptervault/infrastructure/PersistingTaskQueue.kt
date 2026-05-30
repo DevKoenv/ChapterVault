@@ -7,14 +7,13 @@ import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 
-// Wraps any TaskQueue to persist tasks to the DB on enqueue/cancel so that
-// recoverOnBoot can reconstruct the queue state after a crash or restart.
+// persists tasks to DB on enqueue/cancel so recoverOnBoot can replay them after a crash
 class PersistingTaskQueue(
     private val delegate: TaskQueue,
     private val taskRepository: TaskRepository,
 ) : TaskQueue {
     override suspend fun enqueue(task: Task): Result<Id> {
-        // insert is idempotent — safe to call for tasks already in DB (recover path)
+        // insert is idempotent, safe to call for tasks already in DB (recover path)
         taskRepository.insert(task)
         return delegate.enqueue(task)
     }

@@ -126,8 +126,6 @@ class FileStorageTest {
         }
     }
 
-    // --- readPages ---
-
     @Test
     fun `readPages on CBZ returns pages sorted by integer index with correct bytes and MIME type`() =
         runBlocking {
@@ -182,8 +180,6 @@ class FileStorageTest {
             assertIs<AppError.NotFound>((result as Result.Failure).error)
         }
 
-    // --- readPage ---
-
     @Test
     fun `readPage on CBZ returns the page at the given zero-based index`() =
         runBlocking {
@@ -225,8 +221,6 @@ class FileStorageTest {
             assertIs<AppError.NotFound>((result as Result.Failure).error)
         }
 
-    // --- deleteSeriesFiles ---
-
     @Test
     fun `deleteSeriesFiles removes the series directory from libraryPath`() {
         val seriesId = "30000000-0000-0000-0000-000000000001"
@@ -243,8 +237,6 @@ class FileStorageTest {
     fun `deleteSeriesFiles does not throw when path does not exist`() {
         storage.deleteSeriesFiles("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
     }
-
-    // --- writeCover / readCover ---
 
     @Test
     fun `writeCover transcodes to JPEG and writes to thumbnailsPath`() {
@@ -274,8 +266,6 @@ class FileStorageTest {
         assertIs<Result.Failure>(result)
         assertIs<AppError.NotFound>((result as Result.Failure).error)
     }
-
-    // --- cleanupOrphanedThumbnails ---
 
     @Test
     fun `cleanupOrphanedThumbnails removes thumbnails for series not in the known set`() {

@@ -107,8 +107,6 @@ class LibraryRoutesTest {
         block()
     }
 
-    // --- page endpoint tests ---
-
     @Test
     fun `GET chapter page returns 200 with correct Content-Type, ETag, and Cache-Control`() {
         testApp(
@@ -260,8 +258,6 @@ class LibraryRoutesTest {
             assertEquals(HttpStatusCode.NotFound, response.status)
         }
     }
-
-    // --- existing tests ---
 
     @Test
     fun `GET library series returns 200 with paginated list`() {
@@ -475,8 +471,6 @@ class LibraryRoutesTest {
         }
     }
 
-    // RBAC tests: USER role should get 403 on write endpoints
-
     @Test
     fun `POST library series returns 403 for USER role`() {
         testApp(
@@ -522,8 +516,6 @@ class LibraryRoutesTest {
             assertEquals(HttpStatusCode.Forbidden, response.status)
         }
     }
-
-    // DELETE tests
 
     @Test
     fun `DELETE library series returns 204 when ADMIN deletes existing series`() {
@@ -594,8 +586,6 @@ class LibraryRoutesTest {
         }
     }
 
-    // Search tests
-
     @Test
     fun `GET library series search returns 200 with matching results`() {
         testApp(
@@ -617,8 +607,6 @@ class LibraryRoutesTest {
             assertContains(response.bodyAsText(), "totalItems")
         }
     }
-
-    // Chapters-by-status tests
 
     @Test
     fun `GET library chapters with status filter returns only matching chapters`() {
@@ -651,8 +639,6 @@ class LibraryRoutesTest {
             assertEquals(HttpStatusCode.BadRequest, response.status)
         }
     }
-
-    // Redownload tests
 
     @Test
     fun `POST chapter redownload returns 202 and enqueues DOWNLOAD_CHAPTER task`() {
@@ -704,8 +690,6 @@ class LibraryRoutesTest {
             assertEquals(HttpStatusCode.Forbidden, response.status)
         }
     }
-
-    // Delete chapter tests
 
     @Test
     fun `DELETE library chapter returns 204 when ADMIN deletes existing chapter`() {
@@ -786,8 +770,6 @@ class LibraryRoutesTest {
         }
     }
 
-    // Refresh tests
-
     @Test
     fun `POST series refresh returns 202 and enqueues FETCH_SERIES_METADATA task`() {
         val capturingQueue = CapturingTaskQueue()
@@ -837,8 +819,6 @@ class LibraryRoutesTest {
             assertEquals(HttpStatusCode.Forbidden, response.status)
         }
     }
-
-    // PATCH tests
 
     @Test
     fun `PATCH library series returns 200 when ADMIN patches existing series`() {
@@ -996,7 +976,6 @@ private class CapturingTaskQueue : TaskQueue {
     override suspend fun getTask(taskId: Id): Task? = null
 }
 
-/** Returns a stub connector that supports "en" for any requested connectorId. */
 private class StubConnectorRegistry : ConnectorRegistry {
     override fun register(connector: Connector) = Unit
 

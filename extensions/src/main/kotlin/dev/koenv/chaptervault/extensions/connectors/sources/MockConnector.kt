@@ -25,7 +25,7 @@ class MockConnector : HttpConnector(HttpClient()) {
             Bucket.CDN to BucketConfig(requestsPerSecond = 100.0),
         )
 
-    // Returns mock bytes directly — bypasses HTTP/rate-limiting intentionally for dev use.
+    // returns mock bytes directly, skips HTTP and rate limiting
     override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> = Result.Success(ByteArray(10) { i -> i.toByte() })
 
     override suspend fun search(

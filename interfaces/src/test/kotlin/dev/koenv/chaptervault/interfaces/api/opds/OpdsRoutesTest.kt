@@ -344,7 +344,7 @@ class OpdsRoutesTest {
             assertEquals(HttpStatusCode.Unauthorized, res.status)
         }
 
-    // Feed structure
+    // feed structure
 
     @Test
     fun `navigation feed contains self link start link and catalog subsection link`() {
@@ -441,7 +441,7 @@ class OpdsRoutesTest {
         }
     }
 
-    // Input validation
+    // input validation
 
     @Test
     fun `series feed returns 400 for malformed series ID`() {
@@ -459,7 +459,7 @@ class OpdsRoutesTest {
         }
     }
 
-    // Page access edge cases
+    // page access edge cases
 
     @Test
     fun `PSE page endpoint returns 404 for non-downloaded chapter`() {
@@ -477,7 +477,7 @@ class OpdsRoutesTest {
         }
     }
 
-    // Caching
+    // caching
 
     @Test
     fun `PSE page endpoint returns 304 when If-None-Match matches ETag`() {
@@ -493,7 +493,7 @@ class OpdsRoutesTest {
         }
     }
 
-    // Content-type negotiation
+    // content-type negotiation
 
     @Test
     fun `navigation feed returns text-xml content type when Accept header is text-html`() {

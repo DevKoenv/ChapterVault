@@ -49,8 +49,6 @@ class MangaDexConnectorTest {
         return (result as Result.Success<T>).value
     }
 
-    // ── search ────────────────────────────────────────────────────────────────────
-
     @Test
     fun `search maps title, description, and cover URL from response`() {
         val connector =
@@ -130,8 +128,6 @@ class MangaDexConnectorTest {
         assertEquals(20, page.size)
     }
 
-    // ── fetchSeries ───────────────────────────────────────────────────────────────
-
     @Test
     fun `fetchSeries maps title, description, and cover URL`() {
         val connector =
@@ -195,8 +191,6 @@ class MangaDexConnectorTest {
         val meta = assertSuccess(result)
         assertEquals("ワンピース", meta.title)
     }
-
-    // ── fetchChapters ─────────────────────────────────────────────────────────────
 
     @Test
     fun `fetchChapters maps chapter number, title, and page count`() {
@@ -310,8 +304,6 @@ class MangaDexConnectorTest {
         assertEquals(2, chapters.size)
         assertEquals(2, callCount)
     }
-
-    // ── download ──────────────────────────────────────────────────────────────────
 
     @Test
     fun `download builds page URLs from at-home server response`() {

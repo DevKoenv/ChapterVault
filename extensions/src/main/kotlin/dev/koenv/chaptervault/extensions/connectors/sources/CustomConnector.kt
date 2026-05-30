@@ -20,8 +20,6 @@ import io.ktor.client.HttpClient
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ── Customize: change these to match your site's JSON response shapes ──────────
-
 @Serializable
 private data class ApiSearchResponse(
     val results: List<ApiSeriesItem>,
@@ -57,14 +55,12 @@ private data class ApiChapterPages(
     val pages: List<String>,
 )
 
-// ── End customize ────────────────────────────────────────────────────────────────
-
 class CustomConnector(
     httpClient: HttpClient,
-    // Customize: replace with your site's base URL
+    // TODO: replace with your site's base URL
     private val baseUrl: String = "https://your-site.example.com",
 ) : HttpConnector(httpClient) {
-    // Customize: change these to match your site's connector ID and display name
+    // TODO: change id and name to match your site
     override val id: String = "custom"
     override val name: String = "Custom Connector"
 
@@ -78,7 +74,7 @@ class CustomConnector(
         query: String,
         request: PageRequest,
     ): Result<Pagination<SeriesSearchResult>> {
-        // Customize: adjust the endpoint path and parameter names to match your site's search API
+        // TODO: adjust endpoint path and params for your search API
         val response =
             context.getJson<ApiSearchResponse>(
                 url = "$baseUrl/api/search",
@@ -106,7 +102,7 @@ class CustomConnector(
     }
 
     override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> {
-        // Customize: adjust the endpoint path
+        // TODO: adjust endpoint path
         val response =
             context.getJson<ApiSeriesDetail>(
                 url = "$baseUrl/api/series/$externalId",
@@ -121,7 +117,7 @@ class CustomConnector(
         externalId: String,
         language: String,
     ): Result<List<ChapterMetadata>> {
-        // Customize: adjust the endpoint path
+        // TODO: adjust endpoint path
         val response =
             context.getJson<List<ApiChapterItem>>(
                 url = "$baseUrl/api/series/$externalId/chapters",
@@ -136,7 +132,7 @@ class CustomConnector(
         chapter: Chapter,
         format: ChapterFormat,
     ): Result<DownloadResult> {
-        // Customize: adjust the endpoint path; chapter.externalId is the ID from fetchChapters
+        // TODO: adjust endpoint path, chapter.externalId comes from fetchChapters
         val response =
             context.getJson<ApiChapterPages>(
                 url = "$baseUrl/api/chapters/${chapter.externalId}/pages",

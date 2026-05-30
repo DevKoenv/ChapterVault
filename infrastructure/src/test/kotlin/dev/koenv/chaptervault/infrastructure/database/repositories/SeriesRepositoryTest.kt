@@ -65,8 +65,6 @@ class SeriesRepositoryTest {
         }
     }
 
-    // --- cascade delete tests ---
-
     @Test
     fun `removeSeries deletes chapters, progress, bookmarks but preserves tasks`() =
         runBlocking {
@@ -109,8 +107,6 @@ class SeriesRepositoryTest {
 
             assertIs<Result.Success<Unit>>(result)
         }
-
-    // --- existing tests ---
 
     @Test
     fun `getSeries returns NotFound when series does not exist`() {
@@ -326,8 +322,6 @@ class SeriesRepositoryTest {
             assertIs<AppError.NotFound>((result as Result.Failure).error)
         }
     }
-
-    // --- helpers ---
 
     private fun insertUser(id: Id = Id.generate()): Id {
         transaction {

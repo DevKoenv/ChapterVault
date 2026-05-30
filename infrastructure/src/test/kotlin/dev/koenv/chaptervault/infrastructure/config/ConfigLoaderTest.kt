@@ -292,7 +292,7 @@ class ConfigLoaderTest {
         assertTrue(content.contains("port: 8080"))
         assertTrue(content.contains("trustedNetworks"))
         assertTrue(content.contains("intervalHours: 24"))
-        // Config values are still correct defaults
+        // config values should still be correct defaults
         assertEquals(8080, config.server.port)
         assertEquals(24, config.refresh.intervalHours)
     }

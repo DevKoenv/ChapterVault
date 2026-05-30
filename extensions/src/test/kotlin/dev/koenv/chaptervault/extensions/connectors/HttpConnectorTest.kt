@@ -46,7 +46,6 @@ class HttpConnectorTest {
         }
     }
 
-    /** Marker interface so the anonymous class can expose `context` without a cast. */
     private interface TestConnector : Connector {
         fun testContext(): ConnectorContext
     }
@@ -59,7 +58,6 @@ class HttpConnectorTest {
             runBlocking {
                 connector.testContext().get("https://example.com", bucket = Bucket.API)
             }
-        // Bucket.API is configured — must not fail with "bucket not configured"
         assertIs<Result.Success<*>>(result)
     }
 
@@ -69,7 +67,6 @@ class HttpConnectorTest {
 
         val result =
             runBlocking {
-                // Bucket.CDN is NOT in bucketConfigs — should fail immediately
                 connector.testContext().get("https://example.com", bucket = Bucket.CDN)
             }
         assertIs<Result.Failure>(result)

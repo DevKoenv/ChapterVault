@@ -12,7 +12,7 @@ object ConfigLoader {
     ): AppConfig {
         val dataDir = env("CHAPTERVAULT_DATA_DIR") ?: "data"
 
-        // Derived defaults from dataDir — YAML and explicit env vars override these per-field
+        // base config from dataDir, overridable per-field via YAML or env vars
         val derived =
             AppConfig(
                 database = DatabaseConfig(url = "jdbc:sqlite:$dataDir/db/chaptervault.db"),
@@ -139,7 +139,7 @@ object ConfigLoader {
 
         server:
           port: 8080
-          # Bind address — 0.0.0.0 accepts connections on all interfaces.
+          # Bind address, 0.0.0.0 accepts connections on all interfaces
           host: "0.0.0.0"
           # Allowed CORS origins. Empty = allow all origins (fine for local use).
           # corsOrigins:
@@ -147,8 +147,8 @@ object ConfigLoader {
 
         storage:
           # How downloaded chapters are stored on disk.
-          # CBZ    — single zip archive per chapter (default, space-efficient)
-          # FOLDER — one image file per page inside a directory
+          # CBZ    - single zip archive per chapter (default, space-efficient)
+          # FOLDER - one image file per page inside a directory
           defaultFormat: CBZ
 
         refresh:
@@ -178,11 +178,6 @@ object ConfigLoader {
               windowMinutes: 60
         """.trimIndent() + "\n"
 
-    // Env vars take precedence over YAML. All vars are prefixed CHAPTERVAULT_.
-    // CHAPTERVAULT_DATA_DIR sets the default root for db/, library/, thumbnails/ (Task 3).
-    // CHAPTERVAULT_PORT, CHAPTERVAULT_HOST, CHAPTERVAULT_CORS_ORIGINS (comma-separated),
-    // CHAPTERVAULT_DATABASE_URL, CHAPTERVAULT_LIBRARY_PATH, CHAPTERVAULT_THUMBNAILS_PATH,
-    // CHAPTERVAULT_REFRESH_HOURS, CHAPTERVAULT_MOCK_CONNECTOR (true/false)
     private fun applyEnv(
         base: AppConfig,
         env: (String) -> String?,

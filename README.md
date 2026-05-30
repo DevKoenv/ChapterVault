@@ -1,5 +1,7 @@
 # ChapterVault
 
+[![Build](https://github.com/DevKoenv/ChapterVault/actions/workflows/build.yml/badge.svg)](https://github.com/DevKoenv/ChapterVault/actions/workflows/build.yml)
+
 Self-hosted manga library server. Tracks series, automatically downloads new chapters, and serves your collection over a JSON API and OPDS feed.
 
 > **Status:** Active development - v1 not yet released.
@@ -142,6 +144,12 @@ Authorization: Bearer <token>
 | `GET` | `/tasks/{id}` | Get a task by ID |
 | `POST` | `/tasks/{id}/cancel` | Cancel a task |
 
+### Events
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/events` | Server-sent events stream (task updates, new chapters) |
+
 ### Notifications
 
 | Method | Path | Description |
@@ -220,7 +228,7 @@ cd ChapterVault
 ./gradlew :extensions:dependencies --configuration runtimeClasspath | grep infrastructure
 ```
 
-Tests use an in-process SQLite database — no external dependencies needed.
+Tests use a temporary SQLite file — no external dependencies needed.
 
 ---
 

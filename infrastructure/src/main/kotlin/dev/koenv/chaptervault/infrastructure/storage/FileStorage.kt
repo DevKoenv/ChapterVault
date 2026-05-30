@@ -49,8 +49,8 @@ open class FileStorage(
         return Files.isRegularFile(path) || Files.isDirectory(path)
     }
 
-    // Streams chapter content to out without buffering the full archive in memory.
-    // Folder chapters are zipped on-the-fly. Throws if chapter files are not found.
+    // streams chapter to out without buffering full archive in memory
+    // folder chapters are zipped on-the-fly, throws if files not found
     fun streamChapterTo(
         chapter: Chapter,
         out: OutputStream,

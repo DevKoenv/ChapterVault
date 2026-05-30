@@ -46,7 +46,6 @@ fun Route.libraryRoutes(
     connectorRegistry: ConnectorRegistry,
     readingStatusApi: ReadingStatusApi,
 ) {
-    // GET routes are accessible to any authenticated user
     get("/library/series/search") {
         val q = call.request.queryParameters["q"] ?: ""
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
@@ -201,7 +200,7 @@ fun Route.libraryRoutes(
                 }
             }
 
-        // ETag correctness relies on chapter.updatedAt being bumped on re-download.
+        // ETag validity depends on chapter.updatedAt being bumped on re-download
         val etag = "\"${chapter.id}-${chapter.updatedAt.epochSecond}-${index}\""
         val ifNoneMatch = call.request.header(HttpHeaders.IfNoneMatch)
         if (ifNoneMatch == etag) {

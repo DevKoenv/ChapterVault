@@ -33,15 +33,15 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - **Task recovery on boot**: RUNNING tasks are reset to PENDING and all PENDING tasks are re-enqueued on startup, so downloads interrupted by a server restart resume automatically
 - **Six-module Gradle project** with enforced one-way dependency graph: `:shared` -> `:kernel` -> `:extensions` / `:infrastructure` / `:interfaces` -> `:apps:server`; `:interfaces` and `:infrastructure` additionally depend on `:extensions` for connector types
 - **`:shared`**: `Result<T>` / `AppError` sealed hierarchy, `Pagination<T>` / `PageRequest`, `Id` (UUID value class), `Time`, `ChapterFormat` sealed class (`Cbz`, `Folder`), `RateLimiter` (sliding-window with Mutex and burst support)
-- **`:kernel` contracts**: all domain models (`Series`, `Chapter`, `SeriesStatus`, `ChapterStatus`), runtime types (`Task`, `TaskType`, `TaskStatus`, `TaskQueue`, `TaskExecutor`, `TaskScheduler`, `TaskEvents`, `TaskReadStore`), auth types (`UserPrincipal`, `Role`, `Permission`), event system (`DomainEvent`, `EventBus`), extension contracts (`Extension`, `ExtensionLifecycle`, `ExtensionContext`, `ExtensionRegistry`, `Capability`)
+- **`:kernel` contracts**: domain models, runtime types, auth types, event bus, extension lifecycle
 - **`kernel.api` as sole public surface**: `LibraryReadApi`, `LibraryCommandApi`, `ProgressApi`, `BookmarkApi`, `SystemApi`, `AuthApi`; no duplication with internal service interfaces
-- **`:extensions` connector infrastructure**: `Connector` interface, `ConnectorRegistry` interface + `DefaultConnectorRegistry` (ConcurrentHashMap-backed), `ConnectorContext` interface + `DefaultConnectorContext` (rate-limit buckets, retry, content negotiation), `ConnectorExtensions.getJson<T>()` extension
-- **`MockConnector`**: deterministic fake connector with no HTTP calls; "piece" query returns One Piece + Naruto; blank returns Alpha/Beta/Gamma; 3 chapters per series; 3 mock page URLs per chapter
-- **`MangaDexConnector`**: full HTTP implementation against MangaDex API v5; search, series metadata, paginated chapter listing, at-home download with 5-min cache; rate-limited API (3/s burst 3) and CDN (3/s burst 5) buckets
-- **`CustomConnector`**: template connector for self-hosted sources; reads from generic `{baseUrl}/api/*` endpoints
-- **`:infrastructure` repositories**: `SeriesRepository` (getSeries, listSeries, searchLibrary, addToLibrary, removeSeries, updateSeries, updateMetadata), `ChapterRepository` (insertChapter, updateDownloadStatus, listChapters, getChapter), `UserRepository` (bcrypt, session tokens, 30-day TTL), `TaskRepository` (insert, updateStatus, findById, listAll paginated, listByStatus; implements `TaskReadStore`), `ProgressRepository` (markRead, markUnread, getProgress), `BookmarkRepository` (create, list by series, delete with ownership check)
-- **`:infrastructure` storage**: `CbzWriter` (ZipOutputStream), `FolderWriter` (Files.write per page), `ArchiveWriterSelector` (dispatches by ChapterFormat), `FileStorage` with cover transcoding (`JpegThumbnailFormat`), page streaming, and orphan cleanup
-- **`TaskExecutorService`**: coroutine dequeue loop with supervisor scope; dispatches FETCH_SERIES_METADATA (fetchSeries -> updateMetadata -> enqueue FETCH_CHAPTERS) -> FETCH_CHAPTERS (fetchChapters -> insertChapter -> enqueue DOWNLOAD_CHAPTER if autoDownload) -> DOWNLOAD_CHAPTER (download -> pages -> write archive -> DOWNLOADED status) -> DOWNLOAD_SERIES (enqueue DOWNLOAD_CHAPTER per available/failed chapter)
+- **`:extensions` connector infrastructure**: `Connector` interface, `ConnectorRegistry`, `DefaultConnectorContext` (rate-limit buckets, retry, content negotiation)
+- **`MockConnector`**: deterministic fake connector for tests; no HTTP calls
+- **`MangaDexConnector`**: full HTTP implementation (MangaDex API v5): search, metadata, paginated chapters, at-home download
+- **`CustomConnector`**: template connector for self-hosted sources
+- **`:infrastructure` repositories**: `SeriesRepository`, `ChapterRepository`, `UserRepository` (bcrypt, 30-day session TTL), `TaskRepository` (implements `TaskReadStore`), `ProgressRepository`, `BookmarkRepository`
+- **`:infrastructure` storage**: `CbzWriter`, `FolderWriter`, `ArchiveWriterSelector`, `FileStorage` (cover transcoding, page streaming, orphan cleanup)
+- **`TaskExecutorService`**: coroutine dequeue loop with supervisor scope; dispatches FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER, DOWNLOAD_SERIES
 - **Task retry**: up to 3 attempts with exponential backoff (30s, 120s, 600s)
 - **`HttpClientFactory`**: upgraded with ContentNegotiation (JSON ignoreUnknownKeys), DefaultRequest (User-Agent: ChapterVault/1.0), HttpRequestRetry (3 retries, exponential delay, 429+5xx)
 - **`:interfaces` REST routes** (42 endpoints): full library management (series + chapters), connector browsing, task management, per-user progress and bookmarks, page serving with ETag + immutable cache headers, health check, SSE event stream, Swagger UI
@@ -61,14 +61,6 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - Ktor 3.0.3 (server + client), Koin 4.0.0, Exposed 0.57.0 + SQLite JDBC 3.47.0.0
 - kotlinx-coroutines 1.9.0, kotlinx-serialization 1.7.3, Logback 1.5.12
 - 27 tests passing
-
-#### Kernel internals
-
-- `InMemoryEventBus`: coroutine fan-out with typed and untyped handler subscriptions
-- `DefaultExtensionRegistry`: map-backed registry; capability index built from `extension.capabilities`
-- `InMemoryTaskQueue`: channel-backed queue with `enqueue` / `dequeue` / `cancel`
-- `SystemApiImpl`: delegates task queries to `TaskReadStore` (implemented by `TaskRepository`); extension list to `ExtensionRegistry`
-- All bound in `kernelModule`; server boots to `/health`
 
 ---
 
