@@ -59,6 +59,7 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 # Testing
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 jbcrypt = { module = "org.mindrot:jbcrypt", version.ref = "jbcrypt" }
@@ -75,4 +76,4 @@ detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-content-negotiation", "ktor-server-auth", "ktor-server-sse", "ktor-server-config-yaml", "ktor-serialization-kotlinx-json", "ktor-server-call-logging", "ktor-server-cors", "ktor-server-status-pages"]
 exposed = ["exposed-core", "exposed-dao", "exposed-jdbc", "exposed-kotlin-datetime"]
 koin = ["koin-core", "koin-ktor"]
-testing = ["junit-jupiter", "kotlin-test"]
+testing = ["junit-jupiter", "kotlin-test", "kotlinx-coroutines-test"]
