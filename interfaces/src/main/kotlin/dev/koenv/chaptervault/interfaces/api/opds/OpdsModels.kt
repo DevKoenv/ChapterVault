@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.extensions.opds
+package dev.koenv.chaptervault.interfaces.api.opds
 
 data class OpdsFeed(
     val id: String,

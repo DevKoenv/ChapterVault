@@ -1,7 +1,7 @@
 package dev.koenv.chaptervault.interfaces.api.opds
 
-import dev.koenv.chaptervault.extensions.opds.FeedBuilder
-import dev.koenv.chaptervault.extensions.opds.OpdsV1
+import dev.koenv.chaptervault.interfaces.api.opds.FeedBuilder
+import dev.koenv.chaptervault.interfaces.api.opds.OpdsV1
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.library.DownloadStatus

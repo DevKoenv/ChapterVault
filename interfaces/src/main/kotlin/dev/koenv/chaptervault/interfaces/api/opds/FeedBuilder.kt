@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.extensions.opds
+package dev.koenv.chaptervault.interfaces.api.opds
 
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus

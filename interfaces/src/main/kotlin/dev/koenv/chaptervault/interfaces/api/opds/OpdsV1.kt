@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.extensions.opds
+package dev.koenv.chaptervault.interfaces.api.opds
 
 class OpdsV1 {
     fun serialize(feed: OpdsFeed): String =
