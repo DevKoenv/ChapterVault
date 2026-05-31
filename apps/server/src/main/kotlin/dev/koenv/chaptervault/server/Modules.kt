@@ -55,6 +55,7 @@ import dev.koenv.chaptervault.kernel.event.EventBus
 import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
 import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
+import dev.koenv.chaptervault.kernel.extension.ExtensionManager
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.runtime.EventPublishingTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
@@ -183,6 +184,7 @@ val extensionModule =
                 bundledExtensions = bundled,
             )
         }
+        single<ExtensionManager> { get<ExtensionLoaderService>() }
     }
 
 val interfacesModule =
@@ -197,7 +199,7 @@ val registryModule =
             ExtensionRegistryService(
                 registryRepo = get(),
                 registryClient = get(),
-                extensionManager = get<ExtensionLoaderService>(),
+                extensionManager = get<ExtensionManager>(),
                 httpClient = get(),
             )
         }
