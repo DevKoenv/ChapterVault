@@ -34,16 +34,18 @@ class ExternalExtensionLoader(
             log.warn("Skipping ${manifest.id}: requires server ${manifest.minServerVersion}, running $serverVersion")
             return null
         }
+        // URLClassLoader stays open while the extension is active; release on UNLOADED is TODO(Plan2)
+        val classLoader = URLClassLoader(arrayOf(jar.toUri().toURL()), parentClassLoader)
         return try {
-            // URLClassLoader stays open while the extension is active; release on UNLOADED is TODO(Plan2)
-            val classLoader = URLClassLoader(arrayOf(jar.toUri().toURL()), parentClassLoader)
             val extensionClass = classLoader.loadClass(manifest.entryPoint)
             val extension = extensionClass.getDeclaredConstructor().newInstance() as Extension
             LoadedExtension(manifest = manifest, extension = extension, classLoader = classLoader, jarPath = jar)
         } catch (e: ClassNotFoundException) {
+            classLoader.close()
             log.warn("Skipping ${manifest.id}: entry point class '${manifest.entryPoint}' not found")
             null
         } catch (e: Exception) {
+            classLoader.close()
             log.warn("Skipping ${manifest.id}: failed to instantiate entry point -- ${e.message}")
             null
         }

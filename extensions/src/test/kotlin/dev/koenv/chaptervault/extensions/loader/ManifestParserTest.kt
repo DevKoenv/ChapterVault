@@ -174,7 +174,7 @@ class ManifestParserTest {
             """.trimIndent()
         val manifest = ManifestParser.parse(yaml)
         assertNotNull(manifest)
-        assertEquals(2, manifest!!.config.size)
+        assertEquals(2, manifest.config.size)
         assertEquals("api_key", manifest.config[0].key)
         assertEquals(ConfigFieldType.PASSWORD, manifest.config[0].type)
         assertEquals(true, manifest.config[0].required)
@@ -197,6 +197,59 @@ class ManifestParserTest {
             """.trimIndent()
         val manifest = ManifestParser.parse(yaml)
         assertNotNull(manifest)
-        assertEquals(emptyList(), manifest!!.config)
+        assertEquals(emptyList(), manifest.config)
+    }
+
+    @Test
+    fun `config entry with invalid type is skipped silently`() {
+        val yaml =
+            """
+            id: com.example.test
+            name: Test
+            version: 1.0.0
+            minServerVersion: 1.0.0
+            description: desc
+            author: a
+            capabilities:
+              - CanFetchSeries
+            entryPoint: com.example.Ext
+            config:
+              - key: bad
+                label: Bad
+                type: NOTATYPE
+              - key: good
+                label: Good
+                type: STRING
+            """.trimIndent()
+        val manifest = ManifestParser.parse(yaml)
+        assertNotNull(manifest)
+        assertEquals(1, manifest.config.size)
+        assertEquals("good", manifest.config[0].key)
+    }
+
+    @Test
+    fun `config entry missing key is skipped`() {
+        val yaml =
+            """
+            id: com.example.test
+            name: Test
+            version: 1.0.0
+            minServerVersion: 1.0.0
+            description: desc
+            author: a
+            capabilities:
+              - CanFetchSeries
+            entryPoint: com.example.Ext
+            config:
+              - label: No Key
+                type: STRING
+              - key: has_key
+                label: Has Key
+                type: STRING
+            """.trimIndent()
+        val manifest = ManifestParser.parse(yaml)
+        assertNotNull(manifest)
+        assertEquals(1, manifest.config.size)
+        assertEquals("has_key", manifest.config[0].key)
     }
 }

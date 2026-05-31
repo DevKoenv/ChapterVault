@@ -28,6 +28,7 @@ class ExtensionLoaderService(
             enableAndRegister(ext, ExtensionSource.BUNDLED)
         }
         externalLoader.loadAll().forEach { loaded ->
+            // TODO Task 4: pass loaded.manifest to enableAndRegister so config fields are available
             enableAndRegister(loaded.extension, ExtensionSource.LOCAL)
         }
     }

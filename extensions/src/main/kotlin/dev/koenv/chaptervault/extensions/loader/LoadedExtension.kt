@@ -4,7 +4,7 @@ import dev.koenv.chaptervault.kernel.extension.Extension
 import java.net.URLClassLoader
 import java.nio.file.Path
 
-data class LoadedExtension(
+class LoadedExtension(
     val manifest: ExtensionManifest,
     val extension: Extension,
     val classLoader: URLClassLoader,
