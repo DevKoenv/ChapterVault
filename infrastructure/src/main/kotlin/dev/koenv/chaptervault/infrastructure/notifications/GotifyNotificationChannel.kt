@@ -6,20 +6,25 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
+import java.io.IOException
 
 class GotifyNotificationChannel(private val httpClient: HttpClient) : NotificationChannel {
     override val typeId = "GOTIFY"
 
     override suspend fun send(targetUrl: String, targetToken: String?, event: NotificationEvent) {
         val listText = event.newChapters.joinToString(", ") { it.title }
-        httpClient.post("${targetUrl.trimEnd('/')}/message") {
+        val url = "${targetUrl.trimEnd('/')}/message"
+        val response: HttpResponse = httpClient.post(url) {
             targetToken?.let { header("X-Gotify-Key", it) }
             contentType(ContentType.Application.Json)
-            setBody("""{"title":"New chapters: ${j(event.seriesTitle)}","message":"${j(listText)}","priority":5}""")
+            setBody("""{"title":"New chapters: ${jsonEscape(event.seriesTitle)}","message":"${jsonEscape(listText)}","priority":5}""")
+        }
+        if (!response.status.isSuccess()) {
+            throw IOException("HTTP ${response.status.value} from $url")
         }
     }
-
-    private fun j(s: String) = s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 }

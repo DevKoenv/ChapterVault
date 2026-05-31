@@ -25,27 +25,31 @@ class NotificationService(
     }
 
     private suspend fun dispatch(event: NewChaptersDiscovered) {
-        if (event.chapters.isEmpty()) return
-        val targets = notificationApi.listTargets().filter { it.enabled }
-        if (targets.isEmpty()) return
-        val notifEvent = NotificationEvent(
-            seriesId = event.series.id.toString(),
-            seriesTitle = event.series.title,
-            newChapters = event.chapters.map {
-                NotificationEvent.ChapterSummary(it.id.toString(), it.title, it.chapterIndex)
-            },
-        )
-        targets.forEach { target ->
-            val channel = channelRegistry.find(target.type)
-            if (channel == null) {
-                log.warn("No channel registered for type '${target.type}' (target '${target.name}'). Use the built-in types or register an extension channel.")
-                return@forEach
+        runCatching {
+            if (event.chapters.isEmpty()) return
+            val targets = notificationApi.listTargets().filter { it.enabled }
+            if (targets.isEmpty()) return
+            val notifEvent = NotificationEvent(
+                seriesId = event.series.id.toString(),
+                seriesTitle = event.series.title,
+                newChapters = event.chapters.map {
+                    NotificationEvent.ChapterSummary(it.id.toString(), it.title, it.chapterIndex)
+                },
+            )
+            targets.forEach { target ->
+                val channel = channelRegistry.find(target.type)
+                if (channel == null) {
+                    log.warn("No channel registered for type '${target.type}' (target '${target.name}'). Use the built-in types or register an extension channel.")
+                    return@forEach
+                }
+                runCatching {
+                    channel.send(target.url, target.token, notifEvent)
+                }.onFailure { e ->
+                    log.warn("Notification to '${target.name}' (${target.type}) failed: ${e.message}")
+                }
             }
-            runCatching {
-                channel.send(target.url, target.token, notifEvent)
-            }.onFailure { e ->
-                log.warn("Notification to '${target.name}' (${target.type}) failed: ${e.message}")
-            }
+        }.onFailure { e ->
+            log.error("Notification dispatch failed: ${e.message}", e)
         }
     }
 
