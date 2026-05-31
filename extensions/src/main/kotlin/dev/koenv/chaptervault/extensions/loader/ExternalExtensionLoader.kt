@@ -33,6 +33,7 @@ class ExternalExtensionLoader(
             return null
         }
         return try {
+            // URLClassLoader stays open while the extension is active; release on UNLOADED is TODO(Plan2)
             val classLoader = URLClassLoader(arrayOf(jar.toUri().toURL()), parentClassLoader)
             val extensionClass = classLoader.loadClass(manifest.entryPoint)
             val extension = extensionClass.getDeclaredConstructor().newInstance() as Extension
@@ -72,10 +73,5 @@ class ExternalExtensionLoader(
         }
 }
 
-private operator fun IntArray.compareTo(other: IntArray): Int {
-    for (i in 0 until minOf(size, other.size)) {
-        val diff = this[i] - other[i]
-        if (diff != 0) return diff
-    }
-    return size - other.size
-}
+private operator fun IntArray.compareTo(other: IntArray): Int =
+    zip(other.toList()).map { (a, b) -> a.compareTo(b) }.firstOrNull { it != 0 } ?: size.compareTo(other.size)
