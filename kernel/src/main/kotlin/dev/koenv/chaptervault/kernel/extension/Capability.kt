@@ -6,4 +6,6 @@ sealed class Capability {
     data object CanDownloadChapters : Capability()
 
     data object CanEnrichMetadata : Capability()
+
+    data object CanSendNotifications : Capability()
 }

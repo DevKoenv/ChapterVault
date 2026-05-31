@@ -32,4 +32,13 @@ class ExtensionContractsTest {
         )
         assertEquals(1, event.newChapters.size)
     }
+
+    @Test
+    fun `ExtensionConfig getOrDefault returns value when present`() {
+        val config = object : ExtensionConfig {
+            override fun get(key: String) = if (key == "x") "hello" else null
+        }
+        assertEquals("hello", config.getOrDefault("x", "fallback"))
+        assertEquals("fallback", config.getOrDefault("missing", "fallback"))
+    }
 }

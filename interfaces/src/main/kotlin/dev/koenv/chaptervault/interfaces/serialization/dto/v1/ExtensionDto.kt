@@ -29,6 +29,7 @@ fun ExtensionEntry.toDto() =
                     when (capability) {
                         Capability.CanFetchSeries, Capability.CanDownloadChapters -> "connector"
                         Capability.CanEnrichMetadata -> "metadata_enricher"
+                        Capability.CanSendNotifications -> "notification_channel"
                     }
                 }.distinct(),
         errorMessage = errorMessage,

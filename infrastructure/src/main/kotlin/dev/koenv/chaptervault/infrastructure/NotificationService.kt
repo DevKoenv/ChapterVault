@@ -119,6 +119,7 @@ class NotificationService(
                     )
                 }
             }
+            else -> log.warn("No built-in handler for notification type '${target.type}' on target '${target.name}'. Registered extension channels are dispatched in Task 7.")
         }
     }
 

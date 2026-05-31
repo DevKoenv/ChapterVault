@@ -15,4 +15,6 @@ interface Extension {
         key: String,
         value: String,
     ) {}
+
+    fun configFields(): List<ExtensionConfigField> = emptyList()
 }
