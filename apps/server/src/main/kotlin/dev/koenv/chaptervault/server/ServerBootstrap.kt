@@ -15,6 +15,7 @@ import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
 import dev.koenv.chaptervault.interfaces.api.rest.extensionConfigRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.extensionReloadRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
@@ -186,6 +187,7 @@ fun Application.bootstrap() {
             readingStatusRoutes(readingStatusApi)
             notificationRoutes(notificationApi, notificationDispatch)
             extensionRoutes(extensionLoaderService)
+            extensionReloadRoutes(extensionLoaderService)
             extensionConfigRoutes(
                 loaderService = extensionLoaderService,
                 configRepository = extensionConfigRepository,

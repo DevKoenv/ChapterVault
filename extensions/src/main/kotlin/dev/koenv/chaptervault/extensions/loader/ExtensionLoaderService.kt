@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 class ExtensionLoaderService(
@@ -77,6 +78,64 @@ class ExtensionLoaderService(
     override fun listAll(): List<ExtensionEntry> = extensionRegistry.all()
 
     override fun findById(id: String): ExtensionEntry? = extensionRegistry.findById(id)
+
+    override fun unload(id: String) {
+        val entry = extensionRegistry.findById(id) ?: return
+        if (entry.source == ExtensionSource.BUNDLED) {
+            log.warn("Cannot unload bundled extension '$id'")
+            return
+        }
+        if (entry.status == ExtensionStatus.ENABLED) {
+            disable(id)
+        }
+        classloaders.remove(id)?.close()
+        extensionRegistry.updateStatus(id, ExtensionStatus.UNLOADED)
+        log.info("Extension '$id' unloaded")
+    }
+
+    override fun reload(id: String) {
+        val entry = extensionRegistry.findById(id) ?: run {
+            log.warn("reload: extension '$id' not found")
+            return
+        }
+        if (entry.source == ExtensionSource.BUNDLED) {
+            log.warn("Cannot reload bundled extension '$id'")
+            return
+        }
+        val jarPath = entry.jarPath ?: run {
+            log.error("reload: no JAR path recorded for '$id'")
+            return
+        }
+        unload(id)
+        val loaded = externalLoader.loadSingle(jarPath) ?: run {
+            log.error("reload: failed to load JAR for '$id' at $jarPath")
+            return
+        }
+        classloaders[loaded.extension.id] = loaded.classLoader
+        enableAndRegister(loaded.extension, ExtensionSource.LOCAL, loaded.manifest, loaded.jarPath)
+    }
+
+    fun install(extensionId: String, jarBytes: ByteArray) {
+        val dir = externalLoader.extensionsDir
+        Files.createDirectories(dir)
+        val jarPath = dir.resolve("$extensionId.jar")
+        val temp = Files.createTempFile(dir, "install-", ".jar.tmp")
+        try {
+            Files.write(temp, jarBytes)
+            val loaded = externalLoader.loadSingle(temp)
+                ?: error("Downloaded JAR for '$extensionId' is not a valid extension")
+            if (loaded.manifest.id != extensionId) {
+                error("JAR manifest id '${loaded.manifest.id}' does not match requested '$extensionId'")
+            }
+            loaded.classLoader.close()
+            Files.move(temp, jarPath, StandardCopyOption.REPLACE_EXISTING)
+        } catch (e: Exception) {
+            Files.deleteIfExists(temp)
+            throw e
+        }
+        reload(extensionId)
+        log.info("Extension '$extensionId' installed from JAR")
+    }
 
     private fun enableAndRegister(
         extension: Extension,

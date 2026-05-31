@@ -5,4 +5,6 @@ interface ExtensionManager {
     fun findById(id: String): ExtensionEntry?
     fun enable(id: String)
     fun disable(id: String)
+    fun unload(id: String)
+    fun reload(id: String)
 }
