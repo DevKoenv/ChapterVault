@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.extensions.loader
 
+import dev.koenv.chaptervault.kernel.extension.ConfigFieldType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -146,5 +147,56 @@ class ManifestParserTest {
             entryPoint: "test.Extension"
             """.trimIndent()
         assertNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `parses config block from manifest`() {
+        val yaml =
+            """
+            id: com.example.test
+            name: Test
+            version: 1.0.0
+            minServerVersion: 1.0.0
+            description: A test extension
+            author: Tester
+            capabilities:
+              - CanEnrichMetadata
+            entryPoint: com.example.TestExtension
+            config:
+              - key: api_key
+                label: API Key
+                type: PASSWORD
+                required: true
+              - key: language
+                label: Language
+                type: STRING
+                default: en
+            """.trimIndent()
+        val manifest = ManifestParser.parse(yaml)
+        assertNotNull(manifest)
+        assertEquals(2, manifest!!.config.size)
+        assertEquals("api_key", manifest.config[0].key)
+        assertEquals(ConfigFieldType.PASSWORD, manifest.config[0].type)
+        assertEquals(true, manifest.config[0].required)
+        assertEquals("en", manifest.config[1].default)
+    }
+
+    @Test
+    fun `manifest without config block defaults to empty list`() {
+        val yaml =
+            """
+            id: com.example.test
+            name: Test
+            version: 1.0.0
+            minServerVersion: 1.0.0
+            description: A test extension
+            author: Tester
+            capabilities:
+              - CanFetchSeries
+            entryPoint: com.example.TestExtension
+            """.trimIndent()
+        val manifest = ManifestParser.parse(yaml)
+        assertNotNull(manifest)
+        assertEquals(emptyList(), manifest!!.config)
     }
 }

@@ -15,16 +15,16 @@ class ExternalExtensionLoader(
 ) {
     private val log = LoggerFactory.getLogger(ExternalExtensionLoader::class.java)
 
-    fun loadAll(): List<Pair<ExtensionManifest, Extension>> {
+    fun loadAll(): List<LoadedExtension> {
         if (!Files.exists(extensionsDir)) return emptyList()
         return Files
             .list(extensionsDir)
             .filter { it.extension == "jar" }
             .toList()
-            .mapNotNull { loadJar(it) }
+            .mapNotNull { loadSingle(it) }
     }
 
-    private fun loadJar(jar: Path): Pair<ExtensionManifest, Extension>? {
+    fun loadSingle(jar: Path): LoadedExtension? {
         val manifest =
             readManifest(jar) ?: run {
                 log.warn("Skipping ${jar.fileName}: missing or invalid extension.yaml")
@@ -39,7 +39,7 @@ class ExternalExtensionLoader(
             val classLoader = URLClassLoader(arrayOf(jar.toUri().toURL()), parentClassLoader)
             val extensionClass = classLoader.loadClass(manifest.entryPoint)
             val extension = extensionClass.getDeclaredConstructor().newInstance() as Extension
-            manifest to extension
+            LoadedExtension(manifest = manifest, extension = extension, classLoader = classLoader, jarPath = jar)
         } catch (e: ClassNotFoundException) {
             log.warn("Skipping ${manifest.id}: entry point class '${manifest.entryPoint}' not found")
             null

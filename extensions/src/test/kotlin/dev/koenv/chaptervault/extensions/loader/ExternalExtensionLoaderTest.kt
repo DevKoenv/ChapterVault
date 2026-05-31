@@ -157,7 +157,7 @@ class ExternalExtensionLoaderTest {
         buildJar(manifest, TestExtension::class.java)
         val results = makeLoader().loadAll()
         assertEquals(1, results.size)
-        assertEquals("dev.koenv.chaptervault.extensions.loader.testextension", results[0].first.id)
+        assertEquals("dev.koenv.chaptervault.extensions.loader.testextension", results[0].manifest.id)
     }
 
     @Test

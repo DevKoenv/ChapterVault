@@ -27,8 +27,8 @@ class ExtensionLoaderService(
         bundledExtensions.forEach { ext ->
             enableAndRegister(ext, ExtensionSource.BUNDLED)
         }
-        externalLoader.loadAll().forEach { (_, ext) ->
-            enableAndRegister(ext, ExtensionSource.LOCAL)
+        externalLoader.loadAll().forEach { loaded ->
+            enableAndRegister(loaded.extension, ExtensionSource.LOCAL)
         }
     }
 
