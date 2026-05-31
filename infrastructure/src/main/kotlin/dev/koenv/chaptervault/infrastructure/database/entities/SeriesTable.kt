@@ -14,6 +14,10 @@ object SeriesTable : Table("series") {
     val coverUrl = varchar("cover_url", 1000).nullable()
     val description = text("description").nullable()
     val language = varchar("language", 32).default("en")
+    val author = varchar("author", 200).nullable()
+    val artist = varchar("artist", 200).nullable()
+    val year = integer("year").nullable()
+    val upstreamStatus = varchar("upstream_status", 50).nullable()
     val addedAt = timestamp("added_at")
     val updatedAt = timestamp("updated_at")
 

@@ -66,6 +66,24 @@ class DatabaseMigrationsTest {
     }
 
     @Test
+    fun `migration applies V5 through V8`(
+        @TempDir dir: Path,
+    ) {
+        val db = Database.connect("jdbc:sqlite:${dir.resolve("test.db")}", "org.sqlite.JDBC")
+        DatabaseMigrations.migrate(db)
+        transaction(db) {
+            // V5: enrichment columns on series
+            exec("SELECT author, artist, year, upstream_status FROM series LIMIT 0") { }
+            // V6: series_genres table
+            exec("SELECT series_id, genre FROM series_genres LIMIT 0") { }
+            // V7: extension_configs table
+            exec("SELECT extension_id, key, value FROM extension_configs LIMIT 0") { }
+            // V8: extension_registries table
+            exec("SELECT id, name, url, enabled FROM extension_registries LIMIT 0") { }
+        }
+    }
+
+    @Test
     fun `checksum is deterministic for the same statements`() {
         val m1 = DatabaseMigrations.Migration(1, "test", listOf("SELECT 1", "SELECT 2"))
         val m2 = DatabaseMigrations.Migration(1, "test", listOf("SELECT 1", "SELECT 2"))

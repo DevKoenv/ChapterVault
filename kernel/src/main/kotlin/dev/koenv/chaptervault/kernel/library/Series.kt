@@ -15,6 +15,11 @@ data class Series(
     val defaultFormat: ChapterFormat? = null,
     val coverUrl: String? = null,
     val description: String? = null,
+    val author: String? = null,
+    val artist: String? = null,
+    val year: Int? = null,
+    val upstreamStatus: UpstreamStatus? = null,
+    val genres: List<String> = emptyList(),
     val addedAt: Instant,
     val updatedAt: Instant,
 )

@@ -64,6 +64,60 @@ object DatabaseMigrations {
                     """.trimIndent(),
                 ),
             ),
+            Migration(
+                5,
+                "series_enrichment_fields",
+                listOf(
+                    "ALTER TABLE series ADD COLUMN author TEXT",
+                    "ALTER TABLE series ADD COLUMN artist TEXT",
+                    "ALTER TABLE series ADD COLUMN year INTEGER",
+                    "ALTER TABLE series ADD COLUMN upstream_status TEXT",
+                ),
+            ),
+            Migration(
+                6,
+                "series_genres",
+                listOf(
+                    """
+                    CREATE TABLE IF NOT EXISTS series_genres (
+                        series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+                        genre TEXT NOT NULL,
+                        CONSTRAINT pk_series_genres PRIMARY KEY (series_id, genre)
+                    )
+                    """.trimIndent(),
+                    "CREATE INDEX IF NOT EXISTS idx_series_genres_series_id ON series_genres (series_id)",
+                ),
+            ),
+            Migration(
+                7,
+                "extension_configs",
+                listOf(
+                    """
+                    CREATE TABLE IF NOT EXISTS extension_configs (
+                        extension_id TEXT NOT NULL,
+                        key TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        CONSTRAINT pk_extension_configs PRIMARY KEY (extension_id, key)
+                    )
+                    """.trimIndent(),
+                ),
+            ),
+            Migration(
+                8,
+                "extension_registries",
+                listOf(
+                    """
+                    CREATE TABLE IF NOT EXISTS extension_registries (
+                        id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        url TEXT NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 1,
+                        created_at TEXT NOT NULL,
+                        CONSTRAINT pk_extension_registries PRIMARY KEY (id)
+                    )
+                    """.trimIndent(),
+                ),
+            ),
         )
 
     fun migrate(db: Database) {

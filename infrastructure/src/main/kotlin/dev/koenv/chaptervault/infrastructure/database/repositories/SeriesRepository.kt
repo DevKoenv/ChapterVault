@@ -11,6 +11,7 @@ import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
+import dev.koenv.chaptervault.kernel.library.UpstreamStatus
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
@@ -294,6 +295,11 @@ class SeriesRepository(
             defaultFormat = this[SeriesTable.defaultFormat]?.let { ChapterFormat.fromString(it) },
             coverUrl = this[SeriesTable.coverUrl],
             description = this[SeriesTable.description],
+            author = this[SeriesTable.author],
+            artist = this[SeriesTable.artist],
+            year = this[SeriesTable.year],
+            upstreamStatus = this[SeriesTable.upstreamStatus]?.let { UpstreamStatus.valueOf(it) },
+            genres = emptyList(),
             addedAt = this[SeriesTable.addedAt].toJavaInstant(),
             updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
         )
