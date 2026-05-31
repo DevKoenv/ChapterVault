@@ -16,7 +16,10 @@ class ExternalExtensionLoaderTest {
     @TempDir
     lateinit var tempDir: Path
 
-    private fun buildJar(manifestYaml: String, vararg classes: Class<*>): Path {
+    private fun buildJar(
+        manifestYaml: String,
+        vararg classes: Class<*>,
+    ): Path {
         val jar = Files.createTempFile(tempDir, "test-ext", ".jar")
         JarOutputStream(Files.newOutputStream(jar)).use { jos ->
             jos.putNextEntry(JarEntry("extension.yaml"))
@@ -33,11 +36,12 @@ class ExternalExtensionLoaderTest {
         return jar
     }
 
-    private fun makeLoader(serverVersion: String = "1.0.0") = ExternalExtensionLoader(
-        extensionsDir = tempDir,
-        serverVersion = serverVersion,
-        parentClassLoader = Thread.currentThread().contextClassLoader,
-    )
+    private fun makeLoader(serverVersion: String = "1.0.0") =
+        ExternalExtensionLoader(
+            extensionsDir = tempDir,
+            serverVersion = serverVersion,
+            parentClassLoader = Thread.currentThread().contextClassLoader,
+        )
 
     @Test
     fun `returns empty list when directory is empty`() {
@@ -62,7 +66,8 @@ class ExternalExtensionLoaderTest {
 
     @Test
     fun `skips JAR when minServerVersion is higher than server version`() {
-        val manifest = """
+        val manifest =
+            """
             id: "dev.test.future"
             name: "Future"
             version: "1.0.0"
@@ -72,7 +77,7 @@ class ExternalExtensionLoaderTest {
             capabilities:
               - connector
             entryPoint: "dev.test.FakeExtension"
-        """.trimIndent()
+            """.trimIndent()
         buildJar(manifest)
         val results = makeLoader(serverVersion = "1.0.0").loadAll()
         assertTrue(results.isEmpty())
@@ -80,7 +85,8 @@ class ExternalExtensionLoaderTest {
 
     @Test
     fun `accepts JAR when minServerVersion equals server version`() {
-        val manifest = """
+        val manifest =
+            """
             id: "dev.koenv.chaptervault.extensions.loader.testextension"
             name: "Test Extension"
             version: "1.0.0"
@@ -90,7 +96,7 @@ class ExternalExtensionLoaderTest {
             capabilities:
               - connector
             entryPoint: "dev.koenv.chaptervault.extensions.loader.TestExtension"
-        """.trimIndent()
+            """.trimIndent()
         buildJar(manifest, TestExtension::class.java)
         val results = makeLoader(serverVersion = "1.0.0").loadAll()
         assertEquals(1, results.size)
@@ -98,7 +104,8 @@ class ExternalExtensionLoaderTest {
 
     @Test
     fun `accepts JAR when server is a higher minor version than minServerVersion`() {
-        val manifest = """
+        val manifest =
+            """
             id: "dev.koenv.chaptervault.extensions.loader.testextension"
             name: "Test Extension"
             version: "1.0.0"
@@ -108,7 +115,7 @@ class ExternalExtensionLoaderTest {
             capabilities:
               - connector
             entryPoint: "dev.koenv.chaptervault.extensions.loader.TestExtension"
-        """.trimIndent()
+            """.trimIndent()
         buildJar(manifest, TestExtension::class.java)
         val results = makeLoader(serverVersion = "1.1.0").loadAll()
         assertEquals(1, results.size)
@@ -116,7 +123,8 @@ class ExternalExtensionLoaderTest {
 
     @Test
     fun `skips JAR when entry point class is not found`() {
-        val manifest = """
+        val manifest =
+            """
             id: "dev.test.missing-class"
             name: "Missing Class"
             version: "1.0.0"
@@ -126,7 +134,7 @@ class ExternalExtensionLoaderTest {
             capabilities:
               - connector
             entryPoint: "dev.test.NonExistentClass"
-        """.trimIndent()
+            """.trimIndent()
         buildJar(manifest)
         val results = makeLoader().loadAll()
         assertTrue(results.isEmpty())
@@ -134,7 +142,8 @@ class ExternalExtensionLoaderTest {
 
     @Test
     fun `loads extension from valid JAR`() {
-        val manifest = """
+        val manifest =
+            """
             id: "dev.koenv.chaptervault.extensions.loader.testextension"
             name: "Test Extension"
             version: "1.0.0"
@@ -144,7 +153,7 @@ class ExternalExtensionLoaderTest {
             capabilities:
               - connector
             entryPoint: "dev.koenv.chaptervault.extensions.loader.TestExtension"
-        """.trimIndent()
+            """.trimIndent()
         buildJar(manifest, TestExtension::class.java)
         val results = makeLoader().loadAll()
         assertEquals(1, results.size)
@@ -164,7 +173,10 @@ class TestExtension : Extension {
     override val id = "dev.koenv.chaptervault.extensions.loader.testextension"
     override val name = "Test Extension"
     override val version = "1.0.0"
+
     override fun capabilities() = emptySet<Capability>()
+
     override fun onEnable(context: ExtensionContext) {}
+
     override fun onDisable() {}
 }

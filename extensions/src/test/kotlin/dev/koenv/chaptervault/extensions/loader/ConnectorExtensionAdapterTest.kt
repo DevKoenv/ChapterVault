@@ -12,10 +12,11 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ConnectorExtensionAdapterTest {
-    private fun fakeConnector(id: String): Connector = mockk(relaxed = true) {
-        every { this@mockk.id } returns id
-        every { this@mockk.name } returns id
-    }
+    private fun fakeConnector(id: String): Connector =
+        mockk(relaxed = true) {
+            every { this@mockk.id } returns id
+            every { this@mockk.name } returns id
+        }
 
     @Test
     fun `id and name match connector id`() {
@@ -38,9 +39,10 @@ class ConnectorExtensionAdapterTest {
         val adapter = ConnectorExtensionAdapter(connector)
         val registry = DefaultConnectorRegistry()
         val trackingRegistry = TrackingConnectorRegistry(registry)
-        val context: ExtensionContext = mockk(relaxed = true) {
-            every { connectorRegistry } returns trackingRegistry
-        }
+        val context: ExtensionContext =
+            mockk(relaxed = true) {
+                every { connectorRegistry } returns trackingRegistry
+            }
         adapter.onEnable(context)
         assertNotNull(registry.findById("mangadex"))
         assertTrue("mangadex" in trackingRegistry.registeredIds)

@@ -17,17 +17,19 @@ class ExternalExtensionLoader(
 
     fun loadAll(): List<Pair<ExtensionManifest, Extension>> {
         if (!Files.exists(extensionsDir)) return emptyList()
-        return Files.list(extensionsDir)
+        return Files
+            .list(extensionsDir)
             .filter { it.extension == "jar" }
             .toList()
             .mapNotNull { loadJar(it) }
     }
 
     private fun loadJar(jar: Path): Pair<ExtensionManifest, Extension>? {
-        val manifest = readManifest(jar) ?: run {
-            log.warn("Skipping ${jar.fileName}: missing or invalid extension.yaml")
-            return null
-        }
+        val manifest =
+            readManifest(jar) ?: run {
+                log.warn("Skipping ${jar.fileName}: missing or invalid extension.yaml")
+                return null
+            }
         if (!isCompatible(manifest)) {
             log.warn("Skipping ${manifest.id}: requires server ${manifest.minServerVersion}, running $serverVersion")
             return null
@@ -67,7 +69,11 @@ class ExternalExtensionLoader(
 
     private fun parseVersion(version: String): IntArray? =
         try {
-            version.split(".").take(3).map { it.toInt() }.toIntArray()
+            version
+                .split(".")
+                .take(3)
+                .map { it.toInt() }
+                .toIntArray()
         } catch (_: NumberFormatException) {
             null
         }

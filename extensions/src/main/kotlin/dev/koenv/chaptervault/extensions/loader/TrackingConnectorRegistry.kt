@@ -10,7 +10,10 @@ class TrackingConnectorRegistry(
     private val _registeredIds = mutableListOf<String>()
     val registeredIds: List<String> get() = _registeredIds.toList()
 
-    override fun registerRaw(id: String, connector: Any) {
+    override fun registerRaw(
+        id: String,
+        connector: Any,
+    ) {
         delegate.register(connector as Connector)
         _registeredIds.add(id)
     }
