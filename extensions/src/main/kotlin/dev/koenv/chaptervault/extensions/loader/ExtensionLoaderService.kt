@@ -46,7 +46,7 @@ class ExtensionLoaderService(
                 return
             }
         if (entry.status == ExtensionStatus.ENABLED) return
-        enableAndRegister(entry.extension, entry.source)
+        enableAndRegister(entry.extension, entry.source, manifests[id], entry.jarPath)
     }
 
     override fun disable(id: String) {

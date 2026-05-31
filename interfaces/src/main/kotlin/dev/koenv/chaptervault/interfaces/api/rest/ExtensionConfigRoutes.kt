@@ -1,8 +1,10 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
+import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.extension.ExtensionManager
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -16,12 +18,22 @@ fun Route.extensionConfigRoutes(
 ) {
     route("/extensions/{id}/config") {
         get {
+            val principal = call.principal<KtorPrincipal>()
+            if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+                call.respondForbidden()
+                return@get
+            }
             val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             loaderService.findById(id) ?: return@get call.respond(HttpStatusCode.NotFound)
             val values = configRepository.getAll(id)
             call.respond(mapOf("values" to values))
         }
         patch {
+            val principal = call.principal<KtorPrincipal>()
+            if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+                call.respondForbidden()
+                return@patch
+            }
             val id = call.parameters["id"] ?: return@patch call.respond(HttpStatusCode.BadRequest)
             loaderService.findById(id) ?: return@patch call.respond(HttpStatusCode.NotFound)
             val body = call.receive<Map<String, String>>()
