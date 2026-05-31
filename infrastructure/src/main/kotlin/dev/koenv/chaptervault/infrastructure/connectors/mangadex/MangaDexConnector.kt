@@ -1,7 +1,7 @@
 package dev.koenv.chaptervault.infrastructure.connectors.mangadex
 
-import dev.koenv.chaptervault.extensions.connectors.HttpConnector
-import dev.koenv.chaptervault.extensions.connectors.getJson
+import dev.koenv.chaptervault.sdk.connector.getJson
+import dev.koenv.chaptervault.sdk.connector.HttpConnector
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexAtHomeResponse
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexChapterData
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexChapterListResponse

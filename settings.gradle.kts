@@ -19,5 +19,6 @@ include(
     ":extensions",
     ":infrastructure",
     ":interfaces",
+    ":sdk",
     ":apps:server"
 )

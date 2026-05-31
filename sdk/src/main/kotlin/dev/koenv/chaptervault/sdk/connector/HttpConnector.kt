@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.extensions.connectors
+package dev.koenv.chaptervault.sdk.connector
 
 import dev.koenv.chaptervault.kernel.connector.Bucket
 import dev.koenv.chaptervault.kernel.connector.BucketConfig

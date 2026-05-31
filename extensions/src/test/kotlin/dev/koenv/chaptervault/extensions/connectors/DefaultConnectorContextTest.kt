@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.extensions.connectors
 
 import dev.koenv.chaptervault.kernel.connector.Bucket
+import dev.koenv.chaptervault.sdk.connector.DefaultConnectorContext
 import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.client.HttpClient

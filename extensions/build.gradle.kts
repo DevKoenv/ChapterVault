@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":sdk"))
     implementation(project(":shared"))
     implementation(project(":kernel"))
     implementation(libs.kotlinx.coroutines.core)

@@ -1,6 +1,6 @@
 package dev.koenv.chaptervault.infrastructure.connectors
 
-import dev.koenv.chaptervault.extensions.connectors.HttpConnector
+import dev.koenv.chaptervault.sdk.connector.HttpConnector
 import dev.koenv.chaptervault.kernel.connector.Bucket
 import dev.koenv.chaptervault.kernel.connector.BucketConfig
 import dev.koenv.chaptervault.kernel.connector.BucketKey
