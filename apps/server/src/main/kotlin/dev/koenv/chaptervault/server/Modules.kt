@@ -5,6 +5,9 @@ import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
 import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
 import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.MangaDexConnector
+import dev.koenv.chaptervault.extensions.loader.ConnectorExtensionAdapter
+import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
+import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader
 import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.PersistingTaskQueue
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
@@ -39,12 +42,14 @@ import dev.koenv.chaptervault.kernel.api.impl.SystemApiImpl
 import dev.koenv.chaptervault.kernel.event.EventBus
 import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
 import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
+import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.runtime.EventPublishingTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
 import org.koin.dsl.module
+import java.nio.file.Path
 import java.nio.file.Paths
 
 val configModule =
@@ -110,9 +115,40 @@ val kernelModule =
 val extensionModule =
     module {
         single<ConnectorRegistry> { DefaultConnectorRegistry() }
-        single { MockConnector() }
-        single { CustomConnector(get()) }
-        single { MangaDexConnector(get()) }
+        single {
+            val config = get<AppConfig>()
+            val extensionsDataRoot = Paths.get(config.storage.libraryPath).parent.resolve("extensions")
+            val connectorRegistry = get<ConnectorRegistry>() as DefaultConnectorRegistry
+            val contextFactory: (Path) -> ExtensionContext = { dir ->
+                DefaultExtensionContext(
+                    httpClient = get(),
+                    library = get(),
+                    progress = get(),
+                    system = get(),
+                    connectorRegistry = connectorRegistry,
+                    dataDir = dir,
+                )
+            }
+            val bundled =
+                buildList {
+                    add(ConnectorExtensionAdapter(MangaDexConnector(get())))
+                    if (config.debug.mockConnectorEnabled) {
+                        add(ConnectorExtensionAdapter(MockConnector()))
+                        add(ConnectorExtensionAdapter(CustomConnector(get())))
+                    }
+                }
+            ExtensionLoaderService(
+                extensionRegistry = get(),
+                connectorRegistryDelegate = connectorRegistry,
+                contextFactory = contextFactory,
+                externalLoader =
+                    ExternalExtensionLoader(
+                        extensionsDir = extensionsDataRoot,
+                        serverVersion = "1.0.0",
+                    ),
+                bundledExtensions = bundled,
+            )
+        }
     }
 
 val interfacesModule =
