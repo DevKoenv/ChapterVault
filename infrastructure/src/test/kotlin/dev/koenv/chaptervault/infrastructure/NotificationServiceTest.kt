@@ -1,5 +1,10 @@
 package dev.koenv.chaptervault.infrastructure
 
+import dev.koenv.chaptervault.infrastructure.notifications.DefaultNotificationChannelRegistry
+import dev.koenv.chaptervault.infrastructure.notifications.DiscordNotificationChannel
+import dev.koenv.chaptervault.infrastructure.notifications.GotifyNotificationChannel
+import dev.koenv.chaptervault.infrastructure.notifications.NtfyNotificationChannel
+import dev.koenv.chaptervault.infrastructure.notifications.WebhookNotificationChannel
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.NotificationTarget
@@ -65,10 +70,16 @@ class NotificationServiceTest {
             HttpClient(engine) {
                 install(ContentNegotiation) { json() }
             }
+        val registry = DefaultNotificationChannelRegistry().also {
+            it.register(NtfyNotificationChannel(client))
+            it.register(GotifyNotificationChannel(client))
+            it.register(DiscordNotificationChannel(client))
+            it.register(WebhookNotificationChannel(client))
+        }
         return NotificationService(
             eventBus = InMemoryEventBus(),
             notificationApi = api,
-            httpClient = client,
+            channelRegistry = registry,
         )
     }
 

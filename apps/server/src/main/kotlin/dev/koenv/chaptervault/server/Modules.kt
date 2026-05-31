@@ -10,7 +10,11 @@ import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader
 import dev.koenv.chaptervault.infrastructure.enricher.DefaultMetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
-import dev.koenv.chaptervault.kernel.extension.NotificationChannel
+import dev.koenv.chaptervault.infrastructure.notifications.DefaultNotificationChannelRegistry
+import dev.koenv.chaptervault.infrastructure.notifications.DiscordNotificationChannel
+import dev.koenv.chaptervault.infrastructure.notifications.GotifyNotificationChannel
+import dev.koenv.chaptervault.infrastructure.notifications.NtfyNotificationChannel
+import dev.koenv.chaptervault.infrastructure.notifications.WebhookNotificationChannel
 import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
 import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.PersistingTaskQueue
@@ -80,6 +84,18 @@ val infrastructureModule =
         single<ReadingStatusApi> { get<UserSeriesStatusRepository>() }
         single { NotificationRepository() }
         single<NotificationApi> { get<NotificationRepository>() }
+        single { NtfyNotificationChannel(get()) }
+        single { GotifyNotificationChannel(get()) }
+        single { DiscordNotificationChannel(get()) }
+        single { WebhookNotificationChannel(get()) }
+        single<NotificationChannelRegistry> {
+            DefaultNotificationChannelRegistry().also { registry ->
+                registry.register(get<NtfyNotificationChannel>())
+                registry.register(get<GotifyNotificationChannel>())
+                registry.register(get<DiscordNotificationChannel>())
+                registry.register(get<WebhookNotificationChannel>())
+            }
+        }
         single { NotificationService(get(), get(), get()) }
         single<NotificationDispatchApi> { get<NotificationService>() }
         single { createHttpClient() }
@@ -128,12 +144,6 @@ val extensionModule =
             val extensionsDataRoot = Paths.get(config.storage.libraryPath).parent.resolve("extensions")
             val connectorRegistry = get<ConnectorRegistry>()
             val enricherRegistry = get<MetadataEnricherRegistry>()
-            val stubNotificationRegistry = object : NotificationChannelRegistry {
-                override fun register(channel: NotificationChannel) = Unit
-                override fun unregister(typeId: String) = Unit
-                override fun find(typeId: String): NotificationChannel? = null
-                override fun all(): List<NotificationChannel> = emptyList()
-            }
             val contextFactory: (String, Path) -> ExtensionContext = { extensionId, dir ->
                 DefaultExtensionContext(
                     httpClient = get(),
@@ -142,7 +152,7 @@ val extensionModule =
                     system = get(),
                     connectorRegistry = connectorRegistry,
                     enricherRegistry = enricherRegistry,
-                    notificationRegistry = stubNotificationRegistry,
+                    notificationRegistry = get<NotificationChannelRegistry>(),
                     config = get<ExtensionConfigRepository>().forExtension(extensionId),
                     dataDir = dir,
                 )
