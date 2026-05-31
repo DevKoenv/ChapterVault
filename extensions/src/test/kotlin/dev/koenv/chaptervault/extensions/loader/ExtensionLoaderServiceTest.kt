@@ -1,12 +1,17 @@
 package dev.koenv.chaptervault.extensions.loader
 
-import dev.koenv.chaptervault.extensions.connectors.Connector
 import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
+import dev.koenv.chaptervault.extensions.connectors.Connector
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.extensions.connectors.DownloadResult
 import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
 import dev.koenv.chaptervault.extensions.connectors.SeriesSearchResult
-import dev.koenv.chaptervault.kernel.extension.*
+import dev.koenv.chaptervault.kernel.extension.Capability
+import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
+import dev.koenv.chaptervault.kernel.extension.Extension
+import dev.koenv.chaptervault.kernel.extension.ExtensionContext
+import dev.koenv.chaptervault.kernel.extension.ExtensionSource
+import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -24,43 +29,61 @@ class ExtensionLoaderServiceTest {
     @TempDir
     lateinit var tempDir: Path
 
-    private fun fakeConnector(connectorId: String): Connector = object : Connector {
-        override val id = connectorId
-        override val name = connectorId
-        override suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>> =
-            Result.Failure(AppError.InternalError("fake"))
-        override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> =
-            Result.Failure(AppError.InternalError("fake"))
-        override suspend fun fetchChapters(externalId: String, language: String): Result<List<ChapterMetadata>> =
-            Result.Failure(AppError.InternalError("fake"))
-        override suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult> =
-            Result.Failure(AppError.InternalError("fake"))
-        override fun supportedLanguages() = listOf("en")
-    }
+    private fun fakeConnector(connectorId: String): Connector =
+        object : Connector {
+            override val id = connectorId
+            override val name = connectorId
 
-    private fun makeContext(connRegistry: DefaultConnectorRegistry): ExtensionContext = object : ExtensionContext {
-        override val httpClient get() = error("not needed in test")
-        override val library get() = error("not needed in test")
-        override val progress get() = error("not needed in test")
-        override val system get() = error("not needed in test")
-        override val connectorRegistry = connRegistry
-        override val dataDir = tempDir
-        override fun rateLimiter(bucket: String, requestsPerSecond: Double) = error("not needed in test")
-        override fun logger(name: String) = org.slf4j.LoggerFactory.getLogger(name)
-    }
+            override suspend fun search(
+                query: String,
+                request: PageRequest,
+            ): Result<Pagination<SeriesSearchResult>> = Result.Failure(AppError.InternalError("fake"))
+
+            override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> = Result.Failure(AppError.InternalError("fake"))
+
+            override suspend fun fetchChapters(
+                externalId: String,
+                language: String,
+            ): Result<List<ChapterMetadata>> = Result.Failure(AppError.InternalError("fake"))
+
+            override suspend fun download(
+                chapter: Chapter,
+                format: ChapterFormat,
+            ): Result<DownloadResult> = Result.Failure(AppError.InternalError("fake"))
+
+            override fun supportedLanguages() = listOf("en")
+        }
+
+    private fun makeContext(connRegistry: DefaultConnectorRegistry): ExtensionContext =
+        object : ExtensionContext {
+            override val httpClient get() = error("not needed in test")
+            override val library get() = error("not needed in test")
+            override val progress get() = error("not needed in test")
+            override val system get() = error("not needed in test")
+            override val connectorRegistry = connRegistry
+            override val dataDir = tempDir
+
+            override fun rateLimiter(
+                bucket: String,
+                requestsPerSecond: Double,
+            ) = error("not needed in test")
+
+            override fun logger(name: String) = org.slf4j.LoggerFactory.getLogger(name)
+        }
 
     private fun makeService(
         bundled: List<Extension> = emptyList(),
         connRegistry: DefaultConnectorRegistry = DefaultConnectorRegistry(),
         extRegistry: DefaultExtensionRegistry = DefaultExtensionRegistry(),
     ): Pair<ExtensionLoaderService, DefaultConnectorRegistry> {
-        val svc = ExtensionLoaderService(
-            extensionRegistry = extRegistry,
-            connectorRegistryDelegate = connRegistry,
-            contextFactory = { _ -> makeContext(connRegistry) },
-            externalLoader = ExternalExtensionLoader(extensionsDir = tempDir, serverVersion = "1.0.0"),
-            bundledExtensions = bundled,
-        )
+        val svc =
+            ExtensionLoaderService(
+                extensionRegistry = extRegistry,
+                connectorRegistryDelegate = connRegistry,
+                contextFactory = { _ -> makeContext(connRegistry) },
+                externalLoader = ExternalExtensionLoader(extensionsDir = tempDir, serverVersion = "1.0.0"),
+                bundledExtensions = bundled,
+            )
         return svc to connRegistry
     }
 
@@ -121,22 +144,27 @@ class ExtensionLoaderServiceTest {
 
     @Test
     fun `extension whose onEnable throws is set to FAILED`() {
-        val failingExt = object : Extension {
-            override val id = "failing.ext"
-            override val name = "Failing"
-            override val version = "1.0.0"
-            override fun capabilities() = emptySet<Capability>()
-            override fun onEnable(ctx: ExtensionContext) = throw RuntimeException("boom")
-            override fun onDisable() {}
-        }
+        val failingExt =
+            object : Extension {
+                override val id = "failing.ext"
+                override val name = "Failing"
+                override val version = "1.0.0"
+
+                override fun capabilities() = emptySet<Capability>()
+
+                override fun onEnable(ctx: ExtensionContext) = throw RuntimeException("boom")
+
+                override fun onDisable() {}
+            }
         val extRegistry = DefaultExtensionRegistry()
-        val svc = ExtensionLoaderService(
-            extensionRegistry = extRegistry,
-            connectorRegistryDelegate = DefaultConnectorRegistry(),
-            contextFactory = { _ -> makeContext(DefaultConnectorRegistry()) },
-            externalLoader = ExternalExtensionLoader(tempDir, "1.0.0"),
-            bundledExtensions = listOf(failingExt),
-        )
+        val svc =
+            ExtensionLoaderService(
+                extensionRegistry = extRegistry,
+                connectorRegistryDelegate = DefaultConnectorRegistry(),
+                contextFactory = { _ -> makeContext(DefaultConnectorRegistry()) },
+                externalLoader = ExternalExtensionLoader(tempDir, "1.0.0"),
+                bundledExtensions = listOf(failingExt),
+            )
         svc.loadAll()
         val entry = extRegistry.findById("failing.ext")
         assertNotNull(entry)

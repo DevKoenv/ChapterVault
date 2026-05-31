@@ -1,7 +1,12 @@
 package dev.koenv.chaptervault.extensions.loader
 
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
-import dev.koenv.chaptervault.kernel.extension.*
+import dev.koenv.chaptervault.kernel.extension.Extension
+import dev.koenv.chaptervault.kernel.extension.ExtensionContext
+import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
+import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
+import dev.koenv.chaptervault.kernel.extension.ExtensionSource
+import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -27,19 +32,21 @@ class ExtensionLoaderService(
     }
 
     fun enable(id: String) {
-        val entry = extensionRegistry.findById(id) ?: run {
-            log.warn("enable: extension '$id' not found")
-            return
-        }
+        val entry =
+            extensionRegistry.findById(id) ?: run {
+                log.warn("enable: extension '$id' not found")
+                return
+            }
         if (entry.status == ExtensionStatus.ENABLED) return
         enableAndRegister(entry.extension, entry.source)
     }
 
     fun disable(id: String) {
-        val entry = extensionRegistry.findById(id) ?: run {
-            log.warn("disable: extension '$id' not found")
-            return
-        }
+        val entry =
+            extensionRegistry.findById(id) ?: run {
+                log.warn("disable: extension '$id' not found")
+                return
+            }
         if (entry.status != ExtensionStatus.ENABLED) return
         entry.registeredConnectorIds.forEach { connectorId ->
             connectorRegistryDelegate.unregister(connectorId)
@@ -57,13 +64,16 @@ class ExtensionLoaderService(
 
     fun findById(id: String): ExtensionEntry? = extensionRegistry.findById(id)
 
-    private fun enableAndRegister(extension: Extension, source: ExtensionSource) {
+    private fun enableAndRegister(
+        extension: Extension,
+        source: ExtensionSource,
+    ) {
         val dataDir = extensionsDataRoot.resolve(extension.id)
         val tracking = TrackingConnectorRegistry(connectorRegistryDelegate)
         val baseContext = contextFactory(dataDir)
 
         extensionRegistry.register(
-            ExtensionEntry(extension = extension, status = ExtensionStatus.LOADING, source = source)
+            ExtensionEntry(extension = extension, status = ExtensionStatus.LOADING, source = source),
         )
 
         try {
@@ -76,7 +86,7 @@ class ExtensionLoaderService(
                     status = ExtensionStatus.ENABLED,
                     source = source,
                     registeredConnectorIds = tracking.registeredIds,
-                )
+                ),
             )
             log.info("Extension '${extension.id}' enabled (source=$source)")
         } catch (e: Exception) {
@@ -85,7 +95,10 @@ class ExtensionLoaderService(
         }
     }
 
-    private fun buildContextWithTracking(base: ExtensionContext, tracking: TrackingConnectorRegistry): ExtensionContext =
+    private fun buildContextWithTracking(
+        base: ExtensionContext,
+        tracking: TrackingConnectorRegistry,
+    ): ExtensionContext =
         object : ExtensionContext by base {
             override val connectorRegistry = tracking
         }
