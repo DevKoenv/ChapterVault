@@ -10,8 +10,9 @@ import io.ktor.client.HttpClient
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 
-data class DefaultExtensionContext(
+class DefaultExtensionContext(
     override val httpClient: HttpClient,
     override val library: LibraryReadApi,
     override val progress: ProgressApi,
@@ -19,10 +20,12 @@ data class DefaultExtensionContext(
     override val connectorRegistry: ConnectorRegistrar,
     override val dataDir: Path,
 ) : ExtensionContext {
+    private val rateLimiters = ConcurrentHashMap<String, RateLimiter>()
+
     override fun rateLimiter(
         bucket: String,
         requestsPerSecond: Double,
-    ): RateLimiter = RateLimiter(requestsPerSecond)
+    ): RateLimiter = rateLimiters.getOrPut(bucket) { RateLimiter(requestsPerSecond) }
 
     override fun logger(name: String): Logger = LoggerFactory.getLogger(name)
 }
