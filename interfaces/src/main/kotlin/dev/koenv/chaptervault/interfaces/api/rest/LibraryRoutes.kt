@@ -1,6 +1,6 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.AddSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse

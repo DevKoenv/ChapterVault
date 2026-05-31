@@ -3,7 +3,7 @@ package dev.koenv.chaptervault.server
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
-import dev.koenv.chaptervault.kernel.extension.ConnectorRegistrar
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import io.ktor.client.HttpClient
@@ -17,7 +17,7 @@ class DefaultExtensionContext(
     override val library: LibraryReadApi,
     override val progress: ProgressApi,
     override val system: SystemApi,
-    override val connectorRegistry: ConnectorRegistrar,
+    override val connectorRegistry: ConnectorRegistry,
     override val dataDir: Path,
 ) : ExtensionContext {
     private val rateLimiters = ConcurrentHashMap<String, RateLimiter>()

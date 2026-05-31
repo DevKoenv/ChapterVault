@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.kernel.extension
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import io.ktor.client.HttpClient
 import org.slf4j.Logger
@@ -13,7 +14,7 @@ interface ExtensionContext {
     val library: LibraryReadApi
     val progress: ProgressApi
     val system: SystemApi
-    val connectorRegistry: ConnectorRegistrar
+    val connectorRegistry: ConnectorRegistry
     val dataDir: Path
 
     fun rateLimiter(

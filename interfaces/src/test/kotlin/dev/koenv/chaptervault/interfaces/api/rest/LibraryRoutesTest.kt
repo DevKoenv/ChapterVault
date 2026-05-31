@@ -1,7 +1,7 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.extensions.connectors.Connector
-import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.kernel.connector.Connector
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi

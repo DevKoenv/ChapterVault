@@ -1,5 +1,7 @@
 package dev.koenv.chaptervault.extensions.connectors
 
+import dev.koenv.chaptervault.kernel.connector.Bucket
+import dev.koenv.chaptervault.kernel.connector.BucketConfig
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 

@@ -1,6 +1,6 @@
 package dev.koenv.chaptervault.server
 
-import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler

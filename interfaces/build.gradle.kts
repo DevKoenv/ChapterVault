@@ -12,4 +12,5 @@ dependencies {
 
     testImplementation(libs.bundles.testing)
     testImplementation(libs.ktor.server.test.host)
+    testImplementation(project(":infrastructure"))
 }

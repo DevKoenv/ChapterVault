@@ -1,24 +1,14 @@
 package dev.koenv.chaptervault.extensions.loader
 
-import dev.koenv.chaptervault.extensions.connectors.Connector
-import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
-import dev.koenv.chaptervault.kernel.extension.ConnectorRegistrar
+import dev.koenv.chaptervault.kernel.connector.Connector
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 
-class TrackingConnectorRegistry(
-    private val delegate: ConnectorRegistry,
-) : ConnectorRegistrar {
+class TrackingConnectorRegistry(private val delegate: ConnectorRegistry) : ConnectorRegistry by delegate {
     private val _registeredIds = mutableListOf<String>()
     val registeredIds: List<String> get() = _registeredIds.toList()
 
-    override fun registerRaw(
-        id: String,
-        connector: Any,
-    ) {
-        delegate.register(connector as Connector)
-        _registeredIds.add(id)
-    }
-
-    override fun unregister(id: String) {
-        delegate.unregister(id)
+    override fun register(connector: Connector) {
+        delegate.register(connector)
+        _registeredIds.add(connector.id)
     }
 }

@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.extensions.connectors
 
+import dev.koenv.chaptervault.kernel.connector.DownloadPage
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

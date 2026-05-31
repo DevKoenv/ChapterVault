@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.extensions.connectors
+package dev.koenv.chaptervault.kernel.connector
 
 data class SeriesSearchResult(
     val externalId: String,
@@ -27,6 +27,4 @@ data class DownloadPage(
     val headers: Map<String, String> = emptyMap(),
 )
 
-data class DownloadResult(
-    val pages: List<DownloadPage>,
-)
+data class DownloadResult(val pages: List<DownloadPage>)

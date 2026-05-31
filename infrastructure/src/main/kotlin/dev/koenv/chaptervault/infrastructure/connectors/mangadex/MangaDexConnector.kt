@@ -1,25 +1,24 @@
-package dev.koenv.chaptervault.extensions.connectors.sources.mangadex
+package dev.koenv.chaptervault.infrastructure.connectors.mangadex
 
-import dev.koenv.chaptervault.extensions.connectors.Bucket
-import dev.koenv.chaptervault.extensions.connectors.BucketConfig
-import dev.koenv.chaptervault.extensions.connectors.BucketKey
-import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
-import dev.koenv.chaptervault.extensions.connectors.DownloadPage
-import dev.koenv.chaptervault.extensions.connectors.DownloadResult
 import dev.koenv.chaptervault.extensions.connectors.HttpConnector
-import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
-import dev.koenv.chaptervault.extensions.connectors.SeriesSearchResult
 import dev.koenv.chaptervault.extensions.connectors.getJson
-import dev.koenv.chaptervault.extensions.connectors.lenientJson
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexAtHomeResponse
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexChapterData
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexChapterListResponse
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexCoverArtAttributes
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexMangaAttributes
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexMangaData
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexMangaResponse
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexRelationship
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto.MangaDexSearchResponse
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexAtHomeResponse
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexChapterData
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexChapterListResponse
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexCoverArtAttributes
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexMangaAttributes
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexMangaData
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexMangaResponse
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexRelationship
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexSearchResponse
+import dev.koenv.chaptervault.kernel.connector.Bucket
+import dev.koenv.chaptervault.kernel.connector.BucketConfig
+import dev.koenv.chaptervault.kernel.connector.BucketKey
+import dev.koenv.chaptervault.kernel.connector.ChapterMetadata
+import dev.koenv.chaptervault.kernel.connector.DownloadPage
+import dev.koenv.chaptervault.kernel.connector.DownloadResult
+import dev.koenv.chaptervault.kernel.connector.SeriesMetadata
+import dev.koenv.chaptervault.kernel.connector.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -29,8 +28,11 @@ import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.concurrent.ConcurrentHashMap
+
+private val lenientJson = Json { ignoreUnknownKeys = true }
 
 class MangaDexConnector(
     httpClient: HttpClient,

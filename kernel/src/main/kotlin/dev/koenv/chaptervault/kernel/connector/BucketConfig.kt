@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.extensions.connectors
+package dev.koenv.chaptervault.kernel.connector
 
 data class BucketConfig(
     val requestsPerSecond: Double,

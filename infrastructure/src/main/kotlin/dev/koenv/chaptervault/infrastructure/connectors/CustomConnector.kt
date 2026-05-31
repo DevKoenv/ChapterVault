@@ -1,15 +1,15 @@
-package dev.koenv.chaptervault.extensions.connectors.sources
+package dev.koenv.chaptervault.infrastructure.connectors
 
-import dev.koenv.chaptervault.extensions.connectors.Bucket
-import dev.koenv.chaptervault.extensions.connectors.BucketConfig
-import dev.koenv.chaptervault.extensions.connectors.BucketKey
-import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
-import dev.koenv.chaptervault.extensions.connectors.DownloadPage
-import dev.koenv.chaptervault.extensions.connectors.DownloadResult
 import dev.koenv.chaptervault.extensions.connectors.HttpConnector
-import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
-import dev.koenv.chaptervault.extensions.connectors.SeriesSearchResult
 import dev.koenv.chaptervault.extensions.connectors.getJson
+import dev.koenv.chaptervault.kernel.connector.Bucket
+import dev.koenv.chaptervault.kernel.connector.BucketConfig
+import dev.koenv.chaptervault.kernel.connector.BucketKey
+import dev.koenv.chaptervault.kernel.connector.ChapterMetadata
+import dev.koenv.chaptervault.kernel.connector.DownloadPage
+import dev.koenv.chaptervault.kernel.connector.DownloadResult
+import dev.koenv.chaptervault.kernel.connector.SeriesMetadata
+import dev.koenv.chaptervault.kernel.connector.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest

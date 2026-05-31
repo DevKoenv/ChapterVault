@@ -1,10 +1,10 @@
 package dev.koenv.chaptervault.server
 
-import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
-import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
-import dev.koenv.chaptervault.extensions.connectors.sources.CustomConnector
-import dev.koenv.chaptervault.extensions.connectors.sources.MockConnector
-import dev.koenv.chaptervault.extensions.connectors.sources.mangadex.MangaDexConnector
+import dev.koenv.chaptervault.infrastructure.connectors.CustomConnector
+import dev.koenv.chaptervault.infrastructure.connectors.DefaultConnectorRegistry
+import dev.koenv.chaptervault.infrastructure.connectors.MockConnector
+import dev.koenv.chaptervault.infrastructure.connectors.mangadex.MangaDexConnector
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.loader.ConnectorExtensionAdapter
 import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader

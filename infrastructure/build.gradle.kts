@@ -1,3 +1,7 @@
+plugins {
+    alias(libs.plugins.kotlin.serialization)
+}
+
 dependencies {
     implementation(project(":shared"))
     implementation(project(":kernel"))

@@ -1,6 +1,6 @@
 package dev.koenv.chaptervault.extensions.loader
 
-import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.extension.Extension
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.kernel.extension.ExtensionEntry

@@ -1,8 +1,7 @@
 package dev.koenv.chaptervault.infrastructure
 
-import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
-import dev.koenv.chaptervault.extensions.connectors.HttpConnector
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
@@ -316,22 +315,11 @@ class TaskExecutorService(
                 )
             }
 
-            val httpConnector =
-                connector as? HttpConnector
-                    ?: run {
-                        setChapterStatus(chapter, DownloadStatus.FAILED)
-                        return Result.Failure(
-                            AppError.InternalError(
-                                "Connector $connectorId does not support HTTP page fetching",
-                            ),
-                        )
-                    }
-
             val sortedPages = downloadResult.pages.sortedBy { it.index }
             val pages = mutableListOf<Page>()
             val failedIndices = mutableListOf<Int>()
             for (page in sortedPages) {
-                when (val r = httpConnector.fetchPage(page)) {
+                when (val r = connector.fetchPage(page)) {
                     is Result.Success -> pages.add(Page(page.index, r.value))
                     is Result.Failure -> failedIndices.add(page.index)
                 }

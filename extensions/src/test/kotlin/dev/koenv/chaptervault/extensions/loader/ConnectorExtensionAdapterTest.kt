@@ -1,11 +1,12 @@
 package dev.koenv.chaptervault.extensions.loader
 
-import dev.koenv.chaptervault.extensions.connectors.Connector
-import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
+import dev.koenv.chaptervault.kernel.connector.Connector
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.extension.Capability
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import io.mockk.every
 import io.mockk.mockk
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -17,6 +18,16 @@ class ConnectorExtensionAdapterTest {
             every { this@mockk.id } returns id
             every { this@mockk.name } returns id
         }
+
+    private fun simpleRegistry(): ConnectorRegistry {
+        val entries = ConcurrentHashMap<String, Connector>()
+        return object : ConnectorRegistry {
+            override fun register(connector: Connector) { entries[connector.id] = connector }
+            override fun unregister(id: String) { entries.remove(id) }
+            override fun findById(id: String): Connector? = entries[id]
+            override fun all(): List<Connector> = entries.values.toList()
+        }
+    }
 
     @Test
     fun `id and name match connector id`() {
@@ -37,7 +48,7 @@ class ConnectorExtensionAdapterTest {
     fun `onEnable registers the connector`() {
         val connector = fakeConnector("mangadex")
         val adapter = ConnectorExtensionAdapter(connector)
-        val registry = DefaultConnectorRegistry()
+        val registry = simpleRegistry()
         val trackingRegistry = TrackingConnectorRegistry(registry)
         val context: ExtensionContext =
             mockk(relaxed = true) {
@@ -56,9 +67,9 @@ class ConnectorExtensionAdapterTest {
 
     @Test
     fun `registeredIds does not change on unregister`() {
-        val connectorRegistry = DefaultConnectorRegistry()
-        val trackingRegistry = TrackingConnectorRegistry(connectorRegistry)
-        trackingRegistry.registerRaw("mangadex", fakeConnector("mangadex"))
+        val registry = simpleRegistry()
+        val trackingRegistry = TrackingConnectorRegistry(registry)
+        trackingRegistry.register(fakeConnector("mangadex"))
         trackingRegistry.unregister("mangadex")
         assertTrue("mangadex" in trackingRegistry.registeredIds)
     }

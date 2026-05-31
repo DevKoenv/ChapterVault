@@ -1,11 +1,11 @@
 package dev.koenv.chaptervault.extensions.loader
 
-import dev.koenv.chaptervault.extensions.connectors.ChapterMetadata
-import dev.koenv.chaptervault.extensions.connectors.Connector
-import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
-import dev.koenv.chaptervault.extensions.connectors.DownloadResult
-import dev.koenv.chaptervault.extensions.connectors.SeriesMetadata
-import dev.koenv.chaptervault.extensions.connectors.SeriesSearchResult
+import dev.koenv.chaptervault.kernel.connector.ChapterMetadata
+import dev.koenv.chaptervault.kernel.connector.Connector
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
+import dev.koenv.chaptervault.kernel.connector.DownloadResult
+import dev.koenv.chaptervault.kernel.connector.SeriesMetadata
+import dev.koenv.chaptervault.kernel.connector.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.extension.Capability
 import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.Extension
@@ -19,6 +19,7 @@ import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import org.junit.jupiter.api.io.TempDir
+import java.util.concurrent.ConcurrentHashMap
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,6 +29,16 @@ import kotlin.test.assertNull
 class ExtensionLoaderServiceTest {
     @TempDir
     lateinit var tempDir: Path
+
+    private fun simpleRegistry(): ConnectorRegistry {
+        val entries = ConcurrentHashMap<String, Connector>()
+        return object : ConnectorRegistry {
+            override fun register(connector: Connector) { entries[connector.id] = connector }
+            override fun unregister(id: String) { entries.remove(id) }
+            override fun findById(id: String): Connector? = entries[id]
+            override fun all(): List<Connector> = entries.values.toList()
+        }
+    }
 
     private fun fakeConnector(connectorId: String): Connector =
         object : Connector {
@@ -54,7 +65,7 @@ class ExtensionLoaderServiceTest {
             override fun supportedLanguages() = listOf("en")
         }
 
-    private fun makeContext(connRegistry: DefaultConnectorRegistry): ExtensionContext =
+    private fun makeContext(connRegistry: ConnectorRegistry): ExtensionContext =
         object : ExtensionContext {
             override val httpClient get() = error("not needed in test")
             override val library get() = error("not needed in test")
@@ -73,9 +84,9 @@ class ExtensionLoaderServiceTest {
 
     private fun makeService(
         bundled: List<Extension> = emptyList(),
-        connRegistry: DefaultConnectorRegistry = DefaultConnectorRegistry(),
+        connRegistry: ConnectorRegistry = simpleRegistry(),
         extRegistry: DefaultExtensionRegistry = DefaultExtensionRegistry(),
-    ): Pair<ExtensionLoaderService, DefaultConnectorRegistry> {
+    ): Pair<ExtensionLoaderService, ConnectorRegistry> {
         val svc =
             ExtensionLoaderService(
                 extensionRegistry = extRegistry,
@@ -106,7 +117,7 @@ class ExtensionLoaderServiceTest {
         val connector = fakeConnector("my-connector")
         val adapter = ConnectorExtensionAdapter(connector)
         val extRegistry = DefaultExtensionRegistry()
-        val connRegistry = DefaultConnectorRegistry()
+        val connRegistry = simpleRegistry()
         val (svc, _) = makeService(bundled = listOf(adapter), connRegistry = connRegistry, extRegistry = extRegistry)
         svc.loadAll()
         svc.disable("my-connector")
@@ -119,7 +130,7 @@ class ExtensionLoaderServiceTest {
         val connector = fakeConnector("my-connector")
         val adapter = ConnectorExtensionAdapter(connector)
         val extRegistry = DefaultExtensionRegistry()
-        val connRegistry = DefaultConnectorRegistry()
+        val connRegistry = simpleRegistry()
         val (svc, _) = makeService(bundled = listOf(adapter), connRegistry = connRegistry, extRegistry = extRegistry)
         svc.loadAll()
         svc.disable("my-connector")
@@ -160,8 +171,8 @@ class ExtensionLoaderServiceTest {
         val svc =
             ExtensionLoaderService(
                 extensionRegistry = extRegistry,
-                connectorRegistryDelegate = DefaultConnectorRegistry(),
-                contextFactory = { _ -> makeContext(DefaultConnectorRegistry()) },
+                connectorRegistryDelegate = simpleRegistry(),
+                contextFactory = { _ -> makeContext(simpleRegistry()) },
                 externalLoader = ExternalExtensionLoader(tempDir, "1.0.0"),
                 bundledExtensions = listOf(failingExt),
             )

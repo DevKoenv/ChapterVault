@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.extensions.connectors.sources.mangadex
+package dev.koenv.chaptervault.infrastructure.connectors.mangadex
 
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus

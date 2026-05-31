@@ -1,5 +1,7 @@
 package dev.koenv.chaptervault.extensions.connectors
 
+import dev.koenv.chaptervault.kernel.connector.Bucket
+import dev.koenv.chaptervault.kernel.connector.BucketKey
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.client.statement.bodyAsText

@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.extensions.connectors.sources.mangadex.dto
+package dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto
 
 import kotlinx.serialization.Serializable
 
