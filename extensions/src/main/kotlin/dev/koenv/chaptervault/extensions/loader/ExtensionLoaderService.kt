@@ -43,6 +43,7 @@ class ExtensionLoaderService(
 
     fun getManifest(extensionId: String): ExtensionManifest? = manifests[extensionId]
 
+    @Synchronized
     override fun enable(id: String) {
         val entry =
             extensionRegistry.findById(id) ?: run {
@@ -53,6 +54,7 @@ class ExtensionLoaderService(
         enableAndRegister(entry.extension, entry.source, manifests[id], entry.jarPath)
     }
 
+    @Synchronized
     override fun disable(id: String) {
         val entry =
             extensionRegistry.findById(id) ?: run {
@@ -79,6 +81,7 @@ class ExtensionLoaderService(
 
     override fun findById(id: String): ExtensionEntry? = extensionRegistry.findById(id)
 
+    @Synchronized
     override fun unload(id: String) {
         val entry = extensionRegistry.findById(id) ?: return
         if (entry.source == ExtensionSource.BUNDLED) {
@@ -93,6 +96,7 @@ class ExtensionLoaderService(
         log.info("Extension '$id' unloaded")
     }
 
+    @Synchronized
     override fun reload(id: String) {
         val entry = extensionRegistry.findById(id) ?: run {
             log.warn("reload: extension '$id' not found")
@@ -109,6 +113,7 @@ class ExtensionLoaderService(
         unload(id)
         val loaded = externalLoader.loadSingle(jarPath) ?: run {
             log.error("reload: failed to load JAR for '$id' at $jarPath")
+            extensionRegistry.updateStatus(id, ExtensionStatus.FAILED, "reload failed: JAR at $jarPath could not be loaded")
             return
         }
         classloaders[loaded.extension.id] = loaded.classLoader
@@ -133,7 +138,12 @@ class ExtensionLoaderService(
             Files.deleteIfExists(temp)
             throw e
         }
-        reload(extensionId)
+        try {
+            reload(extensionId)
+        } catch (e: Exception) {
+            log.error("Extension '$extensionId' JAR installed at $jarPath but reload failed: ${e.message}. Re-call reload() to retry.")
+            throw e
+        }
         log.info("Extension '$extensionId' installed from JAR")
     }
 

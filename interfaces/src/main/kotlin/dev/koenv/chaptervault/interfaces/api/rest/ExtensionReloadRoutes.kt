@@ -2,6 +2,7 @@ package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.extension.ExtensionManager
+import dev.koenv.chaptervault.shared.result.AppError
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
 import io.ktor.server.response.respond
@@ -16,7 +17,7 @@ fun Route.extensionReloadRoutes(loaderService: ExtensionManager) {
             return@post
         }
         val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        if (loaderService.findById(id) == null) return@post call.respond(HttpStatusCode.NotFound)
+        loaderService.findById(id) ?: return@post call.respondError(AppError.NotFound("Extension", id))
         loaderService.reload(id)
         call.respond(HttpStatusCode.NoContent)
     }
@@ -28,7 +29,7 @@ fun Route.extensionReloadRoutes(loaderService: ExtensionManager) {
             return@post
         }
         val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        if (loaderService.findById(id) == null) return@post call.respond(HttpStatusCode.NotFound)
+        loaderService.findById(id) ?: return@post call.respondError(AppError.NotFound("Extension", id))
         loaderService.unload(id)
         call.respond(HttpStatusCode.NoContent)
     }
