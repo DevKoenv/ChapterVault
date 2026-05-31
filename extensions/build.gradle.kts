@@ -12,6 +12,7 @@ dependencies {
     implementation(libs.snakeyaml)
 
     testImplementation(libs.bundles.testing)
+    testImplementation(libs.mockk)
     testImplementation(libs.ktor.client.cio)
     testImplementation(libs.ktor.client.mock)
 }
