@@ -16,6 +16,8 @@ import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegistryRepository
 import dev.koenv.chaptervault.interfaces.api.rest.extensionConfigRoutes
+import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryService
+import dev.koenv.chaptervault.interfaces.api.rest.extensionInstallRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRegistryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionReloadRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
@@ -149,6 +151,7 @@ fun Application.bootstrap() {
     val extensionLoaderService by inject<ExtensionLoaderService>()
     val extensionConfigRepository by inject<ExtensionConfigRepository>()
     val extensionRegistryRepository by inject<ExtensionRegistryRepository>()
+    val extensionRegistryService by inject<ExtensionRegistryService>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -196,6 +199,7 @@ fun Application.bootstrap() {
                 configRepository = extensionConfigRepository,
             )
             extensionRegistryRoutes(extensionRegistryRepository)
+            extensionInstallRoutes(extensionRegistryService)
             sseRoutes(projectionService)
         }
     }

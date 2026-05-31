@@ -32,6 +32,8 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegi
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserSeriesStatusRepository
+import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryClient
+import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryService
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
 import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
 import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
@@ -188,4 +190,17 @@ val interfacesModule =
         single { EventProjectionService(get()) }
     }
 
-val allModules = listOf(configModule, infrastructureModule, kernelModule, extensionModule, interfacesModule)
+val registryModule =
+    module {
+        single { ExtensionRegistryClient(get()) }
+        single {
+            ExtensionRegistryService(
+                registryRepo = get(),
+                registryClient = get(),
+                extensionManager = get<ExtensionLoaderService>(),
+                httpClient = get(),
+            )
+        }
+    }
+
+val allModules = listOf(configModule, infrastructureModule, kernelModule, extensionModule, interfacesModule, registryModule)

@@ -125,7 +125,7 @@ class ExtensionLoaderService(
         enableAndRegister(loaded.extension, ExtensionSource.LOCAL, loaded.manifest, loaded.jarPath)
     }
 
-    fun install(extensionId: String, jarBytes: ByteArray) {
+    override fun install(extensionId: String, jarBytes: ByteArray) {
         val dir = externalLoader.extensionsDir
         Files.createDirectories(dir)
         val jarPath = dir.resolve("$extensionId.jar")

@@ -7,4 +7,5 @@ interface ExtensionManager {
     fun disable(id: String)
     fun unload(id: String)
     fun reload(id: String)
+    fun install(extensionId: String, jarBytes: ByteArray)
 }
