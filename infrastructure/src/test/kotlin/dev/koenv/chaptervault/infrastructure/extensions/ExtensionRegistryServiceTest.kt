@@ -45,4 +45,18 @@ class ExtensionRegistryServiceTest {
             ))
         }
     }
+
+    @Test
+    fun `requireNonConflicting does not throw when no conflict`() {
+        ExtensionRegistryService.requireNonConflicting("com.example.a", listOf(
+            ResolvedCatalogEntry(CatalogEntry("com.example.a", "A", "1.0.0", jarUrl = "https://r1.com/a.jar"), "R1", conflicting = false),
+        ))
+    }
+
+    @Test
+    fun `requireNonConflicting does not throw on empty matches`() {
+        // empty list = not found; no conflict, so no exception thrown here
+        // the "not found" error is thrown by install() after this check
+        ExtensionRegistryService.requireNonConflicting("com.example.missing", emptyList())
+    }
 }

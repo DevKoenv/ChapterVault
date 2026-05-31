@@ -29,7 +29,7 @@ class ExtensionRegistryService(
         registryRepo.list().forEach { registry ->
             registryClient.invalidate(registry.url)
         }
-        listAll()
+        listAll() // best-effort cache warm; fetch errors are logged inside listAll but not propagated
     }
 
     suspend fun install(extensionId: String) {
