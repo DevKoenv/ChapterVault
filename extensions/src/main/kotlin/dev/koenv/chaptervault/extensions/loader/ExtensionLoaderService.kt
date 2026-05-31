@@ -4,6 +4,7 @@ import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.extension.Extension
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
+import dev.koenv.chaptervault.kernel.extension.ExtensionManager
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
@@ -17,7 +18,7 @@ class ExtensionLoaderService(
     private val contextFactory: (extensionDataDir: Path) -> ExtensionContext,
     private val externalLoader: ExternalExtensionLoader,
     private val bundledExtensions: List<Extension>,
-) {
+) : ExtensionManager {
     private val extensionsDataRoot: Path get() = externalLoader.extensionsDir
 
     private val log = LoggerFactory.getLogger(ExtensionLoaderService::class.java)
@@ -31,7 +32,7 @@ class ExtensionLoaderService(
         }
     }
 
-    fun enable(id: String) {
+    override fun enable(id: String) {
         val entry =
             extensionRegistry.findById(id) ?: run {
                 log.warn("enable: extension '$id' not found")
@@ -41,7 +42,7 @@ class ExtensionLoaderService(
         enableAndRegister(entry.extension, entry.source)
     }
 
-    fun disable(id: String) {
+    override fun disable(id: String) {
         val entry =
             extensionRegistry.findById(id) ?: run {
                 log.warn("disable: extension '$id' not found")
@@ -60,9 +61,9 @@ class ExtensionLoaderService(
         log.info("Extension '${entry.extension.id}' disabled")
     }
 
-    fun listAll(): List<ExtensionEntry> = extensionRegistry.all()
+    override fun listAll(): List<ExtensionEntry> = extensionRegistry.all()
 
-    fun findById(id: String): ExtensionEntry? = extensionRegistry.findById(id)
+    override fun findById(id: String): ExtensionEntry? = extensionRegistry.findById(id)
 
     private fun enableAndRegister(
         extension: Extension,

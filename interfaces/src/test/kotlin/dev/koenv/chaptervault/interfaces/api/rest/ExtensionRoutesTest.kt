@@ -1,14 +1,13 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.infrastructure.connectors.DefaultConnectorRegistry
-import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
-import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.extension.Capability
-import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.Extension
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
+import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
+import dev.koenv.chaptervault.kernel.extension.ExtensionManager
+import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.client.request.bearerAuth
@@ -26,15 +25,10 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Path
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
 class ExtensionRoutesTest {
-    @TempDir
-    lateinit var tempDir: Path
-
     private val testExtension =
         object : Extension {
             override val id = "test.extension"
@@ -48,36 +42,18 @@ class ExtensionRoutesTest {
             override fun onDisable() {}
         }
 
-    private fun makeLoaderService(): ExtensionLoaderService {
-        val extRegistry = DefaultExtensionRegistry()
-        val connRegistry = DefaultConnectorRegistry()
-        return ExtensionLoaderService(
-            extensionRegistry = extRegistry,
-            connectorRegistryDelegate = connRegistry,
-            contextFactory = { _ ->
-                object : ExtensionContext {
-                    override val httpClient get() = error("not needed in test")
-                    override val library get() = error("not needed in test")
-                    override val progress get() = error("not needed in test")
-                    override val system get() = error("not needed in test")
-                    override val connectorRegistry = connRegistry
-                    override val dataDir = tempDir
-
-                    override fun rateLimiter(
-                        bucket: String,
-                        requestsPerSecond: Double,
-                    ) = error("not needed in test")
-
-                    override fun logger(name: String) = org.slf4j.LoggerFactory.getLogger(name)
-                }
-            },
-            externalLoader = ExternalExtensionLoader(extensionsDir = tempDir, serverVersion = "1.0.0"),
-            bundledExtensions = listOf(testExtension),
-        )
+    private fun makeManager(): FakeExtensionManager {
+        val entry =
+            ExtensionEntry(
+                extension = testExtension,
+                status = ExtensionStatus.ENABLED,
+                source = ExtensionSource.BUNDLED,
+            )
+        return FakeExtensionManager(mutableListOf(entry))
     }
 
     private fun testApp(
-        loaderService: ExtensionLoaderService,
+        manager: ExtensionManager,
         block: suspend ApplicationTestBuilder.() -> Unit,
     ) = testApplication {
         application {
@@ -94,7 +70,7 @@ class ExtensionRoutesTest {
             }
             routing {
                 authenticate("auth-bearer") {
-                    extensionRoutes(loaderService)
+                    extensionRoutes(manager)
                 }
             }
         }
@@ -103,9 +79,8 @@ class ExtensionRoutesTest {
 
     @Test
     fun `GET extensions returns 200 with all extensions`() {
-        val loaderService = makeLoaderService()
-        loaderService.loadAll()
-        testApp(loaderService) {
+        val manager = makeManager()
+        testApp(manager) {
             val response = client.get("/extensions") { bearerAuth("admin-token") }
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
@@ -115,9 +90,8 @@ class ExtensionRoutesTest {
 
     @Test
     fun `GET extensions by id returns 200 with ENABLED status`() {
-        val loaderService = makeLoaderService()
-        loaderService.loadAll()
-        testApp(loaderService) {
+        val manager = makeManager()
+        testApp(manager) {
             val response = client.get("/extensions/test.extension") { bearerAuth("admin-token") }
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
@@ -128,9 +102,8 @@ class ExtensionRoutesTest {
 
     @Test
     fun `GET extensions with unknown id returns 404`() {
-        val loaderService = makeLoaderService()
-        loaderService.loadAll()
-        testApp(loaderService) {
+        val manager = makeManager()
+        testApp(manager) {
             val response = client.get("/extensions/unknown.ext") { bearerAuth("admin-token") }
             assertEquals(HttpStatusCode.NotFound, response.status)
         }
@@ -138,9 +111,8 @@ class ExtensionRoutesTest {
 
     @Test
     fun `POST extensions disable returns 204 and sets DISABLED`() {
-        val loaderService = makeLoaderService()
-        loaderService.loadAll()
-        testApp(loaderService) {
+        val manager = makeManager()
+        testApp(manager) {
             val response = client.post("/extensions/test.extension/disable") { bearerAuth("admin-token") }
             assertEquals(HttpStatusCode.NoContent, response.status)
             val detail = client.get("/extensions/test.extension") { bearerAuth("admin-token") }
@@ -150,9 +122,8 @@ class ExtensionRoutesTest {
 
     @Test
     fun `POST extensions enable after disable returns 204 and sets ENABLED`() {
-        val loaderService = makeLoaderService()
-        loaderService.loadAll()
-        testApp(loaderService) {
+        val manager = makeManager()
+        testApp(manager) {
             client.post("/extensions/test.extension/disable") { bearerAuth("admin-token") }
             val response = client.post("/extensions/test.extension/enable") { bearerAuth("admin-token") }
             assertEquals(HttpStatusCode.NoContent, response.status)
@@ -163,11 +134,32 @@ class ExtensionRoutesTest {
 
     @Test
     fun `POST extensions enable with unknown id returns 404`() {
-        val loaderService = makeLoaderService()
-        loaderService.loadAll()
-        testApp(loaderService) {
+        val manager = makeManager()
+        testApp(manager) {
             val response = client.post("/extensions/unknown.ext/enable") { bearerAuth("admin-token") }
             assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+}
+
+private class FakeExtensionManager(
+    private val entries: MutableList<ExtensionEntry>,
+) : ExtensionManager {
+    override fun listAll(): List<ExtensionEntry> = entries.toList()
+
+    override fun findById(id: String): ExtensionEntry? = entries.find { it.extension.id == id }
+
+    override fun enable(id: String) {
+        val index = entries.indexOfFirst { it.extension.id == id }
+        if (index >= 0) {
+            entries[index] = entries[index].copy(status = ExtensionStatus.ENABLED)
+        }
+    }
+
+    override fun disable(id: String) {
+        val index = entries.indexOfFirst { it.extension.id == id }
+        if (index >= 0) {
+            entries[index] = entries[index].copy(status = ExtensionStatus.DISABLED)
         }
     }
 }

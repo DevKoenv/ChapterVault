@@ -1,6 +1,6 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
+import dev.koenv.chaptervault.kernel.extension.ExtensionManager
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.toDto
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.result.AppError
@@ -11,7 +11,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
-fun Route.extensionRoutes(loaderService: ExtensionLoaderService) {
+fun Route.extensionRoutes(loaderService: ExtensionManager) {
     get("/extensions") {
         val principal = call.principal<KtorPrincipal>()
         if (principal == null || !principal.user.hasRole(Role.ADMIN)) {

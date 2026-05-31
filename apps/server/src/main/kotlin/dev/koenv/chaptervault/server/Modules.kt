@@ -118,7 +118,7 @@ val extensionModule =
         single {
             val config = get<AppConfig>()
             val extensionsDataRoot = Paths.get(config.storage.libraryPath).parent.resolve("extensions")
-            val connectorRegistry = get<ConnectorRegistry>() as DefaultConnectorRegistry
+            val connectorRegistry = get<ConnectorRegistry>()
             val contextFactory: (Path) -> ExtensionContext = { dir ->
                 DefaultExtensionContext(
                     httpClient = get(),
