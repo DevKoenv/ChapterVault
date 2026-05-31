@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.server
 
 import dev.koenv.chaptervault.extensions.connectors.ConnectorRegistry
+import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
@@ -12,6 +13,7 @@ import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
@@ -139,6 +141,7 @@ fun Application.bootstrap() {
     val notificationService by inject<NotificationService>()
     val notificationApi by inject<NotificationApi>()
     val notificationDispatch by inject<NotificationDispatchApi>()
+    val extensionLoaderService by inject<ExtensionLoaderService>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -179,6 +182,7 @@ fun Application.bootstrap() {
             bookmarkRoutes(bookmarkApi)
             readingStatusRoutes(readingStatusApi)
             notificationRoutes(notificationApi, notificationDispatch)
+            extensionRoutes(extensionLoaderService)
             sseRoutes(projectionService)
         }
     }

@@ -1,8 +1,8 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.extensions.connectors.DefaultConnectorRegistry
-import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader
 import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
+import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.extension.Capability
