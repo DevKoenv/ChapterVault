@@ -10,6 +10,7 @@ import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
+import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
 import org.slf4j.LoggerFactory
 import java.net.URLClassLoader
 import java.nio.file.Files
@@ -21,6 +22,7 @@ class ExtensionLoaderService(
     private val extensionRegistry: ExtensionRegistry,
     private val connectorRegistryDelegate: ConnectorRegistry,
     private val enricherRegistryDelegate: MetadataEnricherRegistry,
+    private val notificationRegistryDelegate: NotificationChannelRegistry,
     private val contextFactory: (extensionId: String, extensionDataDir: Path) -> ExtensionContext,
     private val externalLoader: ExternalExtensionLoader,
     private val bundledExtensions: List<Extension>,
@@ -67,6 +69,9 @@ class ExtensionLoaderService(
         }
         entry.registeredEnricherIds.forEach { enricherId ->
             enricherRegistryDelegate.unregister(enricherId)
+        }
+        entry.registeredChannelTypeIds.forEach { typeId ->
+            notificationRegistryDelegate.unregister(typeId)
         }
         try {
             entry.extension.onDisable()
@@ -156,6 +161,7 @@ class ExtensionLoaderService(
         val dataDir = extensionsDataRoot.resolve(extension.id)
         val trackingConnectors = TrackingConnectorRegistry(connectorRegistryDelegate)
         val trackingEnrichers = TrackingEnricherRegistry(enricherRegistryDelegate)
+        val trackingNotifications = TrackingNotificationRegistry(notificationRegistryDelegate)
         val baseContext = contextFactory(extension.id, dataDir)
 
         manifest?.let { manifests[extension.id] = it }
@@ -166,8 +172,8 @@ class ExtensionLoaderService(
 
         try {
             Files.createDirectories(dataDir)
-            extension.onEnable(buildContextWithTracking(baseContext, trackingConnectors, trackingEnrichers))
-            validateCapabilities(extension, trackingConnectors, trackingEnrichers)
+            extension.onEnable(buildContextWithTracking(baseContext, trackingConnectors, trackingEnrichers, trackingNotifications))
+            validateCapabilities(extension, trackingConnectors, trackingEnrichers, trackingNotifications)
             extensionRegistry.register(
                 ExtensionEntry(
                     extension = extension,
@@ -176,6 +182,7 @@ class ExtensionLoaderService(
                     jarPath = jarPath,
                     registeredConnectorIds = trackingConnectors.registeredIds,
                     registeredEnricherIds = trackingEnrichers.registeredIds,
+                    registeredChannelTypeIds = trackingNotifications.registeredTypeIds,
                 ),
             )
             log.info("Extension '${extension.id}' enabled (source=$source)")
@@ -189,16 +196,19 @@ class ExtensionLoaderService(
         base: ExtensionContext,
         trackingConnectors: TrackingConnectorRegistry,
         trackingEnrichers: TrackingEnricherRegistry,
+        trackingNotifications: TrackingNotificationRegistry,
     ): ExtensionContext =
         object : ExtensionContext by base {
             override val connectorRegistry = trackingConnectors
             override val enricherRegistry = trackingEnrichers
+            override val notificationRegistry = trackingNotifications
         }
 
     private fun validateCapabilities(
         extension: Extension,
         connectors: TrackingConnectorRegistry,
         enrichers: TrackingEnricherRegistry,
+        notifications: TrackingNotificationRegistry,
     ) {
         val declared = extension.capabilities()
         if (Capability.CanFetchSeries in declared && connectors.registeredIds.isEmpty()) {
@@ -206,6 +216,9 @@ class ExtensionLoaderService(
         }
         if (Capability.CanEnrichMetadata in declared && enrichers.registeredIds.isEmpty()) {
             log.warn("Extension '${extension.id}' declares CanEnrichMetadata but registered no enrichers")
+        }
+        if (Capability.CanSendNotifications in declared && notifications.registeredTypeIds.isEmpty()) {
+            log.warn("Extension '${extension.id}' declares CanSendNotifications but registered no channels")
         }
     }
 }

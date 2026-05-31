@@ -15,6 +15,8 @@ import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricher
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
+import dev.koenv.chaptervault.kernel.extension.NotificationChannel
+import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -43,6 +45,7 @@ class ExtensionLoaderServiceUnloadTest {
             extensionRegistry = extRegistry,
             connectorRegistryDelegate = connRegistry,
             enricherRegistryDelegate = noopEnricherRegistry(),
+            notificationRegistryDelegate = noopNotificationChannelRegistry(),
             contextFactory = { _, _ -> makeContext(connRegistry, tempDir) },
             externalLoader = ExternalExtensionLoader(extensionsDir = tempDir, serverVersion = "1.0.0"),
             bundledExtensions = listOf(adapter),
@@ -144,6 +147,14 @@ private fun noopEnricherRegistry(): MetadataEnricherRegistry =
         override fun register(enricher: MetadataEnricher, priority: Int) = Unit
         override fun unregister(id: String) = Unit
         override fun all(): List<MetadataEnricher> = emptyList()
+    }
+
+private fun noopNotificationChannelRegistry(): NotificationChannelRegistry =
+    object : NotificationChannelRegistry {
+        override fun register(channel: NotificationChannel) = Unit
+        override fun unregister(typeId: String) = Unit
+        override fun find(typeId: String): NotificationChannel? = null
+        override fun all(): List<NotificationChannel> = emptyList()
     }
 
 private fun makeContext(connRegistry: ConnectorRegistry, dataDir: Path): ExtensionContext =

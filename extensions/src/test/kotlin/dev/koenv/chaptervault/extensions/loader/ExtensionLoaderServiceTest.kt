@@ -14,6 +14,8 @@ import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricher
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
+import dev.koenv.chaptervault.kernel.extension.NotificationChannel
+import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -37,6 +39,14 @@ class ExtensionLoaderServiceTest {
             override fun register(enricher: MetadataEnricher, priority: Int) = Unit
             override fun unregister(id: String) = Unit
             override fun all(): List<MetadataEnricher> = emptyList()
+        }
+
+    private fun noopNotificationRegistry(): NotificationChannelRegistry =
+        object : NotificationChannelRegistry {
+            override fun register(channel: NotificationChannel) = Unit
+            override fun unregister(typeId: String) = Unit
+            override fun find(typeId: String): NotificationChannel? = null
+            override fun all(): List<NotificationChannel> = emptyList()
         }
 
     private fun simpleRegistry(): ConnectorRegistry {
@@ -107,6 +117,7 @@ class ExtensionLoaderServiceTest {
                 extensionRegistry = extRegistry,
                 connectorRegistryDelegate = connRegistry,
                 enricherRegistryDelegate = noopEnricherRegistry(),
+                notificationRegistryDelegate = noopNotificationRegistry(),
                 contextFactory = { _, _ -> makeContext(connRegistry) },
                 externalLoader = ExternalExtensionLoader(extensionsDir = tempDir, serverVersion = "1.0.0"),
                 bundledExtensions = bundled,
@@ -189,6 +200,7 @@ class ExtensionLoaderServiceTest {
                 extensionRegistry = extRegistry,
                 connectorRegistryDelegate = simpleRegistry(),
                 enricherRegistryDelegate = noopEnricherRegistry(),
+                notificationRegistryDelegate = noopNotificationRegistry(),
                 contextFactory = { _, _ -> makeContext(simpleRegistry()) },
                 externalLoader = ExternalExtensionLoader(tempDir, "1.0.0"),
                 bundledExtensions = listOf(failingExt),

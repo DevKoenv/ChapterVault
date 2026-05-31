@@ -16,4 +16,5 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.ktor.client.cio)
     testImplementation(libs.ktor.client.mock)
+    testImplementation(project(":infrastructure"))
 }

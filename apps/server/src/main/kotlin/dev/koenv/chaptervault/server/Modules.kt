@@ -169,6 +169,7 @@ val extensionModule =
                 extensionRegistry = get(),
                 connectorRegistryDelegate = connectorRegistry,
                 enricherRegistryDelegate = enricherRegistry,
+                notificationRegistryDelegate = get(),
                 contextFactory = contextFactory,
                 externalLoader =
                     ExternalExtensionLoader(
