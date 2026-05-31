@@ -5,7 +5,6 @@ import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.NotificationTarget
 import dev.koenv.chaptervault.kernel.api.NotificationTargetInput
 import dev.koenv.chaptervault.kernel.api.NotificationTargetPatch
-import dev.koenv.chaptervault.kernel.api.NotificationType
 import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
@@ -24,7 +23,7 @@ import kotlin.test.assertTrue
 
 class NotificationServiceTest {
     private fun mockTarget(
-        type: NotificationType,
+        type: String,
         url: String = "https://example.com",
     ) = NotificationTarget(
         id = Id.generate(),
@@ -48,7 +47,7 @@ class NotificationServiceTest {
                     target?.takeIf { it.id == id }?.let { Result.Success(it) }
                         ?: Result.Failure(AppError.NotFound("NotificationTarget", id.toString()))
 
-                override suspend fun createTarget(input: NotificationTargetInput) = Result.Success(mockTarget(NotificationType.WEBHOOK))
+                override suspend fun createTarget(input: NotificationTargetInput) = Result.Success(mockTarget("WEBHOOK"))
 
                 override suspend fun updateTarget(
                     id: Id,
@@ -76,7 +75,7 @@ class NotificationServiceTest {
     @Test
     fun `sendTest returns Success for enabled NTFY target`() =
         runBlocking {
-            val target = mockTarget(NotificationType.NTFY, "https://ntfy.sh/test")
+            val target = mockTarget("NTFY", "https://ntfy.sh/test")
             val service = buildService(target)
             assertIs<Result.Success<Unit>>(service.sendTest(target.id))
         }
@@ -92,7 +91,7 @@ class NotificationServiceTest {
     fun `sendTest fires HTTP request to target url`() =
         runBlocking {
             val requests = mutableListOf<String>()
-            val target = mockTarget(NotificationType.WEBHOOK, "https://example.com/hook")
+            val target = mockTarget("WEBHOOK", "https://example.com/hook")
             val service = buildService(target, requests)
             service.sendTest(target.id)
             assertTrue(requests.any { it.contains("example.com") })

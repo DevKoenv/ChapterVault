@@ -5,7 +5,6 @@ import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.NotificationTarget
 import dev.koenv.chaptervault.kernel.api.NotificationTargetInput
 import dev.koenv.chaptervault.kernel.api.NotificationTargetPatch
-import dev.koenv.chaptervault.kernel.api.NotificationType
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.shared.result.AppError
@@ -41,7 +40,7 @@ class NotificationRoutesTest {
         NotificationTarget(
             id = targetId,
             name = "My Ntfy",
-            type = NotificationType.NTFY,
+            type = "NTFY",
             url = "https://ntfy.sh/mychannel",
             token = null,
             enabled = true,

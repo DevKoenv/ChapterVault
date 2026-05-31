@@ -16,6 +16,9 @@ interface ExtensionContext {
     val system: SystemApi
     val connectorRegistry: ConnectorRegistry
     val dataDir: Path
+    val enricherRegistry: MetadataEnricherRegistry
+    val notificationRegistry: NotificationChannelRegistry
+    val config: ExtensionConfig
 
     fun rateLimiter(
         bucket: String,

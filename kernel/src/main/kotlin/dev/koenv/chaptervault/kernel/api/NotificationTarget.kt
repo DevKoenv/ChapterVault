@@ -6,7 +6,7 @@ import java.time.Instant
 data class NotificationTarget(
     val id: Id,
     val name: String,
-    val type: NotificationType,
+    val type: String,
     val url: String,
     val token: String?,
     val enabled: Boolean,
@@ -15,7 +15,7 @@ data class NotificationTarget(
 
 data class NotificationTargetInput(
     val name: String,
-    val type: NotificationType,
+    val type: String,
     val url: String,
     val token: String? = null,
     val enabled: Boolean = true,

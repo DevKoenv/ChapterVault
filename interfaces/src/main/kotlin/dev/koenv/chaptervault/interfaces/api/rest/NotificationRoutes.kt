@@ -5,7 +5,6 @@ import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.NotificationTarget
 import dev.koenv.chaptervault.kernel.api.NotificationTargetInput
 import dev.koenv.chaptervault.kernel.api.NotificationTargetPatch
-import dev.koenv.chaptervault.kernel.api.NotificationType
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
@@ -52,7 +51,7 @@ private fun NotificationTarget.toResponse() =
     NotificationTargetResponse(
         id = id.toString(),
         name = name,
-        type = type.name,
+        type = type,
         url = url,
         token = token,
         enabled = enabled,
@@ -89,17 +88,10 @@ fun Route.notificationRoutes(
             call.respondBadRequest("url must not be blank")
             return@post
         }
-        val type =
-            try {
-                NotificationType.valueOf(req.type)
-            } catch (e: IllegalArgumentException) {
-                call.respondBadRequest("Invalid notification type: ${req.type}")
-                return@post
-            }
         val input =
             NotificationTargetInput(
                 name = req.name,
-                type = type,
+                type = req.type,
                 url = req.url,
                 token = req.token,
                 enabled = req.enabled,

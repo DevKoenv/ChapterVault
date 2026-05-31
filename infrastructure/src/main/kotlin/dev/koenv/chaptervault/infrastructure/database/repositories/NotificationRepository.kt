@@ -5,7 +5,6 @@ import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationTarget
 import dev.koenv.chaptervault.kernel.api.NotificationTargetInput
 import dev.koenv.chaptervault.kernel.api.NotificationTargetPatch
-import dev.koenv.chaptervault.kernel.api.NotificationType
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
@@ -49,7 +48,7 @@ class NotificationRepository : NotificationApi {
             NotificationTargetTable.insert {
                 it[id] = newId.toString()
                 it[name] = input.name
-                it[type] = input.type.name
+                it[type] = input.type
                 it[url] = input.url
                 it[token] = input.token
                 it[enabled] = input.enabled
@@ -113,7 +112,7 @@ class NotificationRepository : NotificationApi {
         NotificationTarget(
             id = Id.from(this[NotificationTargetTable.id]),
             name = this[NotificationTargetTable.name],
-            type = NotificationType.valueOf(this[NotificationTargetTable.type]),
+            type = this[NotificationTargetTable.type],
             url = this[NotificationTargetTable.url],
             token = this[NotificationTargetTable.token],
             enabled = this[NotificationTargetTable.enabled],

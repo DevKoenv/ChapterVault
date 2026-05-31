@@ -3,7 +3,6 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 import dev.koenv.chaptervault.infrastructure.database.DatabaseMigrations
 import dev.koenv.chaptervault.kernel.api.NotificationTargetInput
 import dev.koenv.chaptervault.kernel.api.NotificationTargetPatch
-import dev.koenv.chaptervault.kernel.api.NotificationType
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.runBlocking
@@ -34,7 +33,7 @@ class NotificationRepositoryTest {
             val input =
                 NotificationTargetInput(
                     name = "My NTFY",
-                    type = NotificationType.NTFY,
+                    type = "NTFY",
                     url = "https://ntfy.sh/mytopic",
                     token = "secret",
                     enabled = true,
@@ -43,7 +42,7 @@ class NotificationRepositoryTest {
             assertIs<Result.Success<*>>(result)
             val target = (result as Result.Success).value
             assertEquals("My NTFY", target.name)
-            assertEquals(NotificationType.NTFY, target.type)
+            assertEquals("NTFY", target.type)
             assertEquals("https://ntfy.sh/mytopic", target.url)
             assertEquals("secret", target.token)
             assertTrue(target.enabled)
@@ -52,8 +51,8 @@ class NotificationRepositoryTest {
     @Test
     fun `listTargets returns all targets`() =
         runBlocking {
-            repo.createTarget(NotificationTargetInput("A", NotificationType.DISCORD, "https://discord.com/api/webhooks/1"))
-            repo.createTarget(NotificationTargetInput("B", NotificationType.WEBHOOK, "https://example.com"))
+            repo.createTarget(NotificationTargetInput("A", "DISCORD", "https://discord.com/api/webhooks/1"))
+            repo.createTarget(NotificationTargetInput("B", "WEBHOOK", "https://example.com"))
             val targets = repo.listTargets()
             assertEquals(2, targets.size)
         }
@@ -64,7 +63,7 @@ class NotificationRepositoryTest {
             val created =
                 (
                     repo.createTarget(
-                        NotificationTargetInput("Gotify", NotificationType.GOTIFY, "https://gotify.example.com"),
+                        NotificationTargetInput("Gotify", "GOTIFY", "https://gotify.example.com"),
                     ) as Result.Success
                 ).value
 
@@ -86,7 +85,7 @@ class NotificationRepositoryTest {
             val created =
                 (
                     repo.createTarget(
-                        NotificationTargetInput("Old Name", NotificationType.NTFY, "https://ntfy.sh/old", enabled = true),
+                        NotificationTargetInput("Old Name", "NTFY", "https://ntfy.sh/old", enabled = true),
                     ) as Result.Success
                 ).value
 
@@ -104,7 +103,7 @@ class NotificationRepositoryTest {
             val created =
                 (
                     repo.createTarget(
-                        NotificationTargetInput("Del", NotificationType.WEBHOOK, "https://example.com/hook"),
+                        NotificationTargetInput("Del", "WEBHOOK", "https://example.com/hook"),
                     ) as Result.Success
                 ).value
 

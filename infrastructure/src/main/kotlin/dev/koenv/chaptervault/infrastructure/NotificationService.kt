@@ -3,7 +3,6 @@ package dev.koenv.chaptervault.infrastructure
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.NotificationTarget
-import dev.koenv.chaptervault.kernel.api.NotificationType
 import dev.koenv.chaptervault.kernel.event.EventBus
 import dev.koenv.chaptervault.kernel.event.NewChaptersDiscovered
 import dev.koenv.chaptervault.kernel.event.on
@@ -80,14 +79,14 @@ class NotificationService(
         val count = chapters.size
         val listText = chapters.joinToString(", ") { it.title }
         when (target.type) {
-            NotificationType.NTFY -> {
+            "NTFY" -> {
                 httpClient.post(target.url) {
                     header("Title", "New chapters: $seriesTitle")
                     target.token?.let { header("Authorization", "Bearer $it") }
                     setBody("$count new chapter(s): $listText")
                 }
             }
-            NotificationType.GOTIFY -> {
+            "GOTIFY" -> {
                 httpClient.post("${target.url.trimEnd('/')}/message") {
                     target.token?.let { header("X-Gotify-Key", it) }
                     contentType(ContentType.Application.Json)
@@ -96,7 +95,7 @@ class NotificationService(
                     )
                 }
             }
-            NotificationType.DISCORD -> {
+            "DISCORD" -> {
                 val bullets = chapters.joinToString("\\n") { "- ${j(it.title)}" }
                 httpClient.post(target.url) {
                     contentType(ContentType.Application.Json)
@@ -105,7 +104,7 @@ class NotificationService(
                     )
                 }
             }
-            NotificationType.WEBHOOK -> {
+            "WEBHOOK" -> {
                 val chaptersJson =
                     chapters.joinToString(",") {
                         """{"id":"${it.id}","title":"${j(it.title)}","index":${it.index}}"""
