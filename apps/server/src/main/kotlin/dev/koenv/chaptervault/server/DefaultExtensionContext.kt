@@ -23,26 +23,12 @@ class DefaultExtensionContext(
     override val progress: ProgressApi,
     override val system: SystemApi,
     override val connectorRegistry: ConnectorRegistry,
+    override val enricherRegistry: MetadataEnricherRegistry,
+    override val notificationRegistry: NotificationChannelRegistry,
+    override val config: ExtensionConfig,
     override val dataDir: Path,
 ) : ExtensionContext {
     private val rateLimiters = ConcurrentHashMap<String, RateLimiter>()
-
-    override val enricherRegistry: MetadataEnricherRegistry = object : MetadataEnricherRegistry {
-        override fun register(enricher: MetadataEnricher, priority: Int) = Unit
-        override fun unregister(id: String) = Unit
-        override fun all(): List<MetadataEnricher> = emptyList()
-    }
-
-    override val notificationRegistry: NotificationChannelRegistry = object : NotificationChannelRegistry {
-        override fun register(channel: NotificationChannel) = Unit
-        override fun unregister(typeId: String) = Unit
-        override fun find(typeId: String): NotificationChannel? = null
-        override fun all(): List<NotificationChannel> = emptyList()
-    }
-
-    override val config: ExtensionConfig = object : ExtensionConfig {
-        override fun get(key: String): String? = null
-    }
 
     override fun rateLimiter(
         bucket: String,

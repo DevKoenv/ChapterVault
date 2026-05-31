@@ -8,6 +8,10 @@ import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.loader.ConnectorExtensionAdapter
 import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader
+import dev.koenv.chaptervault.kernel.extension.MetadataEnricher
+import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
+import dev.koenv.chaptervault.kernel.extension.NotificationChannel
+import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
 import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.PersistingTaskQueue
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
@@ -19,6 +23,7 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterReposi
 import dev.koenv.chaptervault.infrastructure.database.repositories.NotificationRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserSeriesStatusRepository
@@ -89,6 +94,7 @@ val infrastructureModule =
                 thumbnailFormat = JpegThumbnailFormat,
             )
         }
+        single { ExtensionConfigRepository() }
         single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
         single {
             TaskExecutorService(
@@ -119,13 +125,27 @@ val extensionModule =
             val config = get<AppConfig>()
             val extensionsDataRoot = Paths.get(config.storage.libraryPath).parent.resolve("extensions")
             val connectorRegistry = get<ConnectorRegistry>()
-            val contextFactory: (Path) -> ExtensionContext = { dir ->
+            val stubEnricherRegistry = object : MetadataEnricherRegistry {
+                override fun register(enricher: MetadataEnricher, priority: Int) = Unit
+                override fun unregister(id: String) = Unit
+                override fun all(): List<MetadataEnricher> = emptyList()
+            }
+            val stubNotificationRegistry = object : NotificationChannelRegistry {
+                override fun register(channel: NotificationChannel) = Unit
+                override fun unregister(typeId: String) = Unit
+                override fun find(typeId: String): NotificationChannel? = null
+                override fun all(): List<NotificationChannel> = emptyList()
+            }
+            val contextFactory: (String, Path) -> ExtensionContext = { extensionId, dir ->
                 DefaultExtensionContext(
                     httpClient = get(),
                     library = get(),
                     progress = get(),
                     system = get(),
                     connectorRegistry = connectorRegistry,
+                    enricherRegistry = stubEnricherRegistry,
+                    notificationRegistry = stubNotificationRegistry,
+                    config = get<ExtensionConfigRepository>().forExtension(extensionId),
                     dataDir = dir,
                 )
             }

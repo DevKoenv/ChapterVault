@@ -97,7 +97,7 @@ class ExtensionLoaderServiceTest {
             ExtensionLoaderService(
                 extensionRegistry = extRegistry,
                 connectorRegistryDelegate = connRegistry,
-                contextFactory = { _ -> makeContext(connRegistry) },
+                contextFactory = { _, _ -> makeContext(connRegistry) },
                 externalLoader = ExternalExtensionLoader(extensionsDir = tempDir, serverVersion = "1.0.0"),
                 bundledExtensions = bundled,
             )
@@ -178,7 +178,7 @@ class ExtensionLoaderServiceTest {
             ExtensionLoaderService(
                 extensionRegistry = extRegistry,
                 connectorRegistryDelegate = simpleRegistry(),
-                contextFactory = { _ -> makeContext(simpleRegistry()) },
+                contextFactory = { _, _ -> makeContext(simpleRegistry()) },
                 externalLoader = ExternalExtensionLoader(tempDir, "1.0.0"),
                 bundledExtensions = listOf(failingExt),
             )

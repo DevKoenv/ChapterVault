@@ -13,6 +13,8 @@ import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
+import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
+import dev.koenv.chaptervault.interfaces.api.rest.extensionConfigRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
@@ -142,6 +144,7 @@ fun Application.bootstrap() {
     val notificationApi by inject<NotificationApi>()
     val notificationDispatch by inject<NotificationDispatchApi>()
     val extensionLoaderService by inject<ExtensionLoaderService>()
+    val extensionConfigRepository by inject<ExtensionConfigRepository>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -183,6 +186,10 @@ fun Application.bootstrap() {
             readingStatusRoutes(readingStatusApi)
             notificationRoutes(notificationApi, notificationDispatch)
             extensionRoutes(extensionLoaderService)
+            extensionConfigRoutes(
+                loaderService = extensionLoaderService,
+                configRepository = extensionConfigRepository,
+            )
             sseRoutes(projectionService)
         }
     }

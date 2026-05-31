@@ -9,17 +9,21 @@ import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import org.slf4j.LoggerFactory
+import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 
 class ExtensionLoaderService(
     private val extensionRegistry: ExtensionRegistry,
     private val connectorRegistryDelegate: ConnectorRegistry,
-    private val contextFactory: (extensionDataDir: Path) -> ExtensionContext,
+    private val contextFactory: (extensionId: String, extensionDataDir: Path) -> ExtensionContext,
     private val externalLoader: ExternalExtensionLoader,
     private val bundledExtensions: List<Extension>,
 ) : ExtensionManager {
     private val extensionsDataRoot: Path get() = externalLoader.extensionsDir
+    private val classloaders = ConcurrentHashMap<String, URLClassLoader>()
+    private val manifests = ConcurrentHashMap<String, ExtensionManifest>()
 
     private val log = LoggerFactory.getLogger(ExtensionLoaderService::class.java)
 
@@ -28,10 +32,12 @@ class ExtensionLoaderService(
             enableAndRegister(ext, ExtensionSource.BUNDLED)
         }
         externalLoader.loadAll().forEach { loaded ->
-            // TODO Task 4: pass loaded.manifest to enableAndRegister so config fields are available
-            enableAndRegister(loaded.extension, ExtensionSource.LOCAL)
+            classloaders[loaded.extension.id] = loaded.classLoader
+            enableAndRegister(loaded.extension, ExtensionSource.LOCAL, loaded.manifest, loaded.jarPath)
         }
     }
+
+    fun getManifest(extensionId: String): ExtensionManifest? = manifests[extensionId]
 
     override fun enable(id: String) {
         val entry =
@@ -69,10 +75,14 @@ class ExtensionLoaderService(
     private fun enableAndRegister(
         extension: Extension,
         source: ExtensionSource,
+        manifest: ExtensionManifest? = null,
+        jarPath: Path? = null,
     ) {
         val dataDir = extensionsDataRoot.resolve(extension.id)
         val tracking = TrackingConnectorRegistry(connectorRegistryDelegate)
-        val baseContext = contextFactory(dataDir)
+        val baseContext = contextFactory(extension.id, dataDir)
+
+        manifest?.let { manifests[extension.id] = it }
 
         extensionRegistry.register(
             ExtensionEntry(extension = extension, status = ExtensionStatus.LOADING, source = source),
@@ -87,6 +97,7 @@ class ExtensionLoaderService(
                     extension = extension,
                     status = ExtensionStatus.ENABLED,
                     source = source,
+                    jarPath = jarPath,
                     registeredConnectorIds = tracking.registeredIds,
                 ),
             )
