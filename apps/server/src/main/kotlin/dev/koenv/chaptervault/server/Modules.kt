@@ -8,7 +8,7 @@ import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.extensions.loader.ConnectorExtensionAdapter
 import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader
-import dev.koenv.chaptervault.kernel.extension.MetadataEnricher
+import dev.koenv.chaptervault.infrastructure.enricher.DefaultMetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.extension.NotificationChannel
 import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
@@ -106,6 +106,7 @@ val infrastructureModule =
                 fileStorage = get(),
                 httpClient = get(),
                 eventBus = get(),
+                enricherRegistry = get(),
             )
         }
     }
@@ -121,15 +122,12 @@ val kernelModule =
 val extensionModule =
     module {
         single<ConnectorRegistry> { DefaultConnectorRegistry() }
+        single<MetadataEnricherRegistry> { DefaultMetadataEnricherRegistry() }
         single {
             val config = get<AppConfig>()
             val extensionsDataRoot = Paths.get(config.storage.libraryPath).parent.resolve("extensions")
             val connectorRegistry = get<ConnectorRegistry>()
-            val stubEnricherRegistry = object : MetadataEnricherRegistry {
-                override fun register(enricher: MetadataEnricher, priority: Int) = Unit
-                override fun unregister(id: String) = Unit
-                override fun all(): List<MetadataEnricher> = emptyList()
-            }
+            val enricherRegistry = get<MetadataEnricherRegistry>()
             val stubNotificationRegistry = object : NotificationChannelRegistry {
                 override fun register(channel: NotificationChannel) = Unit
                 override fun unregister(typeId: String) = Unit
@@ -143,7 +141,7 @@ val extensionModule =
                     progress = get(),
                     system = get(),
                     connectorRegistry = connectorRegistry,
-                    enricherRegistry = stubEnricherRegistry,
+                    enricherRegistry = enricherRegistry,
                     notificationRegistry = stubNotificationRegistry,
                     config = get<ExtensionConfigRepository>().forExtension(extensionId),
                     dataDir = dir,
@@ -160,6 +158,7 @@ val extensionModule =
             ExtensionLoaderService(
                 extensionRegistry = get(),
                 connectorRegistryDelegate = connectorRegistry,
+                enricherRegistryDelegate = enricherRegistry,
                 contextFactory = contextFactory,
                 externalLoader =
                     ExternalExtensionLoader(

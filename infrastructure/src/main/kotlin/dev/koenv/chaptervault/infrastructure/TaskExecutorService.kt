@@ -3,6 +3,8 @@ package dev.koenv.chaptervault.infrastructure
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
+import dev.koenv.chaptervault.kernel.extension.EnricherInput
+import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.event.EventBus
@@ -40,6 +42,7 @@ class TaskExecutorService(
     private val fileStorage: FileStorage,
     private val httpClient: HttpClient,
     private val eventBus: EventBus,
+    private val enricherRegistry: MetadataEnricherRegistry,
 ) {
     private val log = LoggerFactory.getLogger(TaskExecutorService::class.java)
     private val lastHeartbeatMs = AtomicLong(0L)
@@ -156,6 +159,31 @@ class TaskExecutorService(
         when (val r = seriesRepository.updateMetadata(task.targetId, metadata.title, localCoverUrl, metadata.description)) {
             is Result.Success -> Unit
             is Result.Failure -> return r
+        }
+
+        // invoke enrichers in priority order; failures are logged, not fatal
+        val enricherInput = EnricherInput(
+            externalId = externalId,
+            connectorId = connectorId,
+            title = metadata.title,
+            coverUrl = metadata.coverUrl,
+            description = metadata.description,
+        )
+        enricherRegistry.all().forEach { enricher ->
+            when (val r = enricher.enrich(enricherInput)) {
+                is Result.Success -> {
+                    val enriched = r.value
+                    seriesRepository.updateEnrichedFields(
+                        id = task.targetId,
+                        author = enriched.author,
+                        artist = enriched.artist,
+                        year = enriched.year,
+                        upstreamStatus = enriched.upstreamStatus,
+                        genres = enriched.genres,
+                    )
+                }
+                is Result.Failure -> log.warn("Enricher '${enricher.id}' failed for series ${task.targetId}: ${r.error}")
+            }
         }
 
         taskQueue.enqueue(

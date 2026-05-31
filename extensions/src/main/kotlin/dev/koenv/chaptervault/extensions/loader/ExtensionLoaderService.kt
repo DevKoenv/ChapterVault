@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.extensions.loader
 
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
+import dev.koenv.chaptervault.kernel.extension.Capability
 import dev.koenv.chaptervault.kernel.extension.Extension
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
@@ -8,6 +9,7 @@ import dev.koenv.chaptervault.kernel.extension.ExtensionManager
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
+import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import org.slf4j.LoggerFactory
 import java.net.URLClassLoader
 import java.nio.file.Files
@@ -17,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 class ExtensionLoaderService(
     private val extensionRegistry: ExtensionRegistry,
     private val connectorRegistryDelegate: ConnectorRegistry,
+    private val enricherRegistryDelegate: MetadataEnricherRegistry,
     private val contextFactory: (extensionId: String, extensionDataDir: Path) -> ExtensionContext,
     private val externalLoader: ExternalExtensionLoader,
     private val bundledExtensions: List<Extension>,
@@ -79,7 +82,8 @@ class ExtensionLoaderService(
         jarPath: Path? = null,
     ) {
         val dataDir = extensionsDataRoot.resolve(extension.id)
-        val tracking = TrackingConnectorRegistry(connectorRegistryDelegate)
+        val trackingConnectors = TrackingConnectorRegistry(connectorRegistryDelegate)
+        val trackingEnrichers = TrackingEnricherRegistry(enricherRegistryDelegate)
         val baseContext = contextFactory(extension.id, dataDir)
 
         manifest?.let { manifests[extension.id] = it }
@@ -90,15 +94,16 @@ class ExtensionLoaderService(
 
         try {
             Files.createDirectories(dataDir)
-            extension.onEnable(buildContextWithTracking(baseContext, tracking))
-            validateCapabilities(extension)
+            extension.onEnable(buildContextWithTracking(baseContext, trackingConnectors, trackingEnrichers))
+            validateCapabilities(extension, trackingConnectors, trackingEnrichers)
             extensionRegistry.register(
                 ExtensionEntry(
                     extension = extension,
                     status = ExtensionStatus.ENABLED,
                     source = source,
                     jarPath = jarPath,
-                    registeredConnectorIds = tracking.registeredIds,
+                    registeredConnectorIds = trackingConnectors.registeredIds,
+                    registeredEnricherIds = trackingEnrichers.registeredIds,
                 ),
             )
             log.info("Extension '${extension.id}' enabled (source=$source)")
@@ -110,13 +115,25 @@ class ExtensionLoaderService(
 
     private fun buildContextWithTracking(
         base: ExtensionContext,
-        tracking: TrackingConnectorRegistry,
+        trackingConnectors: TrackingConnectorRegistry,
+        trackingEnrichers: TrackingEnricherRegistry,
     ): ExtensionContext =
         object : ExtensionContext by base {
-            override val connectorRegistry = tracking
+            override val connectorRegistry = trackingConnectors
+            override val enricherRegistry = trackingEnrichers
         }
 
-    private fun validateCapabilities(extension: Extension) {
-        // TODO(Plan2): validate registered vs declared capabilities (spec §5)
+    private fun validateCapabilities(
+        extension: Extension,
+        connectors: TrackingConnectorRegistry,
+        enrichers: TrackingEnricherRegistry,
+    ) {
+        val declared = extension.capabilities()
+        if (Capability.CanFetchSeries in declared && connectors.registeredIds.isEmpty()) {
+            log.warn("Extension '${extension.id}' declares CanFetchSeries but registered no connectors")
+        }
+        if (Capability.CanEnrichMetadata in declared && enrichers.registeredIds.isEmpty()) {
+            log.warn("Extension '${extension.id}' declares CanEnrichMetadata but registered no enrichers")
+        }
     }
 }

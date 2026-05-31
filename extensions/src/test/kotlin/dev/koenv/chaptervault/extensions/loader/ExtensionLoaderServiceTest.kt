@@ -12,6 +12,8 @@ import dev.koenv.chaptervault.kernel.extension.Extension
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
+import dev.koenv.chaptervault.kernel.extension.MetadataEnricher
+import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -29,6 +31,13 @@ import kotlin.test.assertNull
 class ExtensionLoaderServiceTest {
     @TempDir
     lateinit var tempDir: Path
+
+    private fun noopEnricherRegistry(): MetadataEnricherRegistry =
+        object : MetadataEnricherRegistry {
+            override fun register(enricher: MetadataEnricher, priority: Int) = Unit
+            override fun unregister(id: String) = Unit
+            override fun all(): List<MetadataEnricher> = emptyList()
+        }
 
     private fun simpleRegistry(): ConnectorRegistry {
         val entries = ConcurrentHashMap<String, Connector>()
@@ -97,6 +106,7 @@ class ExtensionLoaderServiceTest {
             ExtensionLoaderService(
                 extensionRegistry = extRegistry,
                 connectorRegistryDelegate = connRegistry,
+                enricherRegistryDelegate = noopEnricherRegistry(),
                 contextFactory = { _, _ -> makeContext(connRegistry) },
                 externalLoader = ExternalExtensionLoader(extensionsDir = tempDir, serverVersion = "1.0.0"),
                 bundledExtensions = bundled,
@@ -178,6 +188,7 @@ class ExtensionLoaderServiceTest {
             ExtensionLoaderService(
                 extensionRegistry = extRegistry,
                 connectorRegistryDelegate = simpleRegistry(),
+                enricherRegistryDelegate = noopEnricherRegistry(),
                 contextFactory = { _, _ -> makeContext(simpleRegistry()) },
                 externalLoader = ExternalExtensionLoader(tempDir, "1.0.0"),
                 bundledExtensions = listOf(failingExt),

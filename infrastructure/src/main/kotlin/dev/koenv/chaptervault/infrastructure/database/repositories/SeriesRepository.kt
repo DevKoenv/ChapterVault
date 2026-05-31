@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
+import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
@@ -242,6 +243,34 @@ class SeriesRepository(
             } else {
                 Result.Success(Unit)
             }
+        }
+
+    suspend fun updateEnrichedFields(
+        id: Id,
+        author: String?,
+        artist: String?,
+        year: Int?,
+        upstreamStatus: UpstreamStatus?,
+        genres: List<String>,
+    ): Result<Unit> =
+        dbQuery {
+            val updated = SeriesTable.update({ SeriesTable.id eq id.toString() }) {
+                it[SeriesTable.author] = author
+                it[SeriesTable.artist] = artist
+                it[SeriesTable.year] = year
+                it[SeriesTable.upstreamStatus] = upstreamStatus?.name
+                it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
+            }
+            if (updated == 0) return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
+
+            SeriesGenresTable.deleteWhere { SeriesGenresTable.seriesId eq id.toString() }
+            genres.forEach { genre ->
+                SeriesGenresTable.insert {
+                    it[SeriesGenresTable.seriesId] = id.toString()
+                    it[SeriesGenresTable.genre] = genre
+                }
+            }
+            Result.Success(Unit)
         }
 
     override suspend fun inLibraryExternalIds(

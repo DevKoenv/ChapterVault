@@ -32,6 +32,7 @@ import dev.koenv.chaptervault.kernel.runtime.TaskType
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
+import dev.koenv.chaptervault.infrastructure.enricher.DefaultMetadataEnricherRegistry
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
@@ -173,6 +174,7 @@ class TaskExecutorServiceTest {
             fileStorage,
             HttpClient(),
             InMemoryEventBus(),
+            DefaultMetadataEnricherRegistry(),
         )
     }
 
@@ -293,6 +295,7 @@ class TaskExecutorServiceTest {
                     localFileStorage,
                     HttpClient(),
                     eventBus,
+                    DefaultMetadataEnricherRegistry(),
                 )
 
             val seriesId = insertSeries()
