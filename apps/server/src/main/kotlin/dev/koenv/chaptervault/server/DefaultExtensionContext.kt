@@ -25,7 +25,7 @@ class DefaultExtensionContext(
     override fun rateLimiter(
         bucket: String,
         requestsPerSecond: Double,
-    ): RateLimiter = rateLimiters.getOrPut(bucket) { RateLimiter(requestsPerSecond) }
+    ): RateLimiter = rateLimiters.computeIfAbsent(bucket) { RateLimiter(requestsPerSecond) }
 
     override fun logger(name: String): Logger = LoggerFactory.getLogger(name)
 }
