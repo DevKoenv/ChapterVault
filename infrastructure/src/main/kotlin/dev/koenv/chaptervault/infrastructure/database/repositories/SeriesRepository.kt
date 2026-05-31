@@ -298,8 +298,8 @@ class SeriesRepository(
             author = this[SeriesTable.author],
             artist = this[SeriesTable.artist],
             year = this[SeriesTable.year],
-            upstreamStatus = this[SeriesTable.upstreamStatus]?.let { UpstreamStatus.valueOf(it) },
-            genres = emptyList(),
+            upstreamStatus = this[SeriesTable.upstreamStatus]?.let { runCatching { UpstreamStatus.valueOf(it.uppercase()) }.getOrNull() },
+            genres = emptyList(), // populated by SeriesRepository.findGenresForSeries() in Task 5
             addedAt = this[SeriesTable.addedAt].toJavaInstant(),
             updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
         )
