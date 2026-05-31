@@ -28,6 +28,7 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.NotificationR
 import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegistryRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserSeriesStatusRepository
@@ -111,6 +112,7 @@ val infrastructureModule =
             )
         }
         single { ExtensionConfigRepository() }
+        single { ExtensionRegistryRepository() }
         single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
         single {
             TaskExecutorService(
