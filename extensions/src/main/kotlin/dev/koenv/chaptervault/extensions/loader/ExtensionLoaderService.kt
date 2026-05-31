@@ -62,6 +62,9 @@ class ExtensionLoaderService(
         entry.registeredConnectorIds.forEach { connectorId ->
             connectorRegistryDelegate.unregister(connectorId)
         }
+        entry.registeredEnricherIds.forEach { enricherId ->
+            enricherRegistryDelegate.unregister(enricherId)
+        }
         try {
             entry.extension.onDisable()
         } catch (e: Exception) {

@@ -169,18 +169,24 @@ class TaskExecutorService(
             coverUrl = metadata.coverUrl,
             description = metadata.description,
         )
+        // Enrichers run in priority order (lowest number first). Each enricher fully
+        // replaces all enriched fields — last writer wins. Non-null fields from a
+        // lower-priority enricher will be overwritten by a higher-priority one.
         enricherRegistry.all().forEach { enricher ->
             when (val r = enricher.enrich(enricherInput)) {
                 is Result.Success -> {
                     val enriched = r.value
-                    seriesRepository.updateEnrichedFields(
+                    when (val dbResult = seriesRepository.updateEnrichedFields(
                         id = task.targetId,
                         author = enriched.author,
                         artist = enriched.artist,
                         year = enriched.year,
                         upstreamStatus = enriched.upstreamStatus,
                         genres = enriched.genres,
-                    )
+                    )) {
+                        is Result.Success -> Unit
+                        is Result.Failure -> log.warn("Failed to persist enriched fields for series ${task.targetId}: ${dbResult.error}")
+                    }
                 }
                 is Result.Failure -> log.warn("Enricher '${enricher.id}' failed for series ${task.targetId}: ${r.error}")
             }

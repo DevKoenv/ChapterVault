@@ -9,11 +9,13 @@ class DefaultMetadataEnricherRegistry : MetadataEnricherRegistry {
 
     private val entries = CopyOnWriteArrayList<Entry>()
 
+    @Synchronized
     override fun register(enricher: MetadataEnricher, priority: Int) {
         entries.removeIf { it.enricher.id == enricher.id }
         entries.add(Entry(enricher, priority))
     }
 
+    @Synchronized
     override fun unregister(id: String) {
         entries.removeIf { it.enricher.id == id }
     }
