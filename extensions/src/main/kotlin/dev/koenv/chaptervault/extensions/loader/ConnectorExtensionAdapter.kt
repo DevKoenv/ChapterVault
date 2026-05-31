@@ -7,10 +7,10 @@ import dev.koenv.chaptervault.kernel.extension.Extension
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 
 class ConnectorExtensionAdapter(
-    val connector: Connector,
+    private val connector: Connector,
 ) : Extension {
-    override val id: String get() = connector.id
-    override val name: String get() = connector.name
+    override val id: String = connector.id
+    override val name: String = connector.name
     override val version: String = "bundled"
 
     override fun capabilities() = setOf(Capability.CanFetchSeries, Capability.CanDownloadChapters)

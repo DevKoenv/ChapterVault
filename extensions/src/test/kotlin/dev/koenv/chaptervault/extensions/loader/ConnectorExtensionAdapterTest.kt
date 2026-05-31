@@ -51,4 +51,13 @@ class ConnectorExtensionAdapterTest {
         val adapter = ConnectorExtensionAdapter(fakeConnector("test"))
         adapter.onDisable()
     }
+
+    @Test
+    fun `registeredIds does not change on unregister`() {
+        val connectorRegistry = DefaultConnectorRegistry()
+        val trackingRegistry = TrackingConnectorRegistry(connectorRegistry)
+        trackingRegistry.registerRaw("mangadex", fakeConnector("mangadex"))
+        trackingRegistry.unregister("mangadex")
+        assertTrue("mangadex" in trackingRegistry.registeredIds)
+    }
 }
