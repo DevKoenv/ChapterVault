@@ -13,18 +13,19 @@ import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
-import kotlin.test.assertNotNull
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class NotificationChannelRegistryTest {
     @Test
     fun `registry dispatches to correct channel by typeId`() {
         val captured = mutableListOf<String>()
-        val engine = MockEngine { request ->
-            captured.add(request.url.toString())
-            respond("", HttpStatusCode.OK)
-        }
+        val engine =
+            MockEngine { request ->
+                captured.add(request.url.toString())
+                respond("", HttpStatusCode.OK)
+            }
         val client = HttpClient(engine)
         val registry = DefaultNotificationChannelRegistry()
         registry.register(NtfyNotificationChannel(client))
@@ -43,10 +44,11 @@ class NotificationChannelRegistryTest {
     @Test
     fun `GotifyNotificationChannel posts to message endpoint with X-Gotify-Key`() {
         val captured = mutableListOf<Pair<String, String?>>()
-        val engine = MockEngine { request ->
-            captured.add(request.url.toString() to request.headers["X-Gotify-Key"])
-            respond("", HttpStatusCode.OK)
-        }
+        val engine =
+            MockEngine { request ->
+                captured.add(request.url.toString() to request.headers["X-Gotify-Key"])
+                respond("", HttpStatusCode.OK)
+            }
         val client = HttpClient(engine)
         runBlocking {
             GotifyNotificationChannel(client).send(
@@ -63,10 +65,11 @@ class NotificationChannelRegistryTest {
     @Test
     fun `DiscordNotificationChannel posts embeds JSON`() {
         val bodies = mutableListOf<String>()
-        val engine = MockEngine { request ->
-            bodies.add(request.body.toByteArray().toString(Charsets.UTF_8))
-            respond("", HttpStatusCode.OK)
-        }
+        val engine =
+            MockEngine { request ->
+                bodies.add(request.body.toByteArray().toString(Charsets.UTF_8))
+                respond("", HttpStatusCode.OK)
+            }
         val client = HttpClient(engine)
         runBlocking {
             DiscordNotificationChannel(client).send(
@@ -83,10 +86,11 @@ class NotificationChannelRegistryTest {
     @Test
     fun `WebhookNotificationChannel posts structured JSON`() {
         val bodies = mutableListOf<String>()
-        val engine = MockEngine { request ->
-            bodies.add(request.body.toByteArray().toString(Charsets.UTF_8))
-            respond("", HttpStatusCode.OK)
-        }
+        val engine =
+            MockEngine { request ->
+                bodies.add(request.body.toByteArray().toString(Charsets.UTF_8))
+                respond("", HttpStatusCode.OK)
+            }
         val client = HttpClient(engine)
         runBlocking {
             WebhookNotificationChannel(client).send(

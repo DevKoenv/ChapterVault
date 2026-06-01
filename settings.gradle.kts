@@ -16,7 +16,7 @@ rootProject.name = "chaptervault"
 include(
     ":shared",
     ":kernel",
-    ":extensions",
+
     ":infrastructure",
     ":interfaces",
     ":sdk",

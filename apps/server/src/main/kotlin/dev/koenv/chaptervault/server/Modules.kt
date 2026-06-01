@@ -5,9 +5,8 @@ import dev.koenv.chaptervault.infrastructure.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.infrastructure.connectors.MockConnector
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.MangaDexConnector
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
-import dev.koenv.chaptervault.extensions.loader.ConnectorExtensionAdapter
-import dev.koenv.chaptervault.extensions.loader.ExtensionLoaderService
-import dev.koenv.chaptervault.extensions.loader.ExternalExtensionLoader
+import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
+import dev.koenv.chaptervault.infrastructure.extensions.loader.ExternalExtensionLoader
 import dev.koenv.chaptervault.infrastructure.enricher.DefaultMetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.infrastructure.notifications.DefaultNotificationChannelRegistry
@@ -162,14 +161,12 @@ val extensionModule =
                     dataDir = dir,
                 )
             }
-            val bundled =
-                buildList {
-                    add(ConnectorExtensionAdapter(MangaDexConnector(get())))
-                    if (config.debug.mockConnectorEnabled) {
-                        add(ConnectorExtensionAdapter(MockConnector()))
-                        add(ConnectorExtensionAdapter(CustomConnector(get())))
-                    }
-                }
+            // Register built-in connectors directly; they are first-party and do not need the extension adapter.
+            connectorRegistry.register(MangaDexConnector(get()))
+            if (config.debug.mockConnectorEnabled) {
+                connectorRegistry.register(MockConnector())
+                connectorRegistry.register(CustomConnector(get()))
+            }
             ExtensionLoaderService(
                 extensionRegistry = get(),
                 connectorRegistryDelegate = connectorRegistry,
@@ -181,7 +178,7 @@ val extensionModule =
                         extensionsDir = extensionsDataRoot,
                         serverVersion = "1.0.0",
                     ),
-                bundledExtensions = bundled,
+                bundledExtensions = emptyList(),
             )
         }
         single<ExtensionManager> { get<ExtensionLoaderService>() }

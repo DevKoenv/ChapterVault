@@ -8,8 +8,9 @@ package dev.koenv.chaptervault.infrastructure.notifications
  * user content is expected.
  */
 internal fun jsonEscape(s: String): String =
-    s.replace("\\", "\\\\")
-     .replace("\"", "\\\"")
-     .replace("\n", "\\n")
-     .replace("\r", "\\r")
-     .replace("\t", "\\t")
+    s
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")

@@ -14,7 +14,10 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class ExtensionRegistryRepository {
-    fun create(name: String, url: String): ExtensionRegistryRecord {
+    fun create(
+        name: String,
+        url: String,
+    ): ExtensionRegistryRecord {
         val id = Id.generate().toString()
         val now = Instant.now().truncatedTo(ChronoUnit.MILLIS)
         transaction {
@@ -36,13 +39,17 @@ class ExtensionRegistryRepository {
 
     fun findById(id: String): ExtensionRegistryRecord? =
         transaction {
-            ExtensionRegistryTable.selectAll()
+            ExtensionRegistryTable
+                .selectAll()
                 .where { ExtensionRegistryTable.id eq id }
                 .singleOrNull()
                 ?.toRecord()
         }
 
-    fun setEnabled(id: String, enabled: Boolean) {
+    fun setEnabled(
+        id: String,
+        enabled: Boolean,
+    ) {
         transaction {
             ExtensionRegistryTable.update({ ExtensionRegistryTable.id eq id }) {
                 it[ExtensionRegistryTable.enabled] = enabled

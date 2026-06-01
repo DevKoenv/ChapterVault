@@ -1,14 +1,14 @@
 package dev.koenv.chaptervault.infrastructure
 
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
-import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
-import dev.koenv.chaptervault.kernel.extension.EnricherInput
-import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.event.EventBus
 import dev.koenv.chaptervault.kernel.event.NewChaptersDiscovered
+import dev.koenv.chaptervault.kernel.extension.EnricherInput
+import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.ChapterEvents
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
@@ -162,13 +162,14 @@ class TaskExecutorService(
         }
 
         // invoke enrichers in priority order; failures are logged, not fatal
-        val enricherInput = EnricherInput(
-            externalId = externalId,
-            connectorId = connectorId,
-            title = metadata.title,
-            coverUrl = metadata.coverUrl,
-            description = metadata.description,
-        )
+        val enricherInput =
+            EnricherInput(
+                externalId = externalId,
+                connectorId = connectorId,
+                title = metadata.title,
+                coverUrl = metadata.coverUrl,
+                description = metadata.description,
+            )
         // Enrichers run in priority order (lowest number first). Each enricher fully
         // replaces all enriched fields — last writer wins. Non-null fields from a
         // lower-priority enricher will be overwritten by a higher-priority one.
@@ -176,14 +177,17 @@ class TaskExecutorService(
             when (val r = enricher.enrich(enricherInput)) {
                 is Result.Success -> {
                     val enriched = r.value
-                    when (val dbResult = seriesRepository.updateEnrichedFields(
-                        id = task.targetId,
-                        author = enriched.author,
-                        artist = enriched.artist,
-                        year = enriched.year,
-                        upstreamStatus = enriched.upstreamStatus,
-                        genres = enriched.genres,
-                    )) {
+                    when (
+                        val dbResult =
+                            seriesRepository.updateEnrichedFields(
+                                id = task.targetId,
+                                author = enriched.author,
+                                artist = enriched.artist,
+                                year = enriched.year,
+                                upstreamStatus = enriched.upstreamStatus,
+                                genres = enriched.genres,
+                            )
+                    ) {
                         is Result.Success -> Unit
                         is Result.Failure -> log.warn("Failed to persist enriched fields for series ${task.targetId}: ${dbResult.error}")
                     }

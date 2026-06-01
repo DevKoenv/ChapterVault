@@ -1,7 +1,5 @@
 package dev.koenv.chaptervault.infrastructure.connectors.mangadex
 
-import dev.koenv.chaptervault.sdk.connector.getJson
-import dev.koenv.chaptervault.sdk.connector.HttpConnector
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexAtHomeResponse
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexChapterData
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.dto.MangaDexChapterListResponse
@@ -17,8 +15,10 @@ import dev.koenv.chaptervault.kernel.connector.BucketKey
 import dev.koenv.chaptervault.kernel.connector.ChapterMetadata
 import dev.koenv.chaptervault.kernel.connector.DownloadPage
 import dev.koenv.chaptervault.kernel.connector.DownloadResult
+import dev.koenv.chaptervault.kernel.connector.HttpConnector
 import dev.koenv.chaptervault.kernel.connector.SeriesMetadata
 import dev.koenv.chaptervault.kernel.connector.SeriesSearchResult
+import dev.koenv.chaptervault.kernel.connector.getJson
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest

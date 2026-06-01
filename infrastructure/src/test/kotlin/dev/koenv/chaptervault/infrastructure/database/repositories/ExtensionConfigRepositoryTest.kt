@@ -23,44 +23,50 @@ class ExtensionConfigRepositoryTest {
     }
 
     @Test
-    fun `set and get a value`() = runBlocking {
-        repo.set("ext.test", "api_key", "secret123")
-        assertEquals("secret123", repo.get("ext.test", "api_key"))
-    }
+    fun `set and get a value`() =
+        runBlocking {
+            repo.set("ext.test", "api_key", "secret123")
+            assertEquals("secret123", repo.get("ext.test", "api_key"))
+        }
 
     @Test
-    fun `get returns null for missing key`() = runBlocking {
-        assertNull(repo.get("ext.test", "missing"))
-    }
+    fun `get returns null for missing key`() =
+        runBlocking {
+            assertNull(repo.get("ext.test", "missing"))
+        }
 
     @Test
-    fun `set overwrites existing value`() = runBlocking {
-        repo.set("ext.test", "key", "old")
-        repo.set("ext.test", "key", "new")
-        assertEquals("new", repo.get("ext.test", "key"))
-    }
+    fun `set overwrites existing value`() =
+        runBlocking {
+            repo.set("ext.test", "key", "old")
+            repo.set("ext.test", "key", "new")
+            assertEquals("new", repo.get("ext.test", "key"))
+        }
 
     @Test
-    fun `getAll returns all keys for extension`() = runBlocking {
-        repo.set("ext.test", "k1", "v1")
-        repo.set("ext.test", "k2", "v2")
-        repo.set("other.ext", "k1", "other")
-        val all = repo.getAll("ext.test")
-        assertEquals(mapOf("k1" to "v1", "k2" to "v2"), all)
-    }
+    fun `getAll returns all keys for extension`() =
+        runBlocking {
+            repo.set("ext.test", "k1", "v1")
+            repo.set("ext.test", "k2", "v2")
+            repo.set("other.ext", "k1", "other")
+            val all = repo.getAll("ext.test")
+            assertEquals(mapOf("k1" to "v1", "k2" to "v2"), all)
+        }
 
     @Test
-    fun `setAll sets multiple keys atomically`() = runBlocking {
-        repo.setAll("ext.test", mapOf("k1" to "v1", "k2" to "v2"))
-        assertEquals("v1", repo.get("ext.test", "k1"))
-        assertEquals("v2", repo.get("ext.test", "k2"))
-    }
+    fun `setAll sets multiple keys atomically`() =
+        runBlocking {
+            repo.setAll("ext.test", mapOf("k1" to "v1", "k2" to "v2"))
+            assertEquals("v1", repo.get("ext.test", "k1"))
+            assertEquals("v2", repo.get("ext.test", "k2"))
+        }
 
     @Test
-    fun `forExtension returns live values`() = runBlocking {
-        val config = repo.forExtension("ext.test")
-        assertNull(config.get("key"))
-        repo.set("ext.test", "key", "value")
-        assertEquals("value", config.get("key"))
-    }
+    fun `forExtension returns live values`() =
+        runBlocking {
+            val config = repo.forExtension("ext.test")
+            assertNull(config.get("key"))
+            repo.set("ext.test", "key", "value")
+            assertEquals("value", config.get("key"))
+        }
 }

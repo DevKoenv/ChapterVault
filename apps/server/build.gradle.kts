@@ -28,7 +28,7 @@ application {
 dependencies {
     implementation(project(":shared"))
     implementation(project(":kernel"))
-    implementation(project(":extensions"))
+
     implementation(project(":infrastructure"))
     implementation(project(":interfaces"))
     implementation(libs.bundles.ktor.server)

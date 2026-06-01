@@ -70,12 +70,13 @@ class NotificationServiceTest {
             HttpClient(engine) {
                 install(ContentNegotiation) { json() }
             }
-        val registry = DefaultNotificationChannelRegistry().also {
-            it.register(NtfyNotificationChannel(client))
-            it.register(GotifyNotificationChannel(client))
-            it.register(DiscordNotificationChannel(client))
-            it.register(WebhookNotificationChannel(client))
-        }
+        val registry =
+            DefaultNotificationChannelRegistry().also {
+                it.register(NtfyNotificationChannel(client))
+                it.register(GotifyNotificationChannel(client))
+                it.register(DiscordNotificationChannel(client))
+                it.register(WebhookNotificationChannel(client))
+            }
         return NotificationService(
             eventBus = InMemoryEventBus(),
             notificationApi = api,

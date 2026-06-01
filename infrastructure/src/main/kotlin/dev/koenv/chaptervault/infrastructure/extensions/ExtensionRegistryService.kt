@@ -17,11 +17,12 @@ class ExtensionRegistryService(
 
     suspend fun listAll(): List<ResolvedCatalogEntry> {
         val registries = registryRepo.list().filter { it.enabled }
-        val catalogs = registries.mapNotNull { registry ->
-            runCatching { registryClient.fetch(registry.url) }
-                .onFailure { log.warn("Failed to fetch registry '${registry.name}': ${it.message}") }
-                .getOrNull()
-        }
+        val catalogs =
+            registries.mapNotNull { registry ->
+                runCatching { registryClient.fetch(registry.url) }
+                    .onFailure { log.warn("Failed to fetch registry '${registry.name}': ${it.message}") }
+                    .getOrNull()
+            }
         return mergeCatalogs(catalogs)
     }
 
@@ -35,8 +36,9 @@ class ExtensionRegistryService(
     suspend fun install(extensionId: String) {
         val all = listAll()
         requireNonConflicting(extensionId, all.filter { it.entry.id == extensionId })
-        val entry = all.firstOrNull { it.entry.id == extensionId }
-            ?: error("Extension '$extensionId' not found in any registry")
+        val entry =
+            all.firstOrNull { it.entry.id == extensionId }
+                ?: error("Extension '$extensionId' not found in any registry")
         val bytes = httpClient.get(entry.entry.jarUrl).readRawBytes()
         extensionManager.install(extensionId, bytes)
         log.info("Installed extension '$extensionId' from ${entry.registryName}")
@@ -58,7 +60,10 @@ class ExtensionRegistryService(
             return result.map { it.copy(conflicting = it.entry.id in conflictingIds) }
         }
 
-        fun requireNonConflicting(extensionId: String, matches: List<ResolvedCatalogEntry>) {
+        fun requireNonConflicting(
+            extensionId: String,
+            matches: List<ResolvedCatalogEntry>,
+        ) {
             if (matches.any { it.conflicting }) {
                 throw ConflictingExtensionException(extensionId, matches.map { it.registryName })
             }

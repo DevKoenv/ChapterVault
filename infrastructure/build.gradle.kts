@@ -3,7 +3,6 @@ plugins {
 }
 
 dependencies {
-    api(project(":sdk"))
     implementation(project(":shared"))
     implementation(project(":kernel"))
     implementation(libs.bundles.exposed)
@@ -19,5 +18,6 @@ dependencies {
     implementation(libs.jbcrypt)
 
     testImplementation(libs.bundles.testing)
+    testImplementation(libs.mockk)
     testImplementation(libs.ktor.client.mock)
 }

@@ -1,12 +1,12 @@
 package dev.koenv.chaptervault.infrastructure.connectors
 
-import dev.koenv.chaptervault.sdk.connector.HttpConnector
 import dev.koenv.chaptervault.kernel.connector.Bucket
 import dev.koenv.chaptervault.kernel.connector.BucketConfig
 import dev.koenv.chaptervault.kernel.connector.BucketKey
 import dev.koenv.chaptervault.kernel.connector.ChapterMetadata
 import dev.koenv.chaptervault.kernel.connector.DownloadPage
 import dev.koenv.chaptervault.kernel.connector.DownloadResult
+import dev.koenv.chaptervault.kernel.connector.HttpConnector
 import dev.koenv.chaptervault.kernel.connector.SeriesMetadata
 import dev.koenv.chaptervault.kernel.connector.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.library.Chapter

@@ -9,20 +9,24 @@ import kotlin.test.assertTrue
 class ExtensionRegistryServiceTest {
     @Test
     fun `merge catalogs from two registries`() {
-        val catalog1 = RegistryCatalog(
-            schemaVersion = 1,
-            registryName = "Official",
-            extensions = listOf(
-                CatalogEntry("com.example.a", "A", "1.0.0", jarUrl = "https://example.com/a.jar"),
-            ),
-        )
-        val catalog2 = RegistryCatalog(
-            schemaVersion = 1,
-            registryName = "Community",
-            extensions = listOf(
-                CatalogEntry("com.example.b", "B", "2.0.0", jarUrl = "https://community.com/b.jar"),
-            ),
-        )
+        val catalog1 =
+            RegistryCatalog(
+                schemaVersion = 1,
+                registryName = "Official",
+                extensions =
+                    listOf(
+                        CatalogEntry("com.example.a", "A", "1.0.0", jarUrl = "https://example.com/a.jar"),
+                    ),
+            )
+        val catalog2 =
+            RegistryCatalog(
+                schemaVersion = 1,
+                registryName = "Community",
+                extensions =
+                    listOf(
+                        CatalogEntry("com.example.b", "B", "2.0.0", jarUrl = "https://community.com/b.jar"),
+                    ),
+            )
         val merged = ExtensionRegistryService.mergeCatalogs(listOf(catalog1, catalog2))
         assertEquals(2, merged.size)
         assertFalse(merged.any { it.conflicting })
@@ -40,17 +44,31 @@ class ExtensionRegistryServiceTest {
     @Test
     fun `install throws on conflicting extension`() {
         assertFailsWith<ConflictingExtensionException> {
-            ExtensionRegistryService.requireNonConflicting("com.example.a", listOf(
-                ResolvedCatalogEntry(CatalogEntry("com.example.a", "A", "1.0.0", jarUrl = "https://r1.com/a.jar"), "R1", conflicting = true),
-            ))
+            ExtensionRegistryService.requireNonConflicting(
+                "com.example.a",
+                listOf(
+                    ResolvedCatalogEntry(
+                        CatalogEntry("com.example.a", "A", "1.0.0", jarUrl = "https://r1.com/a.jar"),
+                        "R1",
+                        conflicting = true,
+                    ),
+                ),
+            )
         }
     }
 
     @Test
     fun `requireNonConflicting does not throw when no conflict`() {
-        ExtensionRegistryService.requireNonConflicting("com.example.a", listOf(
-            ResolvedCatalogEntry(CatalogEntry("com.example.a", "A", "1.0.0", jarUrl = "https://r1.com/a.jar"), "R1", conflicting = false),
-        ))
+        ExtensionRegistryService.requireNonConflicting(
+            "com.example.a",
+            listOf(
+                ResolvedCatalogEntry(
+                    CatalogEntry("com.example.a", "A", "1.0.0", jarUrl = "https://r1.com/a.jar"),
+                    "R1",
+                    conflicting = false,
+                ),
+            ),
+        )
     }
 
     @Test

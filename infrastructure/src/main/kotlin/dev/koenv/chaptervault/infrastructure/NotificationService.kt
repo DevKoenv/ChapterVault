@@ -29,17 +29,21 @@ class NotificationService(
             if (event.chapters.isEmpty()) return
             val targets = notificationApi.listTargets().filter { it.enabled }
             if (targets.isEmpty()) return
-            val notifEvent = NotificationEvent(
-                seriesId = event.series.id.toString(),
-                seriesTitle = event.series.title,
-                newChapters = event.chapters.map {
-                    NotificationEvent.ChapterSummary(it.id.toString(), it.title, it.chapterIndex)
-                },
-            )
+            val notifEvent =
+                NotificationEvent(
+                    seriesId = event.series.id.toString(),
+                    seriesTitle = event.series.title,
+                    newChapters =
+                        event.chapters.map {
+                            NotificationEvent.ChapterSummary(it.id.toString(), it.title, it.chapterIndex)
+                        },
+                )
             targets.forEach { target ->
                 val channel = channelRegistry.find(target.type)
                 if (channel == null) {
-                    log.warn("No channel registered for type '${target.type}' (target '${target.name}'). Use the built-in types or register an extension channel.")
+                    log.warn(
+                        "No channel registered for type '${target.type}' (target '${target.name}'). Use the built-in types or register an extension channel.",
+                    )
                     return@forEach
                 }
                 runCatching {
@@ -54,27 +58,31 @@ class NotificationService(
     }
 
     override suspend fun sendTest(targetId: Id): Result<Unit> {
-        val target = when (val r = notificationApi.findTarget(targetId)) {
-            is Result.Failure -> return r
-            is Result.Success -> r.value
-        }
-        val channel = channelRegistry.find(target.type)
-            ?: return Result.Failure(AppError.InternalError("No channel registered for type '${target.type}'"))
+        val target =
+            when (val r = notificationApi.findTarget(targetId)) {
+                is Result.Failure -> return r
+                is Result.Success -> r.value
+            }
+        val channel =
+            channelRegistry.find(target.type)
+                ?: return Result.Failure(AppError.InternalError("No channel registered for type '${target.type}'"))
         return runCatching {
             channel.send(
                 targetUrl = target.url,
                 targetToken = target.token,
-                event = NotificationEvent(
-                    seriesId = "00000000-0000-0000-0000-000000000000",
-                    seriesTitle = "ChapterVault Test",
-                    newChapters = listOf(
-                        NotificationEvent.ChapterSummary(
-                            "00000000-0000-0000-0000-000000000001",
-                            "Test Chapter 1",
-                            1.0,
-                        ),
+                event =
+                    NotificationEvent(
+                        seriesId = "00000000-0000-0000-0000-000000000000",
+                        seriesTitle = "ChapterVault Test",
+                        newChapters =
+                            listOf(
+                                NotificationEvent.ChapterSummary(
+                                    "00000000-0000-0000-0000-000000000001",
+                                    "Test Chapter 1",
+                                    1.0,
+                                ),
+                            ),
                     ),
-                ),
             )
             Result.Success(Unit)
         }.getOrElse { e ->

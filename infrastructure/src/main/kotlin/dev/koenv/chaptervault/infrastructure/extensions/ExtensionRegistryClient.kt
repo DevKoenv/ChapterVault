@@ -11,8 +11,13 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
-class ExtensionRegistryClient(private val httpClient: HttpClient) {
-    private data class CacheEntry(val catalog: RegistryCatalog, val fetchedAt: Instant)
+class ExtensionRegistryClient(
+    private val httpClient: HttpClient,
+) {
+    private data class CacheEntry(
+        val catalog: RegistryCatalog,
+        val fetchedAt: Instant,
+    )
 
     private val cache = ConcurrentHashMap<String, CacheEntry>()
     private val ttlSeconds = 600L
@@ -28,24 +33,30 @@ class ExtensionRegistryClient(private val httpClient: HttpClient) {
         return catalog
     }
 
-    fun invalidate(url: String) { cache.remove(url) }
+    fun invalidate(url: String) {
+        cache.remove(url)
+    }
 
-    private fun parseJson(url: String, body: String): RegistryCatalog {
+    private fun parseJson(
+        url: String,
+        body: String,
+    ): RegistryCatalog {
         val root = Json.parseToJsonElement(body).jsonObject
         val schemaVersion = root["schemaVersion"]?.jsonPrimitive?.int ?: 1
         val registryName = root["name"]?.jsonPrimitive?.content ?: url
-        val extensions = root["extensions"]?.jsonArray?.map { el ->
-            val obj = el.jsonObject
-            CatalogEntry(
-                id = obj["id"]!!.jsonPrimitive.content,
-                name = obj["name"]!!.jsonPrimitive.content,
-                version = obj["version"]!!.jsonPrimitive.content,
-                jarUrl = obj["jarUrl"]!!.jsonPrimitive.content,
-                description = obj["description"]?.jsonPrimitive?.content ?: "",
-                author = obj["author"]?.jsonPrimitive?.content ?: "",
-                minServerVersion = obj["minServerVersion"]?.jsonPrimitive?.content ?: "1.0.0",
-            )
-        } ?: emptyList()
+        val extensions =
+            root["extensions"]?.jsonArray?.map { el ->
+                val obj = el.jsonObject
+                CatalogEntry(
+                    id = obj["id"]!!.jsonPrimitive.content,
+                    name = obj["name"]!!.jsonPrimitive.content,
+                    version = obj["version"]!!.jsonPrimitive.content,
+                    jarUrl = obj["jarUrl"]!!.jsonPrimitive.content,
+                    description = obj["description"]?.jsonPrimitive?.content ?: "",
+                    author = obj["author"]?.jsonPrimitive?.content ?: "",
+                    minServerVersion = obj["minServerVersion"]?.jsonPrimitive?.content ?: "1.0.0",
+                )
+            } ?: emptyList()
         return RegistryCatalog(schemaVersion, registryName, extensions)
     }
 }

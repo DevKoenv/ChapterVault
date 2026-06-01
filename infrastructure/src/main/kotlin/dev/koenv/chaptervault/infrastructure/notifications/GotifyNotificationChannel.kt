@@ -12,17 +12,24 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import java.io.IOException
 
-class GotifyNotificationChannel(private val httpClient: HttpClient) : NotificationChannel {
+class GotifyNotificationChannel(
+    private val httpClient: HttpClient,
+) : NotificationChannel {
     override val typeId = "GOTIFY"
 
-    override suspend fun send(targetUrl: String, targetToken: String?, event: NotificationEvent) {
+    override suspend fun send(
+        targetUrl: String,
+        targetToken: String?,
+        event: NotificationEvent,
+    ) {
         val listText = event.newChapters.joinToString(", ") { it.title }
         val url = "${targetUrl.trimEnd('/')}/message"
-        val response: HttpResponse = httpClient.post(url) {
-            targetToken?.let { header("X-Gotify-Key", it) }
-            contentType(ContentType.Application.Json)
-            setBody("""{"title":"New chapters: ${jsonEscape(event.seriesTitle)}","message":"${jsonEscape(listText)}","priority":5}""")
-        }
+        val response: HttpResponse =
+            httpClient.post(url) {
+                targetToken?.let { header("X-Gotify-Key", it) }
+                contentType(ContentType.Application.Json)
+                setBody("""{"title":"New chapters: ${jsonEscape(event.seriesTitle)}","message":"${jsonEscape(listText)}","priority":5}""")
+            }
         if (!response.status.isSuccess()) {
             throw IOException("HTTP ${response.status.value} from $url")
         }

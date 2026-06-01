@@ -16,7 +16,13 @@ data class CatalogEntry(
     val minServerVersion: String = "1.0.0",
 )
 
-data class ResolvedCatalogEntry(val entry: CatalogEntry, val registryName: String, val conflicting: Boolean = false)
+data class ResolvedCatalogEntry(
+    val entry: CatalogEntry,
+    val registryName: String,
+    val conflicting: Boolean = false,
+)
 
-class ConflictingExtensionException(id: String, registries: List<String>) :
-    Exception("Extension '$id' found in multiple registries: ${registries.joinToString()}")
+class ConflictingExtensionException(
+    id: String,
+    registries: List<String>,
+) : Exception("Extension '$id' found in multiple registries: ${registries.joinToString()}")
