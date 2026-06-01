@@ -44,6 +44,15 @@ class ExternalExtensionLoaderTest {
         )
 
     @Test
+    fun `creates extensions directory if it does not exist`() {
+        val nonExistent = tempDir.resolve("extensions")
+        val loader = ExternalExtensionLoader(extensionsDir = nonExistent, serverVersion = "1.0.0")
+        val results = loader.loadAll()
+        assertTrue(results.isEmpty())
+        assertTrue(Files.isDirectory(nonExistent), "extensions dir should be created on loadAll")
+    }
+
+    @Test
     fun `returns empty list when directory is empty`() {
         val results = makeLoader().loadAll()
         assertTrue(results.isEmpty())

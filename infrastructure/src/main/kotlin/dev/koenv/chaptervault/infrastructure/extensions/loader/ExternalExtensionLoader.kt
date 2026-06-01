@@ -16,7 +16,7 @@ class ExternalExtensionLoader(
     private val log = LoggerFactory.getLogger(ExternalExtensionLoader::class.java)
 
     fun loadAll(): List<LoadedExtension> {
-        if (!Files.exists(extensionsDir)) return emptyList()
+        Files.createDirectories(extensionsDir)
         return Files
             .list(extensionsDir)
             .filter { it.extension == "jar" }
