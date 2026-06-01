@@ -176,7 +176,7 @@ val extensionModule =
                 externalLoader =
                     ExternalExtensionLoader(
                         extensionsDir = extensionsDataRoot,
-                        serverVersion = "1.0.0",
+                        serverVersion = BuildInfo.SERVER_VERSION,
                     ),
                 bundledExtensions = emptyList(),
             )

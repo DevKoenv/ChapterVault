@@ -34,7 +34,6 @@ class ExternalExtensionLoader(
             log.warn("Skipping ${manifest.id}: requires server ${manifest.minServerVersion}, running $serverVersion")
             return null
         }
-        // URLClassLoader stays open while the extension is active; release on UNLOADED is TODO(Plan2)
         val classLoader = URLClassLoader(arrayOf(jar.toUri().toURL()), parentClassLoader)
         return try {
             val extensionClass = classLoader.loadClass(manifest.entryPoint)

@@ -8,6 +8,7 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
@@ -21,6 +22,7 @@ class ExtensionRegistryClient(
 
     private val cache = ConcurrentHashMap<String, CacheEntry>()
     private val ttlSeconds = 600L
+    private val log = LoggerFactory.getLogger(ExtensionRegistryClient::class.java)
 
     suspend fun fetch(url: String): RegistryCatalog {
         val cached = cache[url]
@@ -45,17 +47,30 @@ class ExtensionRegistryClient(
         val schemaVersion = root["schemaVersion"]?.jsonPrimitive?.int ?: 1
         val registryName = root["name"]?.jsonPrimitive?.content ?: url
         val extensions =
-            root["extensions"]?.jsonArray?.map { el ->
-                val obj = el.jsonObject
-                CatalogEntry(
-                    id = obj["id"]!!.jsonPrimitive.content,
-                    name = obj["name"]!!.jsonPrimitive.content,
-                    version = obj["version"]!!.jsonPrimitive.content,
-                    jarUrl = obj["jarUrl"]!!.jsonPrimitive.content,
-                    description = obj["description"]?.jsonPrimitive?.content ?: "",
-                    author = obj["author"]?.jsonPrimitive?.content ?: "",
-                    minServerVersion = obj["minServerVersion"]?.jsonPrimitive?.content ?: "1.0.0",
-                )
+            root["extensions"]?.jsonArray?.mapNotNull { el ->
+                try {
+                    val obj = el.jsonObject
+                    val id = obj["id"]?.jsonPrimitive?.content
+                    val name = obj["name"]?.jsonPrimitive?.content
+                    val version = obj["version"]?.jsonPrimitive?.content
+                    val jarUrl = obj["jarUrl"]?.jsonPrimitive?.content
+                    if (id == null || name == null || version == null || jarUrl == null) {
+                        log.warn("Skipping extension entry from $url: missing required field (id/name/version/jarUrl)")
+                        return@mapNotNull null
+                    }
+                    CatalogEntry(
+                        id = id,
+                        name = name,
+                        version = version,
+                        jarUrl = jarUrl,
+                        description = obj["description"]?.jsonPrimitive?.content ?: "",
+                        author = obj["author"]?.jsonPrimitive?.content ?: "",
+                        minServerVersion = obj["minServerVersion"]?.jsonPrimitive?.content ?: "1.0.0",
+                    )
+                } catch (e: Exception) {
+                    log.warn("Skipping malformed extension entry from $url: ${e.message}")
+                    null
+                }
             } ?: emptyList()
         return RegistryCatalog(schemaVersion, registryName, extensions)
     }
