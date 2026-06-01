@@ -1,6 +1,8 @@
 package dev.koenv.chaptervault.infrastructure.database
 
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.IntegerColumnType
+import org.jetbrains.exposed.sql.TextColumnType
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
@@ -168,8 +170,12 @@ object DatabaseMigrations {
             log.info("Applying migration V${migration.version}: ${migration.name}")
             migration.statements.forEach { exec(it) }
             exec(
-                "INSERT INTO schema_version (version, name, applied_at, checksum) VALUES " +
-                    "(${migration.version}, '${migration.name}', datetime('now'), '${migration.checksum}')",
+                "INSERT INTO schema_version (version, name, applied_at, checksum) VALUES (?, ?, datetime('now'), ?)",
+                listOf(
+                    IntegerColumnType() to migration.version,
+                    TextColumnType() to migration.name,
+                    TextColumnType() to migration.checksum,
+                ),
             )
             log.info("Migration V${migration.version} applied, checksum: ${migration.checksum}")
         }

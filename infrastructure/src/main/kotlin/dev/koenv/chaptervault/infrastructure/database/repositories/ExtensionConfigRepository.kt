@@ -64,7 +64,8 @@ class ExtensionConfigRepository {
     fun forExtension(extensionId: String): ExtensionConfig =
         object : ExtensionConfig {
             override fun get(key: String): String? =
-                // ExtensionConfig.get is not suspend; bridge to the suspend repo method
+                // ExtensionConfig.get is synchronous (called from onEnable which runs on a plain
+                // thread, never from a coroutine dispatcher). runBlocking is safe here.
                 runBlocking { this@ExtensionConfigRepository.get(extensionId, key) }
         }
 }
