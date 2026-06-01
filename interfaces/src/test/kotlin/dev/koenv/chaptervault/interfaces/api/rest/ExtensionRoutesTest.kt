@@ -177,5 +177,8 @@ private class FakeExtensionManager(
         }
     }
 
-    override fun install(extensionId: String, jarBytes: ByteArray) = Unit
+    override fun install(
+        extensionId: String,
+        jarBytes: ByteArray,
+    ) = Unit
 }

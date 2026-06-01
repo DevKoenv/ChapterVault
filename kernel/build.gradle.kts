@@ -3,11 +3,13 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":shared"))
+    // api: types appear in kernel's public interface signatures
+    api(project(":shared"))
+    api(libs.ktor.client.core)
+    api(libs.slf4j.api)
+    api(libs.jsoup)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.ktor.client.core)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.jsoup)
 
     testImplementation(libs.bundles.testing)
     testImplementation(libs.ktor.client.mock)

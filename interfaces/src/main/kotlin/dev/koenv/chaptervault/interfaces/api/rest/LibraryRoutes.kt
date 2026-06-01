@@ -1,6 +1,5 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.AddSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
@@ -11,6 +10,7 @@ import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.ReadingStatus
 import dev.koenv.chaptervault.kernel.runtime.TargetType

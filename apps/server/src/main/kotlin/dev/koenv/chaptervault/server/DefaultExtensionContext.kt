@@ -6,9 +6,7 @@ import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionConfig
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
-import dev.koenv.chaptervault.kernel.extension.MetadataEnricher
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
-import dev.koenv.chaptervault.kernel.extension.NotificationChannel
 import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
 import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import io.ktor.client.HttpClient

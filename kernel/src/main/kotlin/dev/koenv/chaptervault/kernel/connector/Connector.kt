@@ -11,10 +11,23 @@ interface Connector {
     val id: String
     val name: String
 
-    suspend fun search(query: String, request: PageRequest): Result<Pagination<SeriesSearchResult>>
+    suspend fun search(
+        query: String,
+        request: PageRequest,
+    ): Result<Pagination<SeriesSearchResult>>
+
     suspend fun fetchSeries(externalId: String): Result<SeriesMetadata>
-    suspend fun fetchChapters(externalId: String, language: String = ""): Result<List<ChapterMetadata>>
-    suspend fun download(chapter: Chapter, format: ChapterFormat): Result<DownloadResult>
+
+    suspend fun fetchChapters(
+        externalId: String,
+        language: String = "",
+    ): Result<List<ChapterMetadata>>
+
+    suspend fun download(
+        chapter: Chapter,
+        format: ChapterFormat,
+    ): Result<DownloadResult>
+
     suspend fun fetchPage(page: DownloadPage): Result<ByteArray> =
         Result.Failure(AppError.InternalError("fetchPage not supported by connector '$id'"))
 

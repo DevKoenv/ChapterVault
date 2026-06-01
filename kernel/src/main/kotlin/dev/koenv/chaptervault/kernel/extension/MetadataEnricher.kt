@@ -5,6 +5,7 @@ import dev.koenv.chaptervault.shared.result.Result
 
 interface MetadataEnricher {
     val id: String
+
     suspend fun enrich(series: EnricherInput): Result<EnrichedMetadata>
 }
 

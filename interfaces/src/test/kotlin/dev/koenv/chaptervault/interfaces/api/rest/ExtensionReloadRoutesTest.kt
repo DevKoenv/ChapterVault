@@ -156,5 +156,8 @@ private class TrackingFakeExtensionManager(
         if (index >= 0) entries[index] = entries[index].copy(status = ExtensionStatus.ENABLED)
     }
 
-    override fun install(extensionId: String, jarBytes: ByteArray) = Unit
+    override fun install(
+        extensionId: String,
+        jarBytes: ByteArray,
+    ) = Unit
 }

@@ -21,16 +21,18 @@ fun Route.extensionInstallRoutes(registryService: ExtensionRegistryService) {
                 return@get
             }
             val all = registryService.listAll()
-            call.respond(all.map {
-                mapOf(
-                    "id" to it.entry.id,
-                    "name" to it.entry.name,
-                    "version" to it.entry.version,
-                    "registry" to it.registryName,
-                    "description" to it.entry.description,
-                    "conflicting" to it.conflicting,
-                )
-            })
+            call.respond(
+                all.map {
+                    mapOf(
+                        "id" to it.entry.id,
+                        "name" to it.entry.name,
+                        "version" to it.entry.version,
+                        "registry" to it.registryName,
+                        "description" to it.entry.description,
+                        "conflicting" to it.conflicting,
+                    )
+                },
+            )
         }
         post("/refresh") {
             val principal = call.principal<KtorPrincipal>()
@@ -55,4 +57,6 @@ fun Route.extensionInstallRoutes(registryService: ExtensionRegistryService) {
     }
 }
 
-@Serializable private data class InstallRequest(val extensionId: String)
+@Serializable private data class InstallRequest(
+    val extensionId: String,
+)

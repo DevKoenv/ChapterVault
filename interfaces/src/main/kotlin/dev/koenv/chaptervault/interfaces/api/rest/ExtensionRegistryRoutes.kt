@@ -62,8 +62,14 @@ fun Route.extensionRegistryRoutes(registryRepo: ExtensionRegistryRepository) {
     }
 }
 
-@Serializable private data class CreateRegistryRequest(val name: String, val url: String)
-@Serializable private data class PatchRegistryRequest(val enabled: Boolean? = null)
+@Serializable private data class CreateRegistryRequest(
+    val name: String,
+    val url: String,
+)
+
+@Serializable private data class PatchRegistryRequest(
+    val enabled: Boolean? = null,
+)
 
 private fun dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegistryRecord.toDto() =
     mapOf("id" to id, "name" to name, "url" to url, "enabled" to enabled, "createdAt" to createdAt.toString())

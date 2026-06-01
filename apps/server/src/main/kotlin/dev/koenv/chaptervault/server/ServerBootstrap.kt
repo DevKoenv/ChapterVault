@@ -1,11 +1,13 @@
 package dev.koenv.chaptervault.server
 
-import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
-import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
+import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegistryRepository
+import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryService
+import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.interfaces.api.opds.opdsPageRoutes
 import dev.koenv.chaptervault.interfaces.api.opds.opdsRoutes
@@ -13,10 +15,7 @@ import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
-import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
-import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegistryRepository
 import dev.koenv.chaptervault.interfaces.api.rest.extensionConfigRoutes
-import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryService
 import dev.koenv.chaptervault.interfaces.api.rest.extensionInstallRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRegistryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionReloadRoutes
@@ -40,6 +39,7 @@ import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id

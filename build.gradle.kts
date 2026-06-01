@@ -1,3 +1,5 @@
+group = "dev.koenv.chaptervault"
+
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
@@ -55,6 +57,11 @@ subprojects {
                 "-Xjsr305=strict"
             )
         }
+    }
+
+    tasks.withType<JavaCompile> {
+        sourceCompatibility = "21"
+        targetCompatibility = "21"
     }
 
     tasks.withType<Test> {

@@ -1,6 +1,5 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ChapterMetadataDto
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ConnectorDto
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
@@ -8,6 +7,7 @@ import dev.koenv.chaptervault.interfaces.serialization.dto.v1.SeriesMetadataDto
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.SeriesSearchResultDto
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result

@@ -27,4 +27,6 @@ data class DownloadPage(
     val headers: Map<String, String> = emptyMap(),
 )
 
-data class DownloadResult(val pages: List<DownloadPage>)
+data class DownloadResult(
+    val pages: List<DownloadPage>,
+)

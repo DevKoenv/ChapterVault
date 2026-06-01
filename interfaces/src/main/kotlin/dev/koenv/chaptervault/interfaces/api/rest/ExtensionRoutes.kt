@@ -1,8 +1,8 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.kernel.extension.ExtensionManager
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.toDto
 import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.extension.ExtensionManager
 import dev.koenv.chaptervault.shared.result.AppError
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
