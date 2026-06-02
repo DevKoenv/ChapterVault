@@ -16,6 +16,7 @@ import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskEvents
+import dev.koenv.chaptervault.kernel.runtime.TaskPayloadKeys
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
@@ -130,9 +131,9 @@ class TaskExecutorService(
         }
 
     private suspend fun handleFetchSeriesMetadata(task: Task): Result<Unit> {
-        val connectorId = task.payload["connectorId"] ?: ""
-        val externalId = task.payload["externalId"] ?: ""
-        val language = task.payload["language"] ?: ""
+        val connectorId = task.payload[TaskPayloadKeys.CONNECTOR_ID] ?: ""
+        val externalId = task.payload[TaskPayloadKeys.EXTERNAL_ID] ?: ""
+        val language = task.payload[TaskPayloadKeys.LANGUAGE] ?: ""
 
         val connector =
             connectorRegistry.findById(connectorId)
@@ -205,9 +206,9 @@ class TaskExecutorService(
                 targetId = task.targetId,
                 payload =
                     mapOf(
-                        "connectorId" to connectorId,
-                        "externalId" to externalId,
-                        "language" to language,
+                        TaskPayloadKeys.CONNECTOR_ID to connectorId,
+                        TaskPayloadKeys.EXTERNAL_ID to externalId,
+                        TaskPayloadKeys.LANGUAGE to language,
                     ),
                 createdAt = Instant.now(),
                 updatedAt = Instant.now(),
@@ -218,9 +219,9 @@ class TaskExecutorService(
     }
 
     internal suspend fun handleFetchChapters(task: Task): Result<Unit> {
-        val connectorId = task.payload["connectorId"] ?: ""
-        val externalId = task.payload["externalId"] ?: ""
-        val language = task.payload["language"].orEmpty().ifBlank { "en" }
+        val connectorId = task.payload[TaskPayloadKeys.CONNECTOR_ID] ?: ""
+        val externalId = task.payload[TaskPayloadKeys.EXTERNAL_ID] ?: ""
+        val language = task.payload[TaskPayloadKeys.LANGUAGE].orEmpty().ifBlank { "en" }
 
         val connector =
             connectorRegistry.findById(connectorId)
@@ -262,9 +263,9 @@ class TaskExecutorService(
                         targetId = chapter.id,
                         payload =
                             mapOf(
-                                "connectorId" to connectorId,
-                                "chapterId" to chapter.id.toString(),
-                                "format" to (series.defaultFormat?.toString() ?: "Cbz"),
+                                TaskPayloadKeys.CONNECTOR_ID to connectorId,
+                                TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
+                                TaskPayloadKeys.FORMAT to (series.defaultFormat?.toString() ?: "Cbz"),
                             ),
                         createdAt = Instant.now(),
                         updatedAt = Instant.now(),
@@ -304,9 +305,9 @@ class TaskExecutorService(
                     targetId = chapter.id,
                     payload =
                         mapOf(
-                            "connectorId" to series.connectorId,
-                            "chapterId" to chapter.id.toString(),
-                            "format" to format.toString(),
+                            TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                            TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
+                            TaskPayloadKeys.FORMAT to format.toString(),
                         ),
                     createdAt = now,
                     updatedAt = now,
@@ -317,14 +318,14 @@ class TaskExecutorService(
     }
 
     internal suspend fun handleDownloadChapter(task: Task): Result<Unit> {
-        val connectorId = task.payload["connectorId"] ?: ""
+        val connectorId = task.payload[TaskPayloadKeys.CONNECTOR_ID] ?: ""
 
         // `chapter` not yet in scope, can't mark FAILED if connector missing
         val connector =
             connectorRegistry.findById(connectorId)
                 ?: return Result.Failure(AppError.InternalError("Connector not found: $connectorId"))
 
-        val chapterId = Id.from(task.payload["chapterId"] ?: task.targetId.toString())
+        val chapterId = Id.from(task.payload[TaskPayloadKeys.CHAPTER_ID] ?: task.targetId.toString())
         val chapter =
             when (val r = chapterRepository.getChapter(chapterId)) {
                 is Result.Success -> r.value
@@ -334,7 +335,7 @@ class TaskExecutorService(
         setChapterStatus(chapter, DownloadStatus.DOWNLOADING)
 
         try {
-            val format = ChapterFormat.fromString(task.payload["format"] ?: "Cbz")
+            val format = ChapterFormat.fromString(task.payload[TaskPayloadKeys.FORMAT] ?: "Cbz")
             val downloadResult =
                 when (val r = connector.download(chapter, format)) {
                     is Result.Success -> r.value

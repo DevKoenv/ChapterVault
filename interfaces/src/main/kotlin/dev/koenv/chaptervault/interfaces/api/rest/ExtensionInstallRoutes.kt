@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryService
+import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.kernel.auth.Role
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
@@ -53,7 +54,9 @@ fun Route.extensionInstallRoutes(registryService: ExtensionRegistryService) {
         val body = call.receive<InstallRequest>()
         runCatching { registryService.install(body.extensionId) }
             .onSuccess { call.respond(HttpStatusCode.NoContent) }
-            .onFailure { e -> call.respond(HttpStatusCode.UnprocessableEntity, mapOf("error" to (e.message ?: "install failed"))) }
+            .onFailure { e ->
+                call.respond(HttpStatusCode.UnprocessableEntity, ErrorResponse("INSTALL_FAILED", e.message ?: "install failed"))
+            }
     }
 }
 

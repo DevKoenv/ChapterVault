@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
+import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
@@ -51,7 +52,7 @@ class SeriesRepositoryTest {
                 setupConnection = { it.createStatement().execute("PRAGMA foreign_keys = ON") },
             )
             transaction {
-                SchemaUtils.create(UserTable, SeriesTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
+                SchemaUtils.create(UserTable, SeriesTable, SeriesGenresTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
             }
         }
     }
@@ -60,8 +61,8 @@ class SeriesRepositoryTest {
     fun cleanTables() {
         mockStorage.reset()
         transaction {
-            SchemaUtils.drop(BookmarkTable, ProgressTable, TaskTable, ChapterTable, SeriesTable, UserTable)
-            SchemaUtils.create(UserTable, SeriesTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
+            SchemaUtils.drop(BookmarkTable, ProgressTable, TaskTable, ChapterTable, SeriesGenresTable, SeriesTable, UserTable)
+            SchemaUtils.create(UserTable, SeriesTable, SeriesGenresTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
         }
     }
 
@@ -322,6 +323,31 @@ class SeriesRepositoryTest {
             assertIs<AppError.NotFound>((result as Result.Failure).error)
         }
     }
+
+    @Test
+    fun `getSeries returns genres after updateEnrichedFields`() =
+        runBlocking {
+            val series = (repo.addToLibrary("mangadex", "ext-genres", autoDownload = false) as Result.Success).value
+            repo.updateEnrichedFields(series.id, null, null, null, null, listOf("Action", "Comedy"))
+
+            val result = repo.getSeries(series.id)
+            val fetched = (result as Result.Success).value
+            assertEquals(listOf("Action", "Comedy").sorted(), fetched.genres.sorted())
+        }
+
+    @Test
+    fun `listSeries returns genres for each series`() =
+        runBlocking {
+            val s1 = (repo.addToLibrary("mangadex", "ext-g1", autoDownload = false) as Result.Success).value
+            val s2 = (repo.addToLibrary("mangadex", "ext-g2", autoDownload = false) as Result.Success).value
+            repo.updateEnrichedFields(s1.id, null, null, null, null, listOf("Drama"))
+            repo.updateEnrichedFields(s2.id, null, null, null, null, listOf("Horror", "Thriller"))
+
+            val page = (repo.listSeries(PageRequest()) as Result.Success).value
+            val byId = page.items.associateBy { it.externalId }
+            assertEquals(listOf("Drama"), byId["ext-g1"]!!.genres)
+            assertEquals(listOf("Horror", "Thriller").sorted(), byId["ext-g2"]!!.genres.sorted())
+        }
 
     private fun insertUser(id: Id = Id.generate()): Id {
         transaction {

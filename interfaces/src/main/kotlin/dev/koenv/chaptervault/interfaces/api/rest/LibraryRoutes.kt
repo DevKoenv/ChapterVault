@@ -15,6 +15,7 @@ import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.ReadingStatus
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
+import dev.koenv.chaptervault.kernel.runtime.TaskPayloadKeys
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
@@ -252,9 +253,9 @@ fun Route.libraryRoutes(
                         targetId = series.id,
                         payload =
                             mapOf(
-                                "connectorId" to series.connectorId,
-                                "externalId" to series.externalId,
-                                "language" to series.language,
+                                TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                                TaskPayloadKeys.EXTERNAL_ID to series.externalId,
+                                TaskPayloadKeys.LANGUAGE to series.language,
                             ),
                         createdAt = now,
                         updatedAt = now,
@@ -331,9 +332,9 @@ fun Route.libraryRoutes(
                     targetId = chapter.id,
                     payload =
                         mapOf(
-                            "connectorId" to series.connectorId,
-                            "chapterId" to chapter.id.toString(),
-                            "format" to format.toString(),
+                            TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                            TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
+                            TaskPayloadKeys.FORMAT to format.toString(),
                         ),
                     createdAt = now,
                     updatedAt = now,
@@ -384,9 +385,9 @@ fun Route.libraryRoutes(
                 targetId = chapter.id,
                 payload =
                     mapOf(
-                        "connectorId" to series.connectorId,
-                        "chapterId" to chapter.id.toString(),
-                        "format" to format.toString(),
+                        TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                        TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
+                        TaskPayloadKeys.FORMAT to format.toString(),
                     ),
                 createdAt = now,
                 updatedAt = now,
@@ -434,7 +435,12 @@ fun Route.libraryRoutes(
                 status = TaskStatus.PENDING,
                 targetType = TargetType.CHAPTER,
                 targetId = chapter.id,
-                payload = mapOf("connectorId" to series.connectorId, "chapterId" to chapter.id.toString(), "format" to format.toString()),
+                payload =
+                    mapOf(
+                        TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                        TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
+                        TaskPayloadKeys.FORMAT to format.toString(),
+                    ),
                 createdAt = now,
                 updatedAt = now,
             ),
@@ -490,7 +496,12 @@ fun Route.libraryRoutes(
                 status = TaskStatus.PENDING,
                 targetType = TargetType.SERIES,
                 targetId = series.id,
-                payload = mapOf("connectorId" to series.connectorId, "externalId" to series.externalId, "language" to series.language),
+                payload =
+                    mapOf(
+                        TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                        TaskPayloadKeys.EXTERNAL_ID to series.externalId,
+                        TaskPayloadKeys.LANGUAGE to series.language,
+                    ),
                 createdAt = now,
                 updatedAt = now,
             ),

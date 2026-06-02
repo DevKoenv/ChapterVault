@@ -43,23 +43,26 @@ class SeriesRepository(
 
     override suspend fun getSeries(id: Id): Result<Series> =
         dbQuery {
-            SeriesTable
-                .selectAll()
-                .where { SeriesTable.id eq id.toString() }
-                .singleOrNull()
-                ?.toSeries()
-                ?.let { Result.Success(it) }
-                ?: Result.Failure(AppError.NotFound("Series", id.toString()))
+            val row =
+                SeriesTable
+                    .selectAll()
+                    .where { SeriesTable.id eq id.toString() }
+                    .singleOrNull()
+                    ?: return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
+            val genres = genresFor(id.toString())
+            Result.Success(row.toSeries(genres))
         }
 
     override suspend fun listSeries(request: PageRequest): Result<Pagination<Series>> =
         dbQuery {
             val total = SeriesTable.selectAll().count()
-            val items =
+            val rows =
                 SeriesTable
                     .selectAll()
                     .limit(request.size, (request.page * request.size).toLong())
-                    .map { it.toSeries() }
+                    .toList()
+            val genreMap = genresForIds(rows.map { it[SeriesTable.id] })
+            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
@@ -69,12 +72,14 @@ class SeriesRepository(
     ): Result<Pagination<Series>> =
         dbQuery {
             val total = SeriesTable.selectAll().where { SeriesTable.title like "%$query%" }.count()
-            val items =
+            val rows =
                 SeriesTable
                     .selectAll()
                     .where { SeriesTable.title like "%$query%" }
                     .limit(request.size, (request.page * request.size).toLong())
-                    .map { it.toSeries() }
+                    .toList()
+            val genreMap = genresForIds(rows.map { it[SeriesTable.id] })
+            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
@@ -157,7 +162,7 @@ class SeriesRepository(
                     .single()
                     .toSeries(),
             )
-        }
+        } // genres are empty for a newly added series — no enrichment has run yet
 
     override suspend fun evictChapter(id: Id): Result<Unit> {
         val chapterData =
@@ -304,16 +309,29 @@ class SeriesRepository(
                 it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
             }
 
-            Result.Success(
+            val row =
                 SeriesTable
                     .selectAll()
                     .where { SeriesTable.id eq id.toString() }
                     .single()
-                    .toSeries(),
-            )
+            Result.Success(row.toSeries(genresFor(id.toString())))
         }
 
-    private fun ResultRow.toSeries() =
+    private fun org.jetbrains.exposed.sql.Transaction.genresFor(seriesId: String): List<String> =
+        SeriesGenresTable
+            .selectAll()
+            .where { SeriesGenresTable.seriesId eq seriesId }
+            .map { it[SeriesGenresTable.genre] }
+
+    private fun org.jetbrains.exposed.sql.Transaction.genresForIds(ids: List<String>): Map<String, List<String>> {
+        if (ids.isEmpty()) return emptyMap()
+        return SeriesGenresTable
+            .selectAll()
+            .where { SeriesGenresTable.seriesId inList ids }
+            .groupBy({ it[SeriesGenresTable.seriesId] }, { it[SeriesGenresTable.genre] })
+    }
+
+    private fun ResultRow.toSeries(genres: List<String> = emptyList()) =
         Series(
             id = Id.from(this[SeriesTable.id]),
             title = this[SeriesTable.title],
@@ -329,7 +347,7 @@ class SeriesRepository(
             artist = this[SeriesTable.artist],
             year = this[SeriesTable.year],
             upstreamStatus = this[SeriesTable.upstreamStatus]?.let { runCatching { UpstreamStatus.valueOf(it.uppercase()) }.getOrNull() },
-            genres = emptyList(), // populated by SeriesRepository.findGenresForSeries() in Task 5
+            genres = genres,
             addedAt = this[SeriesTable.addedAt].toJavaInstant(),
             updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
         )

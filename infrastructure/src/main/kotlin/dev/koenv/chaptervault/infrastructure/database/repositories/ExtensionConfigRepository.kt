@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.ExtensionConfigTable
+import dev.koenv.chaptervault.kernel.api.ExtensionConfigApi
 import dev.koenv.chaptervault.kernel.extension.ExtensionConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -10,7 +11,7 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.upsert
 
-class ExtensionConfigRepository {
+class ExtensionConfigRepository : ExtensionConfigApi {
     suspend fun get(
         extensionId: String,
         key: String,
@@ -24,7 +25,7 @@ class ExtensionConfigRepository {
                 ?.get(ExtensionConfigTable.value)
         }
 
-    suspend fun getAll(extensionId: String): Map<String, String> =
+    override suspend fun getAll(extensionId: String): Map<String, String> =
         newSuspendedTransaction(Dispatchers.IO) {
             ExtensionConfigTable
                 .selectAll()
@@ -46,7 +47,7 @@ class ExtensionConfigRepository {
         }
     }
 
-    suspend fun setAll(
+    override suspend fun setAll(
         extensionId: String,
         values: Map<String, String>,
     ) {

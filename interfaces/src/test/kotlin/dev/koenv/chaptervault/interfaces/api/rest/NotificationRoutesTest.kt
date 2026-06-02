@@ -75,7 +75,21 @@ class NotificationRoutesTest {
     }
 
     @Test
-    fun `GET notifications returns 200 with targets for authenticated user`() {
+    fun `GET notifications returns 200 for ADMIN`() {
+        testApp(
+            notificationApi =
+                object : NoOpNotificationApi() {
+                    override suspend fun listTargets() = listOf(fakeTarget)
+                },
+        ) {
+            val response = client.get("/notifications") { bearerAuth("admin-token") }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(response.bodyAsText(), "My Ntfy")
+        }
+    }
+
+    @Test
+    fun `GET notifications returns 403 for non-ADMIN user`() {
         testApp(
             notificationApi =
                 object : NoOpNotificationApi() {
@@ -83,8 +97,7 @@ class NotificationRoutesTest {
                 },
         ) {
             val response = client.get("/notifications") { bearerAuth("user-token") }
-            assertEquals(HttpStatusCode.OK, response.status)
-            assertContains(response.bodyAsText(), "My Ntfy")
+            assertEquals(HttpStatusCode.Forbidden, response.status)
         }
     }
 

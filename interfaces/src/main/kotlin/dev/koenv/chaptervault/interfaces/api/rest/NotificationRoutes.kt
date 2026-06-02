@@ -63,6 +63,11 @@ fun Route.notificationRoutes(
     dispatchApi: NotificationDispatchApi,
 ) {
     get("/notifications") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respondForbidden()
+            return@get
+        }
         val targets = notificationApi.listTargets()
         call.respond(HttpStatusCode.OK, targets.map { it.toResponse() })
     }

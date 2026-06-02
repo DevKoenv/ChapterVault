@@ -9,6 +9,8 @@ import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.Dispatchers
+import kotlinx.datetime.toJavaInstant
+import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Transaction
@@ -52,7 +54,7 @@ class NotificationRepository : NotificationApi {
                 it[url] = input.url
                 it[token] = input.token
                 it[enabled] = input.enabled
-                it[createdAt] = now.toString()
+                it[createdAt] = now.toKotlinInstant()
             }
             Result.Success(
                 NotificationTarget(
@@ -116,6 +118,6 @@ class NotificationRepository : NotificationApi {
             url = this[NotificationTargetTable.url],
             token = this[NotificationTargetTable.token],
             enabled = this[NotificationTargetTable.enabled],
-            createdAt = Instant.parse(this[NotificationTargetTable.createdAt]),
+            createdAt = this[NotificationTargetTable.createdAt].toJavaInstant(),
         )
 }

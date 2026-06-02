@@ -141,6 +141,22 @@ class TaskRoutesTest {
     }
 
     @Test
+    fun `GET tasks returns 403 for USER role`() {
+        testApp(system = fakeSystem()) {
+            val response = client.get("/tasks") { bearerAuth("user-token") }
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+        }
+    }
+
+    @Test
+    fun `GET tasks by id returns 403 for USER role`() {
+        testApp(system = fakeSystem()) {
+            val response = client.get("/tasks/00000000-0000-0000-0000-000000000001") { bearerAuth("user-token") }
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+        }
+    }
+
+    @Test
     fun `POST tasks cancel returns 403 for USER`() {
         testApp(
             system = fakeSystem(),

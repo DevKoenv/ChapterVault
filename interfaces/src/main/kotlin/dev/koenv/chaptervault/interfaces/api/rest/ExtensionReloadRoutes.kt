@@ -16,7 +16,7 @@ fun Route.extensionReloadRoutes(loaderService: ExtensionManager) {
             call.respondForbidden()
             return@post
         }
-        val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val id = call.parameters["id"] ?: return@post call.respondBadRequest("Missing extension id")
         loaderService.findById(id) ?: return@post call.respondError(AppError.NotFound("Extension", id))
         loaderService.reload(id)
         call.respond(HttpStatusCode.NoContent)
@@ -28,7 +28,7 @@ fun Route.extensionReloadRoutes(loaderService: ExtensionManager) {
             call.respondForbidden()
             return@post
         }
-        val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val id = call.parameters["id"] ?: return@post call.respondBadRequest("Missing extension id")
         loaderService.findById(id) ?: return@post call.respondError(AppError.NotFound("Extension", id))
         loaderService.unload(id)
         call.respond(HttpStatusCode.NoContent)

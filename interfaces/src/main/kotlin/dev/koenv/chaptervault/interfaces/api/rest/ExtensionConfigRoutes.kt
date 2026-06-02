@@ -1,8 +1,9 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
+import dev.koenv.chaptervault.kernel.api.ExtensionConfigApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.extension.ExtensionManager
+import dev.koenv.chaptervault.shared.result.AppError
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
@@ -14,7 +15,7 @@ import io.ktor.server.routing.route
 
 fun Route.extensionConfigRoutes(
     loaderService: ExtensionManager,
-    configRepository: ExtensionConfigRepository,
+    configRepository: ExtensionConfigApi,
 ) {
     route("/extensions/{id}/config") {
         get {
@@ -23,8 +24,8 @@ fun Route.extensionConfigRoutes(
                 call.respondForbidden()
                 return@get
             }
-            val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            loaderService.findById(id) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val id = call.parameters["id"] ?: return@get call.respondBadRequest("Missing extension id")
+            loaderService.findById(id) ?: return@get call.respondError(AppError.NotFound("Extension", id))
             val values = configRepository.getAll(id)
             call.respond(mapOf("values" to values))
         }
@@ -34,8 +35,8 @@ fun Route.extensionConfigRoutes(
                 call.respondForbidden()
                 return@patch
             }
-            val id = call.parameters["id"] ?: return@patch call.respond(HttpStatusCode.BadRequest)
-            loaderService.findById(id) ?: return@patch call.respond(HttpStatusCode.NotFound)
+            val id = call.parameters["id"] ?: return@patch call.respondBadRequest("Missing extension id")
+            loaderService.findById(id) ?: return@patch call.respondError(AppError.NotFound("Extension", id))
             val body = call.receive<Map<String, String>>()
             configRepository.setAll(id, body)
             call.respond(HttpStatusCode.NoContent)

@@ -6,6 +6,7 @@ import dev.koenv.chaptervault.kernel.library.ReadingStatus
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.Dispatchers
+import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
@@ -28,7 +29,7 @@ class UserSeriesStatusRepository : ReadingStatusApi {
                 it[UserSeriesStatusTable.userId] = userId.toString()
                 it[UserSeriesStatusTable.seriesId] = seriesId.toString()
                 it[UserSeriesStatusTable.status] = status.name
-                it[UserSeriesStatusTable.updatedAt] = Instant.now().toString()
+                it[UserSeriesStatusTable.updatedAt] = Instant.now().toKotlinInstant()
             }
             Result.Success(Unit)
         }

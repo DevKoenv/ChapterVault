@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.infrastructure
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
+import dev.koenv.chaptervault.kernel.runtime.TaskPayloadKeys
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
@@ -55,9 +56,9 @@ class SeriesRefreshScheduler(
                         targetId = series.id,
                         payload =
                             mapOf(
-                                "connectorId" to series.connectorId,
-                                "externalId" to series.externalId,
-                                "language" to series.language,
+                                TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                                TaskPayloadKeys.EXTERNAL_ID to series.externalId,
+                                TaskPayloadKeys.LANGUAGE to series.language,
                             ),
                         createdAt = now,
                         updatedAt = now,

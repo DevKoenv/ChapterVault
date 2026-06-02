@@ -2,6 +2,7 @@ package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegistryRepository
 import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.shared.result.AppError
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
@@ -41,8 +42,8 @@ fun Route.extensionRegistryRoutes(registryRepo: ExtensionRegistryRepository) {
                     call.respondForbidden()
                     return@patch
                 }
-                val id = call.parameters["id"] ?: return@patch call.respond(HttpStatusCode.BadRequest)
-                registryRepo.findById(id) ?: return@patch call.respond(HttpStatusCode.NotFound)
+                val id = call.parameters["id"] ?: return@patch call.respondBadRequest("Missing registry id")
+                registryRepo.findById(id) ?: return@patch call.respondError(AppError.NotFound("ExtensionRegistry", id))
                 val body = call.receive<PatchRegistryRequest>()
                 body.enabled?.let { registryRepo.setEnabled(id, it) }
                 call.respond(HttpStatusCode.NoContent)
@@ -53,8 +54,8 @@ fun Route.extensionRegistryRoutes(registryRepo: ExtensionRegistryRepository) {
                     call.respondForbidden()
                     return@delete
                 }
-                val id = call.parameters["id"] ?: return@delete call.respond(HttpStatusCode.BadRequest)
-                registryRepo.findById(id) ?: return@delete call.respond(HttpStatusCode.NotFound)
+                val id = call.parameters["id"] ?: return@delete call.respondBadRequest("Missing registry id")
+                registryRepo.findById(id) ?: return@delete call.respondError(AppError.NotFound("ExtensionRegistry", id))
                 registryRepo.delete(id)
                 call.respond(HttpStatusCode.NoContent)
             }

@@ -16,6 +16,11 @@ import io.ktor.server.routing.post
 
 fun Route.taskRoutes(system: SystemApi) {
     get("/tasks") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respondForbidden()
+            return@get
+        }
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
         val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
         when (val result = system.listTasks(PageRequest(page, size.coerceIn(1, 100)))) {
@@ -37,6 +42,11 @@ fun Route.taskRoutes(system: SystemApi) {
     }
 
     get("/tasks/{id}") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respondForbidden()
+            return@get
+        }
         val id =
             try {
                 Id.from(call.parameters["id"]!!)
