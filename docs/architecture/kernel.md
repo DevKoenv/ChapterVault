@@ -22,6 +22,7 @@ The kernel is the system core. It owns all domain state and exposes stable APIs.
   - `NotificationApi`: CRUD for notification targets
   - `NotificationDispatchApi`: send notifications and test dispatch
   - `ChapterPageSource`: read individual pages from downloaded chapters (implemented by `FileStorage`)
+  - `ExtensionConfigApi`: read and write per-extension key/value configuration
   - `SystemApi`: task and extension introspection
 - `kernel.extension`: extension context and lifecycle contracts
 - `kernel.event`: domain event bus

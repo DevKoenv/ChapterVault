@@ -14,6 +14,5 @@ Extensions are untrusted plugins that implement kernel interfaces.
 Each extension declares one or more `Capability` sealed class members:
 - `CanFetchSeries`: source connector
 - `CanDownloadChapters`: chapter downloader
-- `CanServeOpds`: OPDS feed provider
-- `CanEnrichMetadata`: metadata enrichment
-- `CanServeAdmin`: admin UI data provider
+- `CanEnrichMetadata`: metadata enrichment (author, genre, year, etc.)
+- `CanSendNotifications`: custom notification channel

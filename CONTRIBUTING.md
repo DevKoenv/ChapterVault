@@ -26,18 +26,13 @@ Six Gradle modules with a strictly enforced dependency graph:
 | Module | Purpose |
 |--------|---------|
 | `:shared` | Cross-cutting types: `Result`, `Id`, `ChapterFormat`, pagination |
-| `:kernel` | Domain models, API interfaces, extension contracts |
-| `:extensions` | Source connectors, OPDS extension, metadata providers |
-| `:infrastructure` | Database repositories, file storage, HTTP client |
+| `:kernel` | Domain models, API interfaces, extension and connector contracts |
+| `:infrastructure` | Database repositories, connectors, file storage, task execution |
 | `:interfaces` | Ktor routes, DTOs, mappers |
-| `:apps:server` | Composition root - Koin wiring, server bootstrap |
+| `:sdk` | Thin re-export of `:kernel` and `:shared` for extension authors |
+| `:apps:server` | Composition root: Koin wiring, server bootstrap |
 
-The key constraint: **`:extensions` must never depend on `:infrastructure`**. Verify with:
-
-```bash
-./gradlew :extensions:dependencies --configuration runtimeClasspath | grep infrastructure
-# must produce no output
-```
+The key constraint: **`:interfaces` must never import from `:infrastructure`** — routes depend on kernel interfaces only, never on concrete implementations.
 
 ## Running tests
 

@@ -196,15 +196,15 @@ curl -X POST http://localhost:8080/library/series \
 Six Gradle modules with a strictly enforced one-way dependency graph:
 
 ```
-:apps:server    ->  :kernel, :extensions, :infrastructure, :interfaces
+:apps:server    ->  :kernel, :infrastructure, :interfaces
 :interfaces     ->  :kernel, :shared
 :infrastructure ->  :kernel, :shared
-:extensions     ->  :kernel, :shared
+:sdk            ->  :kernel, :shared
 :kernel         ->  :shared
 :shared         ->  (nothing)
 ```
 
-`:extensions` has no path to `:infrastructure` — connectors cannot touch the database directly.
+`:sdk` is a thin re-export layer exposing `:kernel` and `:shared` types for extension authors.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for a full breakdown of each module's responsibilities.
 
@@ -223,9 +223,6 @@ cd ChapterVault
 
 # Run the server
 ./gradlew :apps:server:run
-
-# Verify extension isolation (must produce no output)
-./gradlew :extensions:dependencies --configuration runtimeClasspath | grep infrastructure
 ```
 
 Tests use a temporary SQLite file — no external dependencies needed.
