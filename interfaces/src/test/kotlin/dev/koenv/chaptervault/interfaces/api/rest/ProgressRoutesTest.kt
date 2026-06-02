@@ -22,6 +22,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -159,6 +160,36 @@ class ProgressRoutesTest {
             val response = client.delete("/library/chapters/$chapterId/read") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.NotFound, response.status)
         }
+    }
+
+    @Nested
+    inner class NullPrincipal {
+        private fun testAppNoAuth(block: suspend ApplicationTestBuilder.() -> Unit) =
+            testApplication {
+                application {
+                    install(ContentNegotiation) { json() }
+                    routing { progressRoutes(NoOpProgressApi()) }
+                }
+                block()
+            }
+
+        @Test
+        fun `GET progress returns 403 when principal is missing`() =
+            testAppNoAuth {
+                assertEquals(HttpStatusCode.Forbidden, client.get("/library/series/$seriesId/progress").status)
+            }
+
+        @Test
+        fun `POST read returns 403 when principal is missing`() =
+            testAppNoAuth {
+                assertEquals(HttpStatusCode.Forbidden, client.post("/library/chapters/$chapterId/read").status)
+            }
+
+        @Test
+        fun `DELETE read returns 403 when principal is missing`() =
+            testAppNoAuth {
+                assertEquals(HttpStatusCode.Forbidden, client.delete("/library/chapters/$chapterId/read").status)
+            }
     }
 }
 

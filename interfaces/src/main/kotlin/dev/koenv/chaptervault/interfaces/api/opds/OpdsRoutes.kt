@@ -2,6 +2,8 @@ package dev.koenv.chaptervault.interfaces.api.opds
 
 import dev.koenv.chaptervault.interfaces.api.opds.FeedBuilder
 import dev.koenv.chaptervault.interfaces.api.opds.OpdsV1
+import dev.koenv.chaptervault.interfaces.api.rest.respondBadRequest
+import dev.koenv.chaptervault.interfaces.api.rest.respondError
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
@@ -62,7 +64,9 @@ fun Application.opdsRoutes(
                             )
                         call.respondText(opdsV1.serialize(feed), opdsContentType(call))
                     }
-                    is Result.Failure -> call.respond(HttpStatusCode.InternalServerError)
+                    is Result.Failure -> {
+                        call.respondError(result.error)
+                    }
                 }
             }
 
@@ -71,23 +75,17 @@ fun Application.opdsRoutes(
                     try {
                         Id.from(call.parameters["id"]!!)
                     } catch (e: Exception) {
-                        call.respond(HttpStatusCode.BadRequest)
+                        call.respondBadRequest("Invalid series ID")
                         return@get
                     }
                 val seriesResult = libraryRead.getSeries(id)
                 if (seriesResult is Result.Failure) {
-                    val status =
-                        if (seriesResult.error is AppError.NotFound) {
-                            HttpStatusCode.NotFound
-                        } else {
-                            HttpStatusCode.InternalServerError
-                        }
-                    call.respond(status)
+                    call.respondError(seriesResult.error)
                     return@get
                 }
                 val chaptersResult = libraryRead.listChapters(id)
                 if (chaptersResult is Result.Failure) {
-                    call.respond(HttpStatusCode.InternalServerError)
+                    call.respondError(chaptersResult.error)
                     return@get
                 }
                 val chapters = (chaptersResult as Result.Success).value
@@ -127,35 +125,29 @@ fun Application.opdsPageRoutes(
                     try {
                         Id.from(call.parameters["id"]!!)
                     } catch (e: Exception) {
-                        call.respond(HttpStatusCode.BadRequest)
+                        call.respondBadRequest("Invalid chapter ID")
                         return@get
                     }
                 val pageNumber =
                     call.parameters["pageNumber"]?.toIntOrNull()
                         ?: run {
-                            call.respond(HttpStatusCode.BadRequest)
+                            call.respondBadRequest("Invalid page number")
                             return@get
                         }
 
                 val chapterResult = libraryRead.getChapter(id)
                 if (chapterResult is Result.Failure) {
-                    val status =
-                        if (chapterResult.error is AppError.NotFound) {
-                            HttpStatusCode.NotFound
-                        } else {
-                            HttpStatusCode.InternalServerError
-                        }
-                    call.respond(status)
+                    call.respondError(chapterResult.error)
                     return@get
                 }
                 val chapter = (chapterResult as Result.Success).value
                 if (chapter.downloadStatus != DownloadStatus.DOWNLOADED) {
-                    call.respond(HttpStatusCode.NotFound)
+                    call.respondError(AppError.NotFound("Chapter", id.toString()))
                     return@get
                 }
 
                 when (val pageResult = pageSource.readPage(chapter, pageNumber)) {
-                    is Result.Failure -> call.respond(HttpStatusCode.NotFound)
+                    is Result.Failure -> call.respondError(pageResult.error)
                     is Result.Success -> {
                         val page = pageResult.value
                         val etag = "\"${sha256("$id:${chapter.updatedAt.epochSecond}:$pageNumber")}\""

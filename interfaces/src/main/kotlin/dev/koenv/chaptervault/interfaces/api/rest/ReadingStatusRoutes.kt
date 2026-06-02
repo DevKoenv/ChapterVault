@@ -19,7 +19,11 @@ private data class SetReadingStatusRequest(
 
 fun Route.readingStatusRoutes(readingStatusApi: ReadingStatusApi) {
     put("/library/series/{id}/status") {
-        val principal = call.principal<KtorPrincipal>()!!
+        val principal =
+            call.principal<KtorPrincipal>() ?: run {
+                call.respondForbidden()
+                return@put
+            }
         val seriesId =
             try {
                 Id.from(call.parameters["id"]!!)
@@ -47,7 +51,11 @@ fun Route.readingStatusRoutes(readingStatusApi: ReadingStatusApi) {
     }
 
     delete("/library/series/{id}/status") {
-        val principal = call.principal<KtorPrincipal>()!!
+        val principal =
+            call.principal<KtorPrincipal>() ?: run {
+                call.respondForbidden()
+                return@delete
+            }
         val seriesId =
             try {
                 Id.from(call.parameters["id"]!!)

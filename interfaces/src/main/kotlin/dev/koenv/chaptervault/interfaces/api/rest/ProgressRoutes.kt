@@ -14,7 +14,11 @@ import io.ktor.server.routing.post
 
 fun Route.progressRoutes(progressApi: ProgressApi) {
     get("/library/series/{id}/progress") {
-        val principal = call.principal<KtorPrincipal>()!!
+        val principal =
+            call.principal<KtorPrincipal>() ?: run {
+                call.respondForbidden()
+                return@get
+            }
         val seriesId =
             try {
                 Id.from(call.parameters["id"]!!)
@@ -29,7 +33,11 @@ fun Route.progressRoutes(progressApi: ProgressApi) {
     }
 
     post("/library/chapters/{id}/read") {
-        val principal = call.principal<KtorPrincipal>()!!
+        val principal =
+            call.principal<KtorPrincipal>() ?: run {
+                call.respondForbidden()
+                return@post
+            }
         val chapterId =
             try {
                 Id.from(call.parameters["id"]!!)
@@ -44,7 +52,11 @@ fun Route.progressRoutes(progressApi: ProgressApi) {
     }
 
     delete("/library/chapters/{id}/read") {
-        val principal = call.principal<KtorPrincipal>()!!
+        val principal =
+            call.principal<KtorPrincipal>() ?: run {
+                call.respondForbidden()
+                return@delete
+            }
         val chapterId =
             try {
                 Id.from(call.parameters["id"]!!)

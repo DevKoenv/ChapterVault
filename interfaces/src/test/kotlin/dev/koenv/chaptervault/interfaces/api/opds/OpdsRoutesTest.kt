@@ -24,11 +24,13 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.basic
 import io.ktor.server.auth.bearer
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
@@ -163,6 +165,7 @@ class OpdsRoutesTest {
         block: suspend ApplicationTestBuilder.() -> Unit,
     ) = testApplication {
         application {
+            install(ContentNegotiation) { json() }
             install(Authentication) {
                 basic("auth-basic") {
                     realm = "ChapterVault"
@@ -184,6 +187,7 @@ class OpdsRoutesTest {
     private fun testApp(block: suspend ApplicationTestBuilder.() -> Unit) =
         testApplication {
             application {
+                install(ContentNegotiation) { json() }
                 install(Authentication) {
                     basic("auth-basic") {
                         realm = "ChapterVault"
@@ -233,6 +237,42 @@ class OpdsRoutesTest {
         }
 
     @Test
+    fun `catalog feed returns 500 with error body on listSeries failure`() {
+        val failingLibrary =
+            object : LibraryReadApi {
+                override suspend fun getSeries(id: Id) = Result.Failure(AppError.InternalError("db error"))
+
+                override suspend fun listSeries(request: PageRequest) = Result.Failure(AppError.InternalError("db error"))
+
+                override suspend fun searchLibrary(
+                    query: String,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(items = emptyList<Series>(), page = 0, size = 20, totalItems = 0L))
+
+                override suspend fun getChapter(id: Id) = Result.Failure(AppError.InternalError("db error"))
+
+                override suspend fun listChapters(seriesId: Id) = Result.Failure(AppError.InternalError("db error"))
+
+                override suspend fun listChaptersByStatus(
+                    seriesId: Id,
+                    status: DownloadStatus,
+                ) = Result.Success(emptyList<Chapter>())
+
+                override suspend fun inLibraryExternalIds(
+                    connectorId: String,
+                    externalIds: List<String>,
+                ) = Result.Success(emptySet<String>())
+            }
+        testAppWith(failingLibrary) {
+            val res = client.get("/opds/v1/catalog") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.InternalServerError, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "\"error\"")
+            assertContains(body, "\"message\"")
+        }
+    }
+
+    @Test
     fun `catalog feed returns 200 with series entries when authenticated`() =
         testApp {
             val res = client.get("/opds/v1/catalog?page=0&size=20") { basicAuth("user", "pass") }
@@ -280,6 +320,9 @@ class OpdsRoutesTest {
             val fakeId = Id.generate()
             val res = client.get("/opds/v1/series/$fakeId") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.NotFound, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "\"error\"")
+            assertContains(body, "\"message\"")
         }
 
     @Test
@@ -317,6 +360,9 @@ class OpdsRoutesTest {
         testApp {
             val res = client.get("/opds/v1/chapters/$downloadedChapterId/pages/99") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.NotFound, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "\"error\"")
+            assertContains(body, "\"message\"")
         }
 
     @Test
@@ -448,6 +494,9 @@ class OpdsRoutesTest {
         testApp {
             val res = client.get("/opds/v1/series/not-a-uuid") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.BadRequest, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "\"error\"")
+            assertContains(body, "\"message\"")
         }
     }
 
@@ -456,6 +505,9 @@ class OpdsRoutesTest {
         testApp {
             val res = client.get("/opds/v1/chapters/not-a-uuid/pages/0") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.BadRequest, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "\"error\"")
+            assertContains(body, "\"message\"")
         }
     }
 
@@ -466,6 +518,9 @@ class OpdsRoutesTest {
         testApp {
             val res = client.get("/opds/v1/chapters/$chapterId/pages/0") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.NotFound, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "\"error\"")
+            assertContains(body, "\"message\"")
         }
     }
 
@@ -474,6 +529,9 @@ class OpdsRoutesTest {
         testApp {
             val res = client.get("/opds/v1/chapters/${Id.generate()}/pages/0") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.NotFound, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "\"error\"")
+            assertContains(body, "\"message\"")
         }
     }
 

@@ -16,7 +16,11 @@ import io.ktor.server.routing.post
 
 fun Route.bookmarkRoutes(bookmarkApi: BookmarkApi) {
     get("/library/series/{id}/bookmarks") {
-        val principal = call.principal<KtorPrincipal>()!!
+        val principal =
+            call.principal<KtorPrincipal>() ?: run {
+                call.respondForbidden()
+                return@get
+            }
         val seriesId =
             try {
                 Id.from(call.parameters["id"]!!)
@@ -31,7 +35,11 @@ fun Route.bookmarkRoutes(bookmarkApi: BookmarkApi) {
     }
 
     post("/library/chapters/{id}/bookmarks") {
-        val principal = call.principal<KtorPrincipal>()!!
+        val principal =
+            call.principal<KtorPrincipal>() ?: run {
+                call.respondForbidden()
+                return@post
+            }
         val chapterId =
             try {
                 Id.from(call.parameters["id"]!!)
@@ -53,7 +61,11 @@ fun Route.bookmarkRoutes(bookmarkApi: BookmarkApi) {
     }
 
     delete("/library/bookmarks/{id}") {
-        val principal = call.principal<KtorPrincipal>()!!
+        val principal =
+            call.principal<KtorPrincipal>() ?: run {
+                call.respondForbidden()
+                return@delete
+            }
         val bookmarkId =
             try {
                 Id.from(call.parameters["id"]!!)
