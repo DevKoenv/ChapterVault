@@ -25,6 +25,7 @@ import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.readingStatusRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.respondBadRequest
+import dev.koenv.chaptervault.interfaces.api.rest.respondError
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
 import dev.koenv.chaptervault.interfaces.api.sse.sseRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
@@ -41,6 +42,7 @@ import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
+import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
@@ -220,13 +222,13 @@ fun Application.bootstrap() {
                     }
                 when (val chapterResult = libraryRead.getChapter(chapterId)) {
                     is Result.Failure -> {
-                        call.respond(HttpStatusCode.NotFound)
+                        call.respondError(chapterResult.error)
                         return@get
                     }
                     is Result.Success -> {
                         val chapter = chapterResult.value
                         if (!fileStorage.chapterExists(chapter)) {
-                            call.respond(HttpStatusCode.NotFound)
+                            call.respondError(AppError.NotFound("Chapter file", chapterId.toString()))
                             return@get
                         }
                         call.respondOutputStream(ContentType.parse("application/x-cbz")) {
@@ -249,7 +251,7 @@ fun Application.bootstrap() {
                     return@get
                 }
             when (val result = fileStorage.readCover(id.toString())) {
-                is Result.Failure -> call.respond(HttpStatusCode.NotFound)
+                is Result.Failure -> call.respondError(result.error)
                 is Result.Success -> {
                     val (bytes, mimeType) = result.value
                     call.respondBytes(bytes, ContentType.parse(mimeType))

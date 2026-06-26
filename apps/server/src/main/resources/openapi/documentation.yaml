@@ -21,8 +21,6 @@ tags:
     description: External source connectors (ADMIN only)
   - name: notifications
     description: Push notification targets and dispatch (ADMIN only)
-  - name: admin
-    description: Server administration
   - name: system
     description: System utilities
   - name: opds
@@ -972,18 +970,6 @@ paths:
             image/gif:
               schema: { type: string, format: binary }
         "404": { description: Cover not found (not yet downloaded) }
-
-  /admin:
-    get:
-      tags: [admin]
-      summary: Admin overview (ADMIN)
-      responses:
-        "200":
-          description: Extension and registry status
-          content:
-            application/json:
-              schema:
-                type: object
 
   /opds/v1:
     get:
