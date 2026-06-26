@@ -72,6 +72,7 @@ class ChapterRepository {
         id: Id,
         status: DownloadStatus,
         pageCount: Int? = null,
+        format: ChapterFormat? = null,
     ): Result<Chapter> =
         dbQuery {
             val count =
@@ -84,6 +85,7 @@ class ChapterRepository {
             ChapterTable.update({ ChapterTable.id eq id.toString() }) {
                 it[ChapterTable.downloadStatus] = status.name
                 if (pageCount != null) it[ChapterTable.pageCount] = pageCount
+                if (format != null) it[ChapterTable.format] = format.toString()
                 it[ChapterTable.updatedAt] = Instant.now().toKotlinInstant()
             }
 

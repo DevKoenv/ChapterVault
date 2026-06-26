@@ -198,6 +198,7 @@ class TaskExecutorServiceTest {
 
             val updated = (chapterRepository.getChapter(chapter.id) as Result.Success).value
             assertEquals(DownloadStatus.DOWNLOADED, updated.downloadStatus)
+            assertEquals(ChapterFormat.Cbz, updated.format)
 
             val file = tempDir.resolve(chapter.seriesId.toString()).resolve("${chapter.id}.cbz")
             assert(Files.exists(file)) { "CBZ file was not written to disk at $file" }
