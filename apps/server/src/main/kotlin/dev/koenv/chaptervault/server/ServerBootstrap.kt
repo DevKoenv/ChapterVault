@@ -62,6 +62,9 @@ import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import io.ktor.server.sse.SSE
 import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
@@ -267,14 +270,13 @@ fun Application.bootstrap() {
             val httpStatus = if (status == "ok") HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
             call.respond(
                 httpStatus,
-                mapOf(
-                    "status" to status,
-                    "checks" to
-                        mapOf(
-                            "database" to if (dbOk) "ok" else "error",
-                            "executor" to if (executorOk) "ok" else "error",
-                        ),
-                ),
+                buildJsonObject {
+                    put("status", status)
+                    putJsonObject("checks") {
+                        put("database", if (dbOk) "ok" else "error")
+                        put("executor", if (executorOk) "ok" else "error")
+                    }
+                },
             )
         }
     }
