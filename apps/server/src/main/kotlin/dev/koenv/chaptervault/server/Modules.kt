@@ -12,8 +12,6 @@ import dev.koenv.chaptervault.infrastructure.connectors.MockConnector
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.MangaDexConnector
 import dev.koenv.chaptervault.infrastructure.database.repositories.BookmarkRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
-import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
-import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegistryRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.NotificationRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
@@ -21,8 +19,6 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepositor
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserSeriesStatusRepository
 import dev.koenv.chaptervault.infrastructure.enricher.DefaultMetadataEnricherRegistry
-import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryClient
-import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryService
 import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.extensions.loader.ExternalExtensionLoader
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
@@ -113,8 +109,6 @@ val infrastructureModule =
                 thumbnailFormat = JpegThumbnailFormat,
             )
         }
-        single { ExtensionConfigRepository() }
-        single { ExtensionRegistryRepository() }
         single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
         single {
             TaskExecutorService(
@@ -157,7 +151,6 @@ val extensionModule =
                     connectorRegistry = connectorRegistry,
                     enricherRegistry = enricherRegistry,
                     notificationRegistry = get<NotificationChannelRegistry>(),
-                    config = get<ExtensionConfigRepository>().forExtension(extensionId),
                     dataDir = dir,
                 )
             }
@@ -189,17 +182,4 @@ val interfacesModule =
         single { EventProjectionService(get()) }
     }
 
-val registryModule =
-    module {
-        single { ExtensionRegistryClient(get()) }
-        single {
-            ExtensionRegistryService(
-                registryRepo = get(),
-                registryClient = get(),
-                extensionManager = get<ExtensionManager>(),
-                httpClient = get(),
-            )
-        }
-    }
-
-val allModules = listOf(configModule, infrastructureModule, kernelModule, extensionModule, interfacesModule, registryModule)
+val allModules = listOf(configModule, infrastructureModule, kernelModule, extensionModule, interfacesModule)

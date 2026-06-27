@@ -4,7 +4,6 @@ import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
-import dev.koenv.chaptervault.kernel.extension.ExtensionConfig
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
@@ -23,7 +22,6 @@ class DefaultExtensionContext(
     override val connectorRegistry: ConnectorRegistry,
     override val enricherRegistry: MetadataEnricherRegistry,
     override val notificationRegistry: NotificationChannelRegistry,
-    override val config: ExtensionConfig,
     override val dataDir: Path,
 ) : ExtensionContext {
     private val rateLimiters = ConcurrentHashMap<String, RateLimiter>()

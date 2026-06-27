@@ -4,9 +4,6 @@ import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
-import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionConfigRepository
-import dev.koenv.chaptervault.infrastructure.database.repositories.ExtensionRegistryRepository
-import dev.koenv.chaptervault.infrastructure.extensions.ExtensionRegistryService
 import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.interfaces.api.opds.opdsPageRoutes
@@ -15,9 +12,6 @@ import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
-import dev.koenv.chaptervault.interfaces.api.rest.extensionConfigRoutes
-import dev.koenv.chaptervault.interfaces.api.rest.extensionInstallRoutes
-import dev.koenv.chaptervault.interfaces.api.rest.extensionRegistryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionReloadRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
@@ -151,9 +145,6 @@ fun Application.bootstrap() {
     val notificationApi by inject<NotificationApi>()
     val notificationDispatch by inject<NotificationDispatchApi>()
     val extensionLoaderService by inject<ExtensionLoaderService>()
-    val extensionConfigRepository by inject<ExtensionConfigRepository>()
-    val extensionRegistryRepository by inject<ExtensionRegistryRepository>()
-    val extensionRegistryService by inject<ExtensionRegistryService>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -196,12 +187,6 @@ fun Application.bootstrap() {
             notificationRoutes(notificationApi, notificationDispatch)
             extensionRoutes(extensionLoaderService)
             extensionReloadRoutes(extensionLoaderService)
-            extensionConfigRoutes(
-                loaderService = extensionLoaderService,
-                configRepository = extensionConfigRepository,
-            )
-            extensionRegistryRoutes(extensionRegistryRepository)
-            extensionInstallRoutes(extensionRegistryService)
             sseRoutes(projectionService)
         }
     }
