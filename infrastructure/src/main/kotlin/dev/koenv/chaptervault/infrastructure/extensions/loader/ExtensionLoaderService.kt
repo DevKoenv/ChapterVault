@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 class ExtensionLoaderService(
@@ -126,37 +125,6 @@ class ExtensionLoaderService(
             }
         classloaders[loaded.extension.id] = loaded.classLoader
         enableAndRegister(loaded.extension, ExtensionSource.LOCAL, loaded.manifest, loaded.jarPath)
-    }
-
-    override fun install(
-        extensionId: String,
-        jarBytes: ByteArray,
-    ) {
-        val dir = externalLoader.extensionsDir
-        Files.createDirectories(dir)
-        val jarPath = dir.resolve("$extensionId.jar")
-        val temp = Files.createTempFile(dir, "install-", ".jar.tmp")
-        try {
-            Files.write(temp, jarBytes)
-            val loaded =
-                externalLoader.loadSingle(temp)
-                    ?: error("Downloaded JAR for '$extensionId' is not a valid extension")
-            if (loaded.manifest.id != extensionId) {
-                error("JAR manifest id '${loaded.manifest.id}' does not match requested '$extensionId'")
-            }
-            loaded.classLoader.close()
-            Files.move(temp, jarPath, StandardCopyOption.REPLACE_EXISTING)
-        } catch (e: Exception) {
-            Files.deleteIfExists(temp)
-            throw e
-        }
-        try {
-            reload(extensionId)
-        } catch (e: Exception) {
-            log.error("Extension '$extensionId' JAR installed at $jarPath but reload failed: ${e.message}. Re-call reload() to retry.")
-            throw e
-        }
-        log.info("Extension '$extensionId' installed from JAR")
     }
 
     private fun enableAndRegister(
