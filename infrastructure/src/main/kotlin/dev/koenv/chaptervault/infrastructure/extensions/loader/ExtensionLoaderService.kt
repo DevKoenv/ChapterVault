@@ -161,7 +161,7 @@ class ExtensionLoaderService(
                 ),
             )
             log.info("Extension '${extension.id}' enabled (source=$source)")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             extensionRegistry.updateStatus(extension.id, ExtensionStatus.FAILED, e.message)
             log.error("Extension '${extension.id}' failed to enable: ${e.message}")
         }
