@@ -176,9 +176,4 @@ private class FakeExtensionManager(
             entries[index] = entries[index].copy(status = ExtensionStatus.ENABLED)
         }
     }
-
-    override fun install(
-        extensionId: String,
-        jarBytes: ByteArray,
-    ) = Unit
 }

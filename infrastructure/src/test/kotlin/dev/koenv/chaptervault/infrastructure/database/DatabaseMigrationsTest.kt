@@ -66,7 +66,7 @@ class DatabaseMigrationsTest {
     }
 
     @Test
-    fun `migration applies V5 through V8`(
+    fun `migration applies V5 through V9`(
         @TempDir dir: Path,
     ) {
         val db = Database.connect("jdbc:sqlite:${dir.resolve("test.db")}", "org.sqlite.JDBC")
@@ -76,10 +76,16 @@ class DatabaseMigrationsTest {
             exec("SELECT author, artist, year, upstream_status FROM series LIMIT 0") { }
             // V6: series_genres table
             exec("SELECT series_id, genre FROM series_genres LIMIT 0") { }
-            // V7: extension_configs table
-            exec("SELECT extension_id, key, value FROM extension_configs LIMIT 0") { }
-            // V8: extension_registries table
-            exec("SELECT id, name, url, enabled FROM extension_registries LIMIT 0") { }
+            // V9: extension_configs and extension_registries were dropped
+            val tables =
+                exec(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('extension_configs', 'extension_registries')",
+                ) { rs ->
+                    buildList {
+                        while (rs.next()) add(rs.getString("name"))
+                    }
+                }!!
+            assertTrue(tables.isEmpty(), "Expected extension_configs and extension_registries to be dropped by V9, but found: $tables")
         }
     }
 

@@ -120,6 +120,14 @@ object DatabaseMigrations {
                     """.trimIndent(),
                 ),
             ),
+            Migration(
+                9,
+                "drop_extension_config_and_registry",
+                listOf(
+                    "DROP TABLE IF EXISTS extension_configs",
+                    "DROP TABLE IF EXISTS extension_registries",
+                ),
+            ),
         )
 
     fun migrate(db: Database) {
