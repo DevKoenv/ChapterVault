@@ -4,7 +4,6 @@ import dev.koenv.chaptervault.infrastructure.notifications.DefaultNotificationCh
 import dev.koenv.chaptervault.kernel.extension.Capability
 import dev.koenv.chaptervault.kernel.extension.DefaultExtensionRegistry
 import dev.koenv.chaptervault.kernel.extension.Extension
-import dev.koenv.chaptervault.kernel.extension.ExtensionConfig
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricher
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
@@ -153,10 +152,6 @@ private fun makeNotificationTestContext(
         override val dataDir = dataDir
         override val enricherRegistry get() = error("not needed in test")
         override val notificationRegistry = notificationRegistry
-        override val config: ExtensionConfig =
-            object : ExtensionConfig {
-                override fun get(key: String): String? = null
-            }
 
         override fun rateLimiter(
             bucket: String,

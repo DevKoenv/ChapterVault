@@ -186,11 +186,6 @@ private fun makeContext(
         override val dataDir = dataDir
         override val enricherRegistry get() = error("not needed in test")
         override val notificationRegistry get() = error("not needed in test")
-        override val config: dev.koenv.chaptervault.kernel.extension.ExtensionConfig =
-            object : dev.koenv.chaptervault.kernel.extension.ExtensionConfig {
-                override fun get(key: String): String? = null
-            }
-
         override fun rateLimiter(
             bucket: String,
             requestsPerSecond: Double,
