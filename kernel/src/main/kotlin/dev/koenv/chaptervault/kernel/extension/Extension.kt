@@ -10,11 +10,4 @@ interface Extension {
     fun onEnable(context: ExtensionContext)
 
     fun onDisable()
-
-    fun onConfigChanged(
-        key: String,
-        value: String,
-    ) {}
-
-    fun configFields(): List<ExtensionConfigField> = emptyList()
 }

@@ -12,9 +12,4 @@ interface ExtensionManager {
     fun unload(id: String)
 
     fun reload(id: String)
-
-    fun install(
-        extensionId: String,
-        jarBytes: ByteArray,
-    )
 }
