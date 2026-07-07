@@ -142,7 +142,7 @@ val extensionModule =
             val extensionsDataRoot = Paths.get(config.storage.libraryPath).parent.resolve("extensions")
             val connectorRegistry = get<ConnectorRegistry>()
             val enricherRegistry = get<MetadataEnricherRegistry>()
-            val contextFactory: (String, Path) -> ExtensionContext = { extensionId, dir ->
+            val contextFactory: (String, Path) -> ExtensionContext = { _, dir ->
                 DefaultExtensionContext(
                     httpClient = get(),
                     library = get(),
@@ -152,6 +152,7 @@ val extensionModule =
                     enricherRegistry = enricherRegistry,
                     notificationRegistry = get<NotificationChannelRegistry>(),
                     dataDir = dir,
+                    config = DefaultManagedConfig(dir.resolve("config.yml").toFile()),
                 )
             }
             // Register built-in connectors directly; they are first-party and do not need the extension adapter.

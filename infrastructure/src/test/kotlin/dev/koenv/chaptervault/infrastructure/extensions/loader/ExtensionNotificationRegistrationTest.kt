@@ -152,6 +152,7 @@ private fun makeNotificationTestContext(
         override val dataDir = dataDir
         override val enricherRegistry get() = error("not needed in test")
         override val notificationRegistry = notificationRegistry
+        override val config get() = error("not needed in test")
 
         override fun rateLimiter(
             bucket: String,

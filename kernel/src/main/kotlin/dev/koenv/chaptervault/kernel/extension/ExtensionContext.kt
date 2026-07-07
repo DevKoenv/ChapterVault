@@ -16,6 +16,7 @@ interface ExtensionContext {
     val system: SystemApi
     val connectorRegistry: ConnectorRegistry
     val dataDir: Path
+    val config: ManagedConfig
     val enricherRegistry: MetadataEnricherRegistry
     val notificationRegistry: NotificationChannelRegistry
 

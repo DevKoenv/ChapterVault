@@ -5,6 +5,7 @@ import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
+import dev.koenv.chaptervault.kernel.extension.ManagedConfig
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
 import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
@@ -23,6 +24,7 @@ class DefaultExtensionContext(
     override val enricherRegistry: MetadataEnricherRegistry,
     override val notificationRegistry: NotificationChannelRegistry,
     override val dataDir: Path,
+    override val config: ManagedConfig,
 ) : ExtensionContext {
     private val rateLimiters = ConcurrentHashMap<String, RateLimiter>()
 

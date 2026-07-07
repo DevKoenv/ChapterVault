@@ -184,6 +184,7 @@ private fun makeContext(
         override val system get() = error("not needed in test")
         override val connectorRegistry = connRegistry
         override val dataDir = dataDir
+        override val config get() = error("not needed in test")
         override val enricherRegistry get() = error("not needed in test")
         override val notificationRegistry get() = error("not needed in test")
         override fun rateLimiter(
