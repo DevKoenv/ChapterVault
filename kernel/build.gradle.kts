@@ -8,6 +8,7 @@ dependencies {
     api(libs.ktor.client.core)
     api(libs.slf4j.api)
     api(libs.jsoup)
+    api(libs.snakeyaml)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
 
