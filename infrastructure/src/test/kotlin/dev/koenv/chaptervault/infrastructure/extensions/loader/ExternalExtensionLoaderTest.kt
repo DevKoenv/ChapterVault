@@ -77,7 +77,7 @@ class ExternalExtensionLoaderTest {
     fun `skips JAR when minServerVersion is higher than server version`() {
         val manifest =
             """
-            id: "dev.test.future"
+            id: "future-ext"
             name: "Future"
             version: "1.0.0"
             minServerVersion: "2.0.0"
@@ -96,7 +96,7 @@ class ExternalExtensionLoaderTest {
     fun `accepts JAR when minServerVersion equals server version`() {
         val manifest =
             """
-            id: "dev.koenv.chaptervault.infrastructure.extensions.loader.testextension"
+            id: "test-extension"
             name: "Test Extension"
             version: "1.0.0"
             minServerVersion: "1.0.0"
@@ -115,7 +115,7 @@ class ExternalExtensionLoaderTest {
     fun `accepts JAR when server is a higher minor version than minServerVersion`() {
         val manifest =
             """
-            id: "dev.koenv.chaptervault.infrastructure.extensions.loader.testextension"
+            id: "test-extension"
             name: "Test Extension"
             version: "1.0.0"
             minServerVersion: "1.0.1"
@@ -134,7 +134,7 @@ class ExternalExtensionLoaderTest {
     fun `skips JAR when entry point class is not found`() {
         val manifest =
             """
-            id: "dev.test.missing-class"
+            id: "missing-class"
             name: "Missing Class"
             version: "1.0.0"
             minServerVersion: "1.0.0"
@@ -153,7 +153,7 @@ class ExternalExtensionLoaderTest {
     fun `loads extension from valid JAR`() {
         val manifest =
             """
-            id: "dev.koenv.chaptervault.infrastructure.extensions.loader.testextension"
+            id: "test-extension"
             name: "Test Extension"
             version: "1.0.0"
             minServerVersion: "1.0.0"
@@ -166,7 +166,7 @@ class ExternalExtensionLoaderTest {
         buildJar(manifest, TestExtension::class.java)
         val results = makeLoader().loadAll()
         assertEquals(1, results.size)
-        assertEquals("dev.koenv.chaptervault.infrastructure.extensions.loader.testextension", results[0].manifest.id)
+        assertEquals("test-extension", results[0].manifest.id)
     }
 
     @Test
@@ -175,11 +175,31 @@ class ExternalExtensionLoaderTest {
         val results = makeLoader().loadAll()
         assertTrue(results.isEmpty())
     }
+
+    @Test
+    fun `skips second JAR when duplicate id is loaded`() {
+        val manifest =
+            """
+            id: test-extension
+            name: Test Extension
+            version: 1.0.0
+            minServerVersion: 1.0.0
+            description: Test
+            author: Test
+            capabilities:
+              - connector
+            entryPoint: "dev.koenv.chaptervault.infrastructure.extensions.loader.TestExtension"
+            """.trimIndent()
+        buildJar(manifest, TestExtension::class.java)
+        buildJar(manifest, TestExtension::class.java) // second JAR, same id
+        val results = makeLoader().loadAll()
+        assertEquals(1, results.size) // second must be skipped
+    }
 }
 
 // Minimal test extension -- must be in the same module so its class bytes are accessible
 class TestExtension : Extension {
-    override val id = "dev.koenv.chaptervault.infrastructure.extensions.loader.testextension"
+    override val id = "test-extension"
     override val name = "Test Extension"
     override val version = "1.0.0"
 

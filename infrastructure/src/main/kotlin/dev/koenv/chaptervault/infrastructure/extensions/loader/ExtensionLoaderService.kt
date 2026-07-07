@@ -37,7 +37,7 @@ class ExtensionLoaderService(
             enableAndRegister(ext, ExtensionSource.BUNDLED)
         }
         externalLoader.loadAll().forEach { loaded ->
-            classloaders[loaded.extension.id] = loaded.classLoader
+            classloaders[loaded.manifest.id] = loaded.classLoader
             enableAndRegister(loaded.extension, ExtensionSource.LOCAL, loaded.manifest, loaded.jarPath)
         }
     }
@@ -123,7 +123,7 @@ class ExtensionLoaderService(
                 extensionRegistry.updateStatus(id, ExtensionStatus.FAILED, "reload failed: JAR at $jarPath could not be loaded")
                 return
             }
-        classloaders[loaded.extension.id] = loaded.classLoader
+        classloaders[loaded.manifest.id] = loaded.classLoader
         enableAndRegister(loaded.extension, ExtensionSource.LOCAL, loaded.manifest, loaded.jarPath)
     }
 
@@ -133,16 +133,17 @@ class ExtensionLoaderService(
         manifest: ExtensionManifest? = null,
         jarPath: Path? = null,
     ) {
-        val dataDir = extensionsDataRoot.resolve(extension.id)
+        val canonicalId = manifest?.id ?: extension.id
+        val dataDir = extensionsDataRoot.resolve(canonicalId)
         val trackingConnectors = TrackingConnectorRegistry(connectorRegistryDelegate)
         val trackingEnrichers = TrackingEnricherRegistry(enricherRegistryDelegate)
         val trackingNotifications = TrackingNotificationRegistry(notificationRegistryDelegate)
-        val baseContext = contextFactory(extension.id, dataDir)
+        val baseContext = contextFactory(canonicalId, dataDir)
 
-        manifest?.let { manifests[extension.id] = it }
+        manifest?.let { manifests[canonicalId] = it }
 
         extensionRegistry.register(
-            ExtensionEntry(extension = extension, status = ExtensionStatus.LOADING, source = source),
+            ExtensionEntry(extension = extension, id = canonicalId, status = ExtensionStatus.LOADING, source = source),
         )
 
         try {
@@ -152,6 +153,7 @@ class ExtensionLoaderService(
             extensionRegistry.register(
                 ExtensionEntry(
                     extension = extension,
+                    id = canonicalId,
                     status = ExtensionStatus.ENABLED,
                     source = source,
                     jarPath = jarPath,
@@ -160,10 +162,10 @@ class ExtensionLoaderService(
                     registeredChannelTypeIds = trackingNotifications.registeredTypeIds,
                 ),
             )
-            log.info("Extension '${extension.id}' enabled (source=$source)")
+            log.info("Extension '$canonicalId' enabled (source=$source)")
         } catch (e: Throwable) {
-            extensionRegistry.updateStatus(extension.id, ExtensionStatus.FAILED, e.message)
-            log.error("Extension '${extension.id}' failed to enable: ${e.message}")
+            extensionRegistry.updateStatus(canonicalId, ExtensionStatus.FAILED, e.message)
+            log.error("Extension '$canonicalId' failed to enable: ${e.message}")
         }
     }
 

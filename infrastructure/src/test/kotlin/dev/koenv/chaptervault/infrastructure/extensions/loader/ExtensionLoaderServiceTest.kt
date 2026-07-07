@@ -195,7 +195,7 @@ class ExtensionLoaderServiceTest {
     fun `extension whose onEnable throws is set to FAILED`() {
         val failingExt =
             object : Extension {
-                override val id = "failing.ext"
+                override val id = "failing-ext"
                 override val name = "Failing"
                 override val version = "1.0.0"
 
@@ -217,7 +217,7 @@ class ExtensionLoaderServiceTest {
                 bundledExtensions = listOf(failingExt),
             )
         svc.loadAll()
-        val entry = extRegistry.findById("failing.ext")
+        val entry = extRegistry.findById("failing-ext")
         assertNotNull(entry)
         assertEquals(ExtensionStatus.FAILED, entry.status)
         assertNotNull(entry.errorMessage)

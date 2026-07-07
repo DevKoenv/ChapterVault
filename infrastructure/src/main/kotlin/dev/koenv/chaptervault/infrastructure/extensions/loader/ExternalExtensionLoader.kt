@@ -17,11 +17,22 @@ class ExternalExtensionLoader(
 
     fun loadAll(): List<LoadedExtension> {
         Files.createDirectories(extensionsDir)
+        val seen = mutableMapOf<String, String>() // id -> first jar filename
         return Files
             .list(extensionsDir)
             .filter { it.extension == "jar" }
             .toList()
-            .mapNotNull { loadSingle(it) }
+            .mapNotNull { jar ->
+                val loaded = loadSingle(jar) ?: return@mapNotNull null
+                val id = loaded.manifest.id
+                val existing = seen[id]
+                if (existing != null) {
+                    log.warn("Duplicate extension id '$id': already loaded from '$existing', skipping '${jar.fileName}'.")
+                    return@mapNotNull null
+                }
+                seen[id] = jar.fileName.toString()
+                loaded
+            }
     }
 
     fun loadSingle(jar: Path): LoadedExtension? {
@@ -38,6 +49,12 @@ class ExternalExtensionLoader(
         return try {
             val extensionClass = classLoader.loadClass(manifest.entryPoint)
             val extension = extensionClass.getDeclaredConstructor().newInstance() as Extension
+            if (extension.id != manifest.id) {
+                log.warn(
+                    "Extension '${jar.fileName}' has manifest id '${manifest.id}' but Extension.id returned '${extension.id}'. " +
+                        "The manifest value will be used. Update Extension.id to match the manifest.",
+                )
+            }
             LoadedExtension(manifest = manifest, extension = extension, classLoader = classLoader, jarPath = jar)
         } catch (e: ClassNotFoundException) {
             classLoader.close()

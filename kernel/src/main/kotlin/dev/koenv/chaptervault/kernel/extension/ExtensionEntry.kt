@@ -4,6 +4,7 @@ import java.nio.file.Path
 
 data class ExtensionEntry(
     val extension: Extension,
+    val id: String = extension.id,
     val status: ExtensionStatus,
     val source: ExtensionSource,
     val errorMessage: String? = null,

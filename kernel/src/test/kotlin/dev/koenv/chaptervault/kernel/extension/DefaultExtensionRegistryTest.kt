@@ -88,8 +88,8 @@ class DefaultExtensionRegistryTest {
 
                 override fun onDisable() {}
             }
-        registry.register(ExtensionEntry(enabledExt, ExtensionStatus.ENABLED, ExtensionSource.BUNDLED))
-        registry.register(ExtensionEntry(disabledExt, ExtensionStatus.DISABLED, ExtensionSource.BUNDLED))
+        registry.register(ExtensionEntry(extension = enabledExt, status = ExtensionStatus.ENABLED, source = ExtensionSource.BUNDLED))
+        registry.register(ExtensionEntry(extension = disabledExt, status = ExtensionStatus.DISABLED, source = ExtensionSource.BUNDLED))
         val results = registry.enabledWithCapability(Capability.CanFetchSeries)
         assertEquals(1, results.size)
         assertEquals("enabled", results[0].extension.id)

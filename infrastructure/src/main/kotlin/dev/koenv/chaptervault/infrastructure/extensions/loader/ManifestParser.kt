@@ -5,6 +5,7 @@ import org.yaml.snakeyaml.error.YAMLException
 
 object ManifestParser {
     private val yaml = Yaml()
+    private val SLUG_PATTERN = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
 
     fun parse(content: String): ExtensionManifest? {
         if (content.isBlank()) return null
@@ -12,6 +13,7 @@ object ManifestParser {
             @Suppress("UNCHECKED_CAST")
             val map = yaml.load<Map<String, Any>>(content) ?: return null
             val id = map["id"] as? String ?: return null
+            if (!SLUG_PATTERN.matches(id)) return null
             val name = map["name"] as? String ?: return null
             val version = map["version"] as? String ?: return null
             val minServerVersion = map["minServerVersion"] as? String ?: return null

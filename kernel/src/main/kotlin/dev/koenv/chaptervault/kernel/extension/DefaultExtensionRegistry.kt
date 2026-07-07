@@ -6,7 +6,7 @@ class DefaultExtensionRegistry : ExtensionRegistry {
     private val entries = ConcurrentHashMap<String, ExtensionEntry>()
 
     override fun register(entry: ExtensionEntry) {
-        entries[entry.extension.id] = entry
+        entries[entry.id] = entry
     }
 
     override fun updateStatus(

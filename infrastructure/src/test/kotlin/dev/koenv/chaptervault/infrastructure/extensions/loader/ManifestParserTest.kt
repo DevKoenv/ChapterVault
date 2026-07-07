@@ -8,7 +8,7 @@ import kotlin.test.assertNull
 class ManifestParserTest {
     private val validYaml =
         """
-        id: "dev.example.my-source"
+        id: "my-source"
         name: "My Source"
         version: "1.2.0"
         minServerVersion: "1.0.0"
@@ -23,7 +23,7 @@ class ManifestParserTest {
     fun `parses valid manifest`() {
         val manifest = ManifestParser.parse(validYaml)
         assertNotNull(manifest)
-        assertEquals("dev.example.my-source", manifest.id)
+        assertEquals("my-source", manifest.id)
         assertEquals("My Source", manifest.name)
         assertEquals("1.2.0", manifest.version)
         assertEquals("1.0.0", manifest.minServerVersion)
@@ -75,7 +75,7 @@ class ManifestParserTest {
     fun `returns null when entryPoint is missing`() {
         val yaml =
             """
-            id: "dev.example.test"
+            id: "test-ext"
             name: "Test"
             version: "1.0.0"
             minServerVersion: "1.0.0"
@@ -107,7 +107,7 @@ class ManifestParserTest {
     fun `returns null when capabilities is missing`() {
         val yaml =
             """
-            id: "test.extension"
+            id: "test-ext"
             name: "Test"
             version: "1.0.0"
             minServerVersion: "1.0.0"
@@ -122,7 +122,7 @@ class ManifestParserTest {
     fun `returns null when description is missing`() {
         val yaml =
             """
-            id: "test.extension"
+            id: "test-ext"
             name: "Test"
             version: "1.0.0"
             minServerVersion: "1.0.0"
@@ -137,13 +137,115 @@ class ManifestParserTest {
     fun `returns null when author is missing`() {
         val yaml =
             """
-            id: "test.extension"
+            id: "test-ext"
             name: "Test"
             version: "1.0.0"
             minServerVersion: "1.0.0"
             description: "desc"
             capabilities: []
             entryPoint: "test.Extension"
+            """.trimIndent()
+        assertNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `rejects reverse domain id`() {
+        val yaml =
+            """
+            id: "dev.example.my-source"
+            name: "My Source"
+            version: "1.2.0"
+            minServerVersion: "1.0.0"
+            description: "Fetches manga from example.com"
+            author: "Test Author"
+            capabilities:
+              - connector
+            entryPoint: "dev.example.MyExtension"
+            """.trimIndent()
+        assertNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `accepts valid slug id`() {
+        val yaml =
+            """
+            id: "my-source"
+            name: "My Source"
+            version: "1.2.0"
+            minServerVersion: "1.0.0"
+            description: "Fetches manga from example.com"
+            author: "Test Author"
+            capabilities:
+              - connector
+            entryPoint: "dev.example.MyExtension"
+            """.trimIndent()
+        assertNotNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `rejects slug with uppercase`() {
+        val yaml =
+            """
+            id: "MySource"
+            name: "My Source"
+            version: "1.2.0"
+            minServerVersion: "1.0.0"
+            description: "Fetches manga from example.com"
+            author: "Test Author"
+            capabilities:
+              - connector
+            entryPoint: "dev.example.MyExtension"
+            """.trimIndent()
+        assertNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `rejects slug with underscores`() {
+        val yaml =
+            """
+            id: "my_source"
+            name: "My Source"
+            version: "1.2.0"
+            minServerVersion: "1.0.0"
+            description: "Fetches manga from example.com"
+            author: "Test Author"
+            capabilities:
+              - connector
+            entryPoint: "dev.example.MyExtension"
+            """.trimIndent()
+        assertNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `rejects slug with leading hyphen`() {
+        val yaml =
+            """
+            id: "-my-source"
+            name: "My Source"
+            version: "1.2.0"
+            minServerVersion: "1.0.0"
+            description: "Fetches manga from example.com"
+            author: "Test Author"
+            capabilities:
+              - connector
+            entryPoint: "dev.example.MyExtension"
+            """.trimIndent()
+        assertNull(ManifestParser.parse(yaml))
+    }
+
+    @Test
+    fun `rejects slug with trailing hyphen`() {
+        val yaml =
+            """
+            id: "my-source-"
+            name: "My Source"
+            version: "1.2.0"
+            minServerVersion: "1.0.0"
+            description: "Fetches manga from example.com"
+            author: "Test Author"
+            capabilities:
+              - connector
+            entryPoint: "dev.example.MyExtension"
             """.trimIndent()
         assertNull(ManifestParser.parse(yaml))
     }
