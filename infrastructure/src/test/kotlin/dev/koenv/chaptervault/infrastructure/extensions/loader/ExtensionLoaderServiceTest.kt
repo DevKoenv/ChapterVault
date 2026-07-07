@@ -23,12 +23,17 @@ import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.jar.JarEntry
+import java.util.jar.JarOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ExtensionLoaderServiceTest {
     @TempDir
@@ -134,6 +139,94 @@ class ExtensionLoaderServiceTest {
                 bundledExtensions = bundled,
             )
         return svc to connRegistry
+    }
+
+    private fun buildJarWithConfig(
+        manifestYaml: String,
+        configYaml: String?,
+        vararg classes: Class<*>,
+    ): Path {
+        val jar = Files.createTempFile(tempDir, "test-ext", ".jar")
+        JarOutputStream(Files.newOutputStream(jar)).use { jos ->
+            jos.putNextEntry(JarEntry("extension.yaml"))
+            jos.write(manifestYaml.toByteArray())
+            jos.closeEntry()
+            if (configYaml != null) {
+                jos.putNextEntry(JarEntry("config.yml"))
+                jos.write(configYaml.toByteArray())
+                jos.closeEntry()
+            }
+            for (cls in classes) {
+                val resourcePath = cls.name.replace('.', '/') + ".class"
+                val bytes = cls.getResourceAsStream("/$resourcePath")!!.readBytes()
+                jos.putNextEntry(JarEntry(resourcePath))
+                jos.write(bytes)
+                jos.closeEntry()
+            }
+        }
+        return jar
+    }
+
+    private val testExtManifest =
+        """
+        id: test-extension
+        name: Test Extension
+        version: 1.0.0
+        minServerVersion: 1.0.0
+        description: Test
+        author: Test
+        capabilities:
+          - connector
+        entryPoint: "dev.koenv.chaptervault.infrastructure.extensions.loader.TestExtension"
+        """.trimIndent()
+
+    @Test
+    fun `extracts bundled config yml from JAR to dataDir`() {
+        val jar = buildJarWithConfig(
+            testExtManifest,
+            "baseUrl: https://example.com\n",
+            TestExtension::class.java,
+        )
+        Files.move(jar, tempDir.resolve("test-extension-1.0.jar"))
+
+        val extRegistry = DefaultExtensionRegistry()
+        val (svc, _) = makeService(extRegistry = extRegistry)
+        svc.loadAll()
+
+        val configFile = tempDir.resolve("test-extension").resolve("config.yml").toFile()
+        assertTrue(configFile.exists(), "config.yml should be extracted to dataDir")
+        assertTrue(configFile.readText().contains("example.com"))
+    }
+
+    @Test
+    fun `does not overwrite existing config yml during extraction`() {
+        val jar = buildJarWithConfig(
+            testExtManifest,
+            "baseUrl: https://from-jar.com\n",
+            TestExtension::class.java,
+        )
+        Files.move(jar, tempDir.resolve("test-extension-1.0.jar"))
+
+        val dataDir = tempDir.resolve("test-extension").also { Files.createDirectories(it) }
+        val configFile = dataDir.resolve("config.yml").toFile()
+        configFile.writeText("baseUrl: https://already-here.com\n")
+
+        val (svc, _) = makeService()
+        svc.loadAll()
+
+        assertEquals("baseUrl: https://already-here.com\n", configFile.readText())
+    }
+
+    @Test
+    fun `skips extraction when JAR has no config yml`() {
+        val jar = buildJarWithConfig(testExtManifest, null, TestExtension::class.java)
+        Files.move(jar, tempDir.resolve("test-extension-1.0.jar"))
+
+        val (svc, _) = makeService()
+        svc.loadAll()
+
+        val configFile = tempDir.resolve("test-extension").resolve("config.yml").toFile()
+        assertFalse(configFile.exists(), "config.yml should not be created when JAR has none")
     }
 
     @Test

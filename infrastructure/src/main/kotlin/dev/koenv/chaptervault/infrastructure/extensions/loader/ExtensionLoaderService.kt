@@ -16,6 +16,7 @@ import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.jar.JarFile
 
 class ExtensionLoaderService(
     private val extensionRegistry: ExtensionRegistry,
@@ -148,6 +149,21 @@ class ExtensionLoaderService(
 
         try {
             Files.createDirectories(dataDir)
+
+            // Extract bundled config.yml from JAR if not already present (LOCAL extensions only)
+            if (jarPath != null) {
+                val configFile = dataDir.resolve("config.yml").toFile()
+                if (!configFile.exists()) {
+                    try {
+                        extractBundledConfig(jarPath, configFile)
+                    } catch (e: Exception) {
+                        extensionRegistry.updateStatus(canonicalId, ExtensionStatus.FAILED, "Failed to extract bundled config: ${e.message}")
+                        log.error("Extension '$canonicalId' failed to extract bundled config.yml: ${e.message}")
+                        return
+                    }
+                }
+            }
+
             extension.onEnable(buildContextWithTracking(baseContext, trackingConnectors, trackingEnrichers, trackingNotifications))
             validateCapabilities(extension, trackingConnectors, trackingEnrichers, trackingNotifications)
             extensionRegistry.register(
@@ -166,6 +182,16 @@ class ExtensionLoaderService(
         } catch (e: Throwable) {
             extensionRegistry.updateStatus(canonicalId, ExtensionStatus.FAILED, e.message)
             log.error("Extension '$canonicalId' failed to enable: ${e.message}")
+        }
+    }
+
+    private fun extractBundledConfig(jarPath: Path, targetFile: java.io.File) {
+        JarFile(jarPath.toFile()).use { jar ->
+            val entry = jar.getJarEntry("config.yml") ?: return
+            targetFile.parentFile?.mkdirs()
+            jar.getInputStream(entry).use { input ->
+                targetFile.outputStream().use { output -> input.copyTo(output) }
+            }
         }
     }
 
