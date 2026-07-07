@@ -139,7 +139,6 @@ class ExtensionLoaderService(
         val trackingConnectors = TrackingConnectorRegistry(connectorRegistryDelegate)
         val trackingEnrichers = TrackingEnricherRegistry(enricherRegistryDelegate)
         val trackingNotifications = TrackingNotificationRegistry(notificationRegistryDelegate)
-        val baseContext = contextFactory(canonicalId, dataDir)
 
         manifest?.let { manifests[canonicalId] = it }
 
@@ -163,6 +162,13 @@ class ExtensionLoaderService(
                     }
                 }
             }
+
+            // contextFactory is called after extraction so that DefaultManagedConfig's eager
+            // YamlConfig.load() in its constructor reads the extracted defaults, not a missing file.
+            // It is also inside the try block so that a malformed config.yml (which throws in
+            // YamlConfig.load()) marks only this extension as FAILED rather than aborting all
+            // remaining extensions.
+            val baseContext = contextFactory(canonicalId, dataDir)
 
             extension.onEnable(buildContextWithTracking(baseContext, trackingConnectors, trackingEnrichers, trackingNotifications))
             validateCapabilities(extension, trackingConnectors, trackingEnrichers, trackingNotifications)

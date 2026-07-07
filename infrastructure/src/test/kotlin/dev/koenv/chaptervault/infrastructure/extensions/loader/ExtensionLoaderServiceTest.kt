@@ -12,10 +12,12 @@ import dev.koenv.chaptervault.kernel.extension.Extension
 import dev.koenv.chaptervault.kernel.extension.ExtensionContext
 import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
+import dev.koenv.chaptervault.kernel.extension.ManagedConfig
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricher
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.extension.NotificationChannel
 import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
+import dev.koenv.chaptervault.kernel.extension.YamlConfig
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -314,5 +316,98 @@ class ExtensionLoaderServiceTest {
         assertNotNull(entry)
         assertEquals(ExtensionStatus.FAILED, entry.status)
         assertNotNull(entry.errorMessage)
+    }
+
+    @Test
+    fun `extracted config yml is readable by extension on first enable`() {
+        ConfigReadingTestExtension.capturedBaseUrl = null // reset before test
+
+        val manifest =
+            """
+            id: test-extension
+            name: Test Extension
+            version: 1.0.0
+            minServerVersion: 1.0.0
+            description: Test
+            author: Test
+            capabilities:
+              - connector
+            entryPoint: "dev.koenv.chaptervault.infrastructure.extensions.loader.ConfigReadingTestExtension"
+            """.trimIndent()
+
+        val jar = buildJarWithConfig(manifest, "baseUrl: https://example.com\n", ConfigReadingTestExtension::class.java)
+        Files.move(jar, tempDir.resolve("test-extension-1.0.jar"))
+
+        val extRegistry = DefaultExtensionRegistry()
+        val svc =
+            ExtensionLoaderService(
+                extensionRegistry = extRegistry,
+                connectorRegistryDelegate = simpleRegistry(),
+                enricherRegistryDelegate = noopEnricherRegistry(),
+                notificationRegistryDelegate = noopNotificationRegistry(),
+                contextFactory = { _, dir ->
+                    // Inline ManagedConfig backed by YamlConfig — mirrors DefaultManagedConfig from
+                    // :apps:server but avoids a cross-module dependency in the infrastructure tests.
+                    val yamlCfg = YamlConfig(dir.resolve("config.yml").toFile()).load()
+                    val config =
+                        object : ManagedConfig {
+                            override fun reload() { yamlCfg.load() }
+                            override fun save() = yamlCfg.save()
+                            override fun getString(path: String, default: String?) = yamlCfg.getString(path, default)
+                            override fun getInt(path: String, default: Int?) = yamlCfg.getInt(path, default)
+                            override fun getBoolean(path: String, default: Boolean?) = yamlCfg.getBoolean(path, default)
+                            override fun getDouble(path: String, default: Double?) = yamlCfg.getDouble(path, default)
+                            override fun get(path: String) = yamlCfg.get(path)
+                            override fun set(path: String, value: Any?) = yamlCfg.set(path, value)
+                            override fun remove(path: String) = yamlCfg.remove(path)
+                            override fun contains(path: String) = yamlCfg.contains(path)
+                        }
+                    object : ExtensionContext {
+                        override val httpClient get() = error("not needed in test")
+                        override val library get() = error("not needed in test")
+                        override val progress get() = error("not needed in test")
+                        override val system get() = error("not needed in test")
+                        override val connectorRegistry get() = error("not needed in test")
+                        override val dataDir = dir
+                        override val config = config
+                        override val enricherRegistry get() = error("not needed in test")
+                        override val notificationRegistry get() = error("not needed in test")
+                        override fun rateLimiter(bucket: String, requestsPerSecond: Double) = error("not needed in test")
+                        override fun logger(name: String) = org.slf4j.LoggerFactory.getLogger(name)
+                    }
+                },
+                externalLoader = ExternalExtensionLoader(extensionsDir = tempDir, serverVersion = "1.0.0"),
+                bundledExtensions = emptyList(),
+            )
+        svc.loadAll()
+
+        assertEquals(ExtensionStatus.ENABLED, extRegistry.findById("test-extension")?.status)
+        assertEquals("https://example.com", ConfigReadingTestExtension.capturedBaseUrl)
+    }
+}
+
+/**
+ * Extension that records the value of `baseUrl` from its config in [onEnable].
+ * Used by the "extracted config yml is readable by extension on first enable" test to prove
+ * that config extraction happens before [ExtensionLoaderService] builds the context.
+ *
+ * Loaded via URLClassLoader (parent-delegation), so [capturedBaseUrl] in the companion object
+ * is shared between the test and the loaded extension instance.
+ */
+class ConfigReadingTestExtension : Extension {
+    override val id = "test-extension"
+    override val name = "Test Extension (Config Reading)"
+    override val version = "1.0.0"
+
+    override fun capabilities() = emptySet<Capability>()
+
+    override fun onEnable(context: ExtensionContext) {
+        capturedBaseUrl = context.config.getString("baseUrl")
+    }
+
+    override fun onDisable() {}
+
+    companion object {
+        var capturedBaseUrl: String? = null
     }
 }
