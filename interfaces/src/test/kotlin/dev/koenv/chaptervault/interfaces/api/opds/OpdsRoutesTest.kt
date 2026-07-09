@@ -2,7 +2,14 @@ package dev.koenv.chaptervault.interfaces.api.opds
 
 import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
+import dev.koenv.chaptervault.kernel.api.ChapterWithSeries
+import dev.koenv.chaptervault.kernel.api.GenreCount
+import dev.koenv.chaptervault.kernel.api.LanguageCount
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.OpdsReadApi
+import dev.koenv.chaptervault.kernel.api.OpdsSeriesFilter
+import dev.koenv.chaptervault.kernel.api.RecentlyReadEntry
+import dev.koenv.chaptervault.kernel.api.StatusCount
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.library.Chapter
@@ -139,6 +146,21 @@ class OpdsRoutesTest {
             ) = Result.Success(emptySet<String>())
         }
 
+    private val fakeOpdsRead =
+        object : OpdsReadApi {
+            override suspend fun listReadHistory(userId: Id, request: PageRequest) =
+                Result.Success(Pagination(items = emptyList<RecentlyReadEntry>(), page = 0, size = 20, totalItems = 0L))
+
+            override suspend fun listRecentlyAddedChapters(request: PageRequest) =
+                Result.Success(Pagination(items = emptyList<ChapterWithSeries>(), page = 0, size = 20, totalItems = 0L))
+
+            override suspend fun listGenres() = Result.Success(emptyList<GenreCount>())
+            override suspend fun listLanguages() = Result.Success(emptyList<LanguageCount>())
+            override suspend fun listUpstreamStatuses() = Result.Success(emptyList<StatusCount>())
+            override suspend fun listSeriesFiltered(filter: OpdsSeriesFilter, request: PageRequest) =
+                Result.Success(Pagination(items = emptyList<dev.koenv.chaptervault.kernel.library.Series>(), page = 0, size = 20, totalItems = 0L))
+        }
+
     private val fakePageSource =
         object : ChapterPageSource {
             override suspend fun readPage(
@@ -178,7 +200,7 @@ class OpdsRoutesTest {
                     }
                 }
             }
-            opdsRoutes(libraryRead, fakePageSource)
+            opdsRoutes(libraryRead, fakeOpdsRead, fakePageSource)
             opdsPageRoutes(libraryRead, fakePageSource)
         }
         block()
@@ -209,7 +231,7 @@ class OpdsRoutesTest {
                         }
                     }
                 }
-                opdsRoutes(fakeLibraryRead, fakePageSource)
+                opdsRoutes(fakeLibraryRead, fakeOpdsRead, fakePageSource)
                 opdsPageRoutes(fakeLibraryRead, fakePageSource)
                 routing {
                     authenticate("auth-bearer") {

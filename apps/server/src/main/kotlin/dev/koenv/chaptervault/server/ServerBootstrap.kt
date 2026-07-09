@@ -31,6 +31,7 @@ import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
+import dev.koenv.chaptervault.kernel.api.OpdsReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
@@ -194,7 +195,8 @@ fun Application.bootstrap() {
         }
     }
 
-    opdsRoutes(libraryRead, fileStorage)
+    val opdsRead by inject<OpdsReadApi>()
+    opdsRoutes(libraryRead, opdsRead, fileStorage)
     opdsPageRoutes(libraryRead, fileStorage)
 
     // here rather than :interfaces because it needs FileStorage directly

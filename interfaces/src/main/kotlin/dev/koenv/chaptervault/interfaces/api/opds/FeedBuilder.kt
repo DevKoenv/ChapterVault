@@ -1,8 +1,14 @@
 package dev.koenv.chaptervault.interfaces.api.opds
 
+import dev.koenv.chaptervault.kernel.api.ChapterWithSeries
+import dev.koenv.chaptervault.kernel.api.GenreCount
+import dev.koenv.chaptervault.kernel.api.LanguageCount
+import dev.koenv.chaptervault.kernel.api.RecentlyReadEntry
+import dev.koenv.chaptervault.kernel.api.StatusCount
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
+import java.net.URLEncoder
 
 class FeedBuilder {
     fun buildNavigationFeed(now: String): OpdsFeed =
@@ -12,16 +18,50 @@ class FeedBuilder {
             updated = now,
             selfHref = "/opds/v1",
             kind = "navigation",
-            entries =
-                listOf(
-                    OpdsEntry(
-                        id = "urn:chaptervault:catalog",
-                        title = "Library",
-                        updated = now,
-                        content = "Browse the manga library",
-                        links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/catalog", type = TYPE_ACQUISITION)),
-                    ),
+            entries = listOf(
+                OpdsEntry(
+                    id = "urn:chaptervault:catalog",
+                    title = "Library",
+                    updated = now,
+                    content = "Browse the manga library",
+                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/catalog", type = TYPE_ACQUISITION)),
                 ),
+                OpdsEntry(
+                    id = "urn:chaptervault:history",
+                    title = "Reading History",
+                    updated = now,
+                    content = "Series you have been reading",
+                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/history", type = TYPE_ACQUISITION)),
+                ),
+                OpdsEntry(
+                    id = "urn:chaptervault:library-updates",
+                    title = "Library Updates",
+                    updated = now,
+                    content = "Recently added chapters",
+                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library-updates", type = TYPE_ACQUISITION)),
+                ),
+                OpdsEntry(
+                    id = "urn:chaptervault:library:genres",
+                    title = "Browse by Genre",
+                    updated = now,
+                    content = "Browse series by genre",
+                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/genres", type = TYPE_NAVIGATION)),
+                ),
+                OpdsEntry(
+                    id = "urn:chaptervault:library:languages",
+                    title = "Browse by Language",
+                    updated = now,
+                    content = "Browse series by language",
+                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/languages", type = TYPE_NAVIGATION)),
+                ),
+                OpdsEntry(
+                    id = "urn:chaptervault:library:status",
+                    title = "Browse by Status",
+                    updated = now,
+                    content = "Browse series by upstream status",
+                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/status", type = TYPE_NAVIGATION)),
+                ),
+            ),
         )
 
     fun buildCatalogFeed(
@@ -40,6 +80,168 @@ class FeedBuilder {
             kind = "acquisition",
             nextHref = if (page + 1 < totalPages) "/opds/v1/catalog?page=${page + 1}&size=$size" else null,
             prevHref = if (page > 0) "/opds/v1/catalog?page=${page - 1}&size=$size" else null,
+            totalResults = totalItems,
+            itemsPerPage = size,
+            startIndex = page * size + 1,
+            entries = series.map { buildSeriesEntry(it, now) },
+        )
+    }
+
+    fun buildHistoryFeed(
+        entries: List<RecentlyReadEntry>,
+        page: Int,
+        size: Int,
+        totalItems: Long,
+        now: String,
+    ): OpdsFeed {
+        val totalPages = if (size > 0) (totalItems + size - 1) / size else 1
+        return OpdsFeed(
+            id = "urn:chaptervault:history",
+            title = "Reading History",
+            updated = now,
+            selfHref = "/opds/v1/history?page=$page&size=$size",
+            kind = "acquisition",
+            nextHref = if (page + 1 < totalPages) "/opds/v1/history?page=${page + 1}&size=$size" else null,
+            prevHref = if (page > 0) "/opds/v1/history?page=${page - 1}&size=$size" else null,
+            totalResults = totalItems,
+            itemsPerPage = size,
+            startIndex = page * size + 1,
+            entries = entries.map { entry ->
+                val series = entry.series
+                val links = mutableListOf(
+                    OpdsLink(rel = "subsection", href = "/opds/v1/series/${series.id}", type = TYPE_ACQUISITION),
+                )
+                series.coverUrl?.let { links.add(OpdsLink(rel = REL_IMAGE, href = it, type = "image/jpeg")) }
+                OpdsEntry(
+                    id = "urn:chaptervault:history:series:${series.id}",
+                    title = series.title,
+                    updated = entry.lastReadAt.toString(),
+                    summary = "${entry.chaptersRead} of ${entry.totalChapters} chapters read",
+                    links = links,
+                )
+            },
+        )
+    }
+
+    fun buildLibraryUpdatesFeed(
+        chapters: List<ChapterWithSeries>,
+        page: Int,
+        size: Int,
+        totalItems: Long,
+        now: String,
+    ): OpdsFeed {
+        val totalPages = if (size > 0) (totalItems + size - 1) / size else 1
+        return OpdsFeed(
+            id = "urn:chaptervault:library-updates",
+            title = "Library Updates",
+            updated = now,
+            selfHref = "/opds/v1/library-updates?page=$page&size=$size",
+            kind = "acquisition",
+            nextHref = if (page + 1 < totalPages) "/opds/v1/library-updates?page=${page + 1}&size=$size" else null,
+            prevHref = if (page > 0) "/opds/v1/library-updates?page=${page - 1}&size=$size" else null,
+            totalResults = totalItems,
+            itemsPerPage = size,
+            startIndex = page * size + 1,
+            entries = chapters.map { (chapter, series) ->
+                buildChapterEntry(chapter, now, coverUrl = series.coverUrl)
+            },
+        )
+    }
+
+    fun buildGenreNavFeed(genres: List<GenreCount>, now: String): OpdsFeed =
+        OpdsFeed(
+            id = "urn:chaptervault:library:genres",
+            title = "Browse by Genre",
+            updated = now,
+            selfHref = "/opds/v1/library/genres",
+            kind = "navigation",
+            entries = genres.map { g ->
+                OpdsEntry(
+                    id = "urn:chaptervault:library:genre:${g.genre}",
+                    title = "${g.genre} (${g.seriesCount})",
+                    updated = now,
+                    links = listOf(
+                        OpdsLink(
+                            rel = "subsection",
+                            href = "/opds/v1/catalog?genre=${encodeParam(g.genre)}",
+                            type = TYPE_ACQUISITION,
+                        ),
+                    ),
+                )
+            },
+        )
+
+    fun buildLanguageNavFeed(languages: List<LanguageCount>, now: String): OpdsFeed =
+        OpdsFeed(
+            id = "urn:chaptervault:library:languages",
+            title = "Browse by Language",
+            updated = now,
+            selfHref = "/opds/v1/library/languages",
+            kind = "navigation",
+            entries = languages.map { l ->
+                OpdsEntry(
+                    id = "urn:chaptervault:library:language:${l.language}",
+                    title = "${l.language} (${l.seriesCount})",
+                    updated = now,
+                    links = listOf(
+                        OpdsLink(
+                            rel = "subsection",
+                            href = "/opds/v1/catalog?language=${encodeParam(l.language)}",
+                            type = TYPE_ACQUISITION,
+                        ),
+                    ),
+                )
+            },
+        )
+
+    fun buildStatusNavFeed(statuses: List<StatusCount>, now: String): OpdsFeed =
+        OpdsFeed(
+            id = "urn:chaptervault:library:status",
+            title = "Browse by Status",
+            updated = now,
+            selfHref = "/opds/v1/library/status",
+            kind = "navigation",
+            entries = statuses.map { s ->
+                OpdsEntry(
+                    id = "urn:chaptervault:library:status:${s.status}",
+                    title = "${s.status} (${s.seriesCount})",
+                    updated = now,
+                    links = listOf(
+                        OpdsLink(
+                            rel = "subsection",
+                            href = "/opds/v1/catalog?upstreamStatus=${encodeParam(s.status)}",
+                            type = TYPE_ACQUISITION,
+                        ),
+                    ),
+                )
+            },
+        )
+
+    fun buildFilteredCatalogFeed(
+        series: List<Series>,
+        page: Int,
+        size: Int,
+        totalItems: Long,
+        now: String,
+        genre: String? = null,
+        language: String? = null,
+        upstreamStatus: String? = null,
+    ): OpdsFeed {
+        val totalPages = if (size > 0) (totalItems + size - 1) / size else 1
+        val filterParams = buildList {
+            genre?.let { add("genre=${encodeParam(it)}") }
+            language?.let { add("language=${encodeParam(it)}") }
+            upstreamStatus?.let { add("upstreamStatus=${encodeParam(it)}") }
+        }.joinToString("&")
+        val baseQuery = if (filterParams.isNotEmpty()) "$filterParams&" else ""
+        return OpdsFeed(
+            id = "urn:chaptervault:catalog:filtered",
+            title = "Library",
+            updated = now,
+            selfHref = "/opds/v1/catalog?${baseQuery}page=$page&size=$size",
+            kind = "acquisition",
+            nextHref = if (page + 1 < totalPages) "/opds/v1/catalog?${baseQuery}page=${page + 1}&size=$size" else null,
+            prevHref = if (page > 0) "/opds/v1/catalog?${baseQuery}page=${page - 1}&size=$size" else null,
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
@@ -134,6 +336,8 @@ class FeedBuilder {
         val pageCount: Int,
         val firstPageMimeType: String,
     )
+
+    private fun encodeParam(value: String): String = URLEncoder.encode(value, "UTF-8")
 
     companion object {
         const val TYPE_NAVIGATION = "application/atom+xml;profile=opds-catalog;kind=navigation"
