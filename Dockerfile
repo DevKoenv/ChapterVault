@@ -4,13 +4,13 @@ WORKDIR /build
 
 COPY . .
 
-RUN ./gradlew :apps:server:fatJar --no-daemon -q
+RUN ./gradlew :apps:server:shadowJar --no-daemon -q
 
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-COPY --from=builder /build/apps/server/build/libs/server-fat.jar app.jar
+COPY --from=builder /build/apps/server/build/libs/server-*.jar app.jar
 COPY config/ config/
 
 RUN mkdir -p data/db data/library data/thumbnails

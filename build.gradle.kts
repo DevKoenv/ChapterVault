@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.ktlint) apply false
     alias(libs.plugins.detekt)
+    alias(libs.plugins.shadow) apply false
 }
 
 val coverageThreshold = 70 // raise this as test coverage improves

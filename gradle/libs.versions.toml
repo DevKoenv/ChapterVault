@@ -16,6 +16,7 @@ jsoup = "1.18.3"
 kover = "0.9.1"
 ktlint-gradle = "14.2.0"
 detekt = "1.23.8"
+shadow = "8.3.6"
 
 [libraries]
 # Ktor server
@@ -75,6 +76,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint-gradle" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 
 [bundles]
 ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-content-negotiation", "ktor-server-auth", "ktor-server-sse", "ktor-server-config-yaml", "ktor-serialization-kotlinx-json", "ktor-server-call-logging", "ktor-server-cors", "ktor-server-status-pages"]
