@@ -56,6 +56,7 @@ import dev.koenv.chaptervault.kernel.runtime.EventPublishingTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
+import dev.koenv.chaptervault.server.generated.BuildConfig
 import org.koin.dsl.module
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -170,7 +171,7 @@ val extensionModule =
                 externalLoader =
                     ExternalExtensionLoader(
                         extensionsDir = extensionsDataRoot,
-                        serverVersion = BuildInfo.SERVER_VERSION,
+                        serverVersion = BuildConfig.VERSION,
                     ),
                 bundledExtensions = emptyList(),
             )

@@ -1,6 +1,24 @@
 plugins {
     application
     alias(libs.plugins.shadow)
+    alias(libs.plugins.buildconfig)
+}
+
+val gitRevision: String = try {
+    providers.exec {
+        commandLine("git", "rev-parse", "--short", "HEAD")
+    }.standardOutput.asText.get().trim()
+} catch (e: Exception) {
+    "unknown"
+}
+
+buildConfig {
+    packageName("dev.koenv.chaptervault.server.generated")
+    buildConfigField("String", "VERSION", "\"${project.version}\"")
+    buildConfigField("long", "BUILD_TIME", System.currentTimeMillis().toString())
+    buildConfigField("String", "REVISION", "\"$gitRevision\"")
+    buildConfigField("String", "PROJECT_NAME", "\"${project.name}\"")
+    buildConfigField("String", "REPOSITORY_URL", "\"https://github.com/DevKoenv/ChapterVault\"")
 }
 
 kover {
