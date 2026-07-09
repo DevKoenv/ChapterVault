@@ -13,6 +13,7 @@ import dev.koenv.chaptervault.infrastructure.connectors.mangadex.MangaDexConnect
 import dev.koenv.chaptervault.infrastructure.database.repositories.BookmarkRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.NotificationRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.OpdsReadRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
@@ -39,6 +40,7 @@ import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
+import dev.koenv.chaptervault.kernel.api.OpdsReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
@@ -82,6 +84,8 @@ val infrastructureModule =
         single<BookmarkApi> { get<BookmarkRepository>() }
         single { UserSeriesStatusRepository() }
         single<ReadingStatusApi> { get<UserSeriesStatusRepository>() }
+        single { OpdsReadRepository() }
+        single<OpdsReadApi> { get<OpdsReadRepository>() }
         single { NotificationRepository() }
         single<NotificationApi> { get<NotificationRepository>() }
         single { NtfyNotificationChannel(get()) }
