@@ -1,4 +1,5 @@
 dependencies {
+    implementation(libs.kotlin.logging.jvm)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)

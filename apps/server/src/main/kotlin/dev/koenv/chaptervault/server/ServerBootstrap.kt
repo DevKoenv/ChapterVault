@@ -67,13 +67,13 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.koin.ktor.ext.inject
-import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
-private val log = LoggerFactory.getLogger("ServerBootstrap")
+private val logger = KotlinLogging.logger("ServerBootstrap")
 
 private val basicAuthCache = ConcurrentHashMap<String, Pair<KtorPrincipal, Long>>()
 private const val BASIC_AUTH_CACHE_TTL_MS = 60_000L
@@ -104,7 +104,7 @@ fun Application.bootstrap() {
     install(ContentNegotiation) { json() }
     install(StatusPages) {
         exception<Throwable> { call, cause ->
-            log.error("Unhandled exception on ${call.request.httpMethod.value} ${call.request.uri}", cause)
+            logger.error(cause) { "Unhandled exception on ${call.request.httpMethod.value} ${call.request.uri}" }
             call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", "An unexpected error occurred"))
         }
         status(HttpStatusCode.NotFound) { call, status ->

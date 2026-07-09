@@ -10,18 +10,19 @@ import dev.koenv.chaptervault.kernel.extension.NotificationEvent
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 class NotificationService(
     private val eventBus: EventBus,
     private val notificationApi: NotificationApi,
     private val channelRegistry: NotificationChannelRegistry,
 ) : NotificationDispatchApi {
-    private val log = LoggerFactory.getLogger(NotificationService::class.java)
 
     fun start() {
         eventBus.on<NewChaptersDiscovered> { event -> dispatch(event) }
-        log.info("NotificationService started")
+        logger.info { "NotificationService started" }
     }
 
     private suspend fun dispatch(event: NewChaptersDiscovered) {
@@ -41,19 +42,19 @@ class NotificationService(
             targets.forEach { target ->
                 val channel = channelRegistry.find(target.type)
                 if (channel == null) {
-                    log.warn(
-                        "No channel registered for type '${target.type}' (target '${target.name}'). Use the built-in types or register an extension channel.",
-                    )
+                    logger.warn {
+                        "No channel registered for type '${target.type}' (target '${target.name}'). Use the built-in types or register an extension channel."
+                    }
                     return@forEach
                 }
                 runCatching {
                     channel.send(target.url, target.token, notifEvent)
                 }.onFailure { e ->
-                    log.warn("Notification to '${target.name}' (${target.type}) failed: ${e.message}")
+                    logger.warn { "Notification to '${target.name}' (${target.type}) failed: ${e.message}" }
                 }
             }
         }.onFailure { e ->
-            log.error("Notification dispatch failed: ${e.message}", e)
+            logger.error(e) { "Notification dispatch failed: ${e.message}" }
         }
     }
 

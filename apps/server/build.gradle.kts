@@ -41,6 +41,7 @@ dependencies {
     implementation(project(":kernel"))
     implementation(project(":infrastructure"))
     implementation(project(":interfaces"))
+    implementation(libs.kotlin.logging.jvm)
     implementation(libs.bundles.ktor.server)
     implementation(libs.ktor.server.swagger)
     implementation(libs.bundles.koin)

@@ -30,7 +30,7 @@ import io.ktor.client.statement.readRawBytes
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
 
@@ -45,7 +45,7 @@ class TaskExecutorService(
     private val eventBus: EventBus,
     private val enricherRegistry: MetadataEnricherRegistry,
 ) {
-    private val log = LoggerFactory.getLogger(TaskExecutorService::class.java)
+    private val logger = KotlinLogging.logger {}
     private val lastHeartbeatMs = AtomicLong(0L)
 
     fun isAlive(): Boolean = System.currentTimeMillis() - lastHeartbeatMs.get() < 2_000L
@@ -78,27 +78,27 @@ class TaskExecutorService(
                 }
                 // skip tasks cancelled between enqueue and dequeue
                 if (taskQueue.getTask(task.id)?.status == TaskStatus.CANCELLED) {
-                    log.info("Task ${task.id} [${task.type}] skipped, cancelled while queued")
+                    logger.info { "Task ${task.id} [${task.type}] skipped, cancelled while queued" }
                     continue
                 }
                 taskRepository.updateStatus(task.id, TaskStatus.RUNNING)
                 eventBus.publish(TaskEvents.TaskStarted(task.id, task.type, task.targetId, Instant.now()))
-                log.info("Task ${task.id} [${task.type}] started, target=${task.targetId}")
+                logger.info { "Task ${task.id} [${task.type}] started, target=${task.targetId}" }
                 val result =
                     runCatching { dispatch(task) }.getOrElse { e ->
-                        log.error("Task ${task.id} [${task.type}] threw uncaught exception", e)
+                        logger.error(e) { "Task ${task.id} [${task.type}] threw uncaught exception" }
                         Result.Failure(AppError.InternalError(e.message ?: "Executor error"))
                     }
                 when (result) {
                     is Result.Success -> {
                         taskRepository.updateStatus(task.id, TaskStatus.COMPLETED)
                         eventBus.publish(TaskEvents.TaskCompleted(task.id, task.type, task.targetId, Instant.now()))
-                        log.info("Task ${task.id} [${task.type}] completed")
+                        logger.info { "Task ${task.id} [${task.type}] completed" }
                     }
                     is Result.Failure -> {
                         taskRepository.updateStatus(task.id, TaskStatus.FAILED, result.error.message)
                         eventBus.publish(TaskEvents.TaskFailed(task.id, task.type, task.targetId, result.error.message, Instant.now()))
-                        log.error("Task ${task.id} [${task.type}] failed: ${result.error.message}")
+                        logger.error { "Task ${task.id} [${task.type}] failed: ${result.error.message}" }
                         if (task.retryCount < MAX_RETRIES) {
                             val delayMs = RETRY_DELAYS_MS[task.retryCount]
                             val retryTask =
@@ -110,7 +110,7 @@ class TaskExecutorService(
                                     createdAt = Instant.now(),
                                     updatedAt = Instant.now(),
                                 )
-                            log.info("Task ${task.id} will be retried (attempt ${retryTask.retryCount}/$MAX_RETRIES) in ${delayMs}ms")
+                            logger.info { "Task ${task.id} will be retried (attempt ${retryTask.retryCount}/$MAX_RETRIES) in ${delayMs}ms" }
                             launch {
                                 delay(delayMs)
                                 taskQueue.enqueue(retryTask)
@@ -152,7 +152,7 @@ class TaskExecutorService(
                     fileStorage.writeCover(task.targetId.toString(), bytes)
                     "/library/series/${task.targetId}/cover"
                 } catch (e: Exception) {
-                    log.warn("Cover download failed for series ${task.targetId}, using remote URL: ${e.message}")
+                    logger.warn { "Cover download failed for series ${task.targetId}, using remote URL: ${e.message}" }
                     coverUrl
                 }
             }
@@ -190,10 +190,10 @@ class TaskExecutorService(
                             )
                     ) {
                         is Result.Success -> Unit
-                        is Result.Failure -> log.warn("Failed to persist enriched fields for series ${task.targetId}: ${dbResult.error}")
+                        is Result.Failure -> logger.warn { "Failed to persist enriched fields for series ${task.targetId}: ${dbResult.error}" }
                     }
                 }
-                is Result.Failure -> log.warn("Enricher '${enricher.id}' failed for series ${task.targetId}: ${r.error}")
+                is Result.Failure -> logger.warn { "Enricher '${enricher.id}' failed for series ${task.targetId}: ${r.error}" }
             }
         }
 

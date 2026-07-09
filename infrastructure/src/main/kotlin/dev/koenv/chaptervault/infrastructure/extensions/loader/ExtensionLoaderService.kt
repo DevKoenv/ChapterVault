@@ -11,7 +11,7 @@ import dev.koenv.chaptervault.kernel.extension.ExtensionSource
 import dev.koenv.chaptervault.kernel.extension.ExtensionStatus
 import dev.koenv.chaptervault.kernel.extension.MetadataEnricherRegistry
 import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
@@ -31,7 +31,7 @@ class ExtensionLoaderService(
     private val classloaders = ConcurrentHashMap<String, URLClassLoader>()
     private val manifests = ConcurrentHashMap<String, ExtensionManifest>()
 
-    private val log = LoggerFactory.getLogger(ExtensionLoaderService::class.java)
+    private val logger = KotlinLogging.logger {}
 
     fun loadAll() {
         bundledExtensions.forEach { ext ->
@@ -49,7 +49,7 @@ class ExtensionLoaderService(
     override fun enable(id: String) {
         val entry =
             extensionRegistry.findById(id) ?: run {
-                log.warn("enable: extension '$id' not found")
+                logger.warn { "enable: extension '$id' not found" }
                 return
             }
         if (entry.status == ExtensionStatus.ENABLED) return
@@ -60,7 +60,7 @@ class ExtensionLoaderService(
     override fun disable(id: String) {
         val entry =
             extensionRegistry.findById(id) ?: run {
-                log.warn("disable: extension '$id' not found")
+                logger.warn { "disable: extension '$id' not found" }
                 return
             }
         if (entry.status != ExtensionStatus.ENABLED) return
@@ -76,10 +76,10 @@ class ExtensionLoaderService(
         try {
             entry.extension.onDisable()
         } catch (e: Exception) {
-            log.warn("onDisable threw for '${entry.extension.id}': ${e.message}")
+            logger.warn { "onDisable threw for '${entry.extension.id}': ${e.message}" }
         }
         extensionRegistry.updateStatus(id, ExtensionStatus.DISABLED)
-        log.info("Extension '${entry.extension.id}' disabled")
+        logger.info { "Extension '${entry.extension.id}' disabled" }
     }
 
     override fun listAll(): List<ExtensionEntry> = extensionRegistry.all()
@@ -90,7 +90,7 @@ class ExtensionLoaderService(
     override fun unload(id: String) {
         val entry = extensionRegistry.findById(id) ?: return
         if (entry.source == ExtensionSource.BUNDLED) {
-            log.warn("Cannot unload bundled extension '$id'")
+            logger.warn { "Cannot unload bundled extension '$id'" }
             return
         }
         if (entry.status == ExtensionStatus.ENABLED) {
@@ -98,29 +98,29 @@ class ExtensionLoaderService(
         }
         classloaders.remove(id)?.close()
         extensionRegistry.updateStatus(id, ExtensionStatus.UNLOADED)
-        log.info("Extension '$id' unloaded")
+        logger.info { "Extension '$id' unloaded" }
     }
 
     @Synchronized
     override fun reload(id: String) {
         val entry =
             extensionRegistry.findById(id) ?: run {
-                log.warn("reload: extension '$id' not found")
+                logger.warn { "reload: extension '$id' not found" }
                 return
             }
         if (entry.source == ExtensionSource.BUNDLED) {
-            log.warn("Cannot reload bundled extension '$id'")
+            logger.warn { "Cannot reload bundled extension '$id'" }
             return
         }
         val jarPath =
             entry.jarPath ?: run {
-                log.error("reload: no JAR path recorded for '$id'")
+                logger.error { "reload: no JAR path recorded for '$id'" }
                 return
             }
         unload(id)
         val loaded =
             externalLoader.loadSingle(jarPath) ?: run {
-                log.error("reload: failed to load JAR for '$id' at $jarPath")
+                logger.error { "reload: failed to load JAR for '$id' at $jarPath" }
                 extensionRegistry.updateStatus(id, ExtensionStatus.FAILED, "reload failed: JAR at $jarPath could not be loaded")
                 return
             }
@@ -161,7 +161,7 @@ class ExtensionLoaderService(
                             ExtensionStatus.FAILED,
                             "Failed to extract bundled config: ${e.message}",
                         )
-                        log.error("Extension '$canonicalId' failed to extract bundled config.yml: ${e.message}")
+                        logger.error { "Extension '$canonicalId' failed to extract bundled config.yml: ${e.message}" }
                         return
                     }
                 }
@@ -188,10 +188,10 @@ class ExtensionLoaderService(
                     registeredChannelTypeIds = trackingNotifications.registeredTypeIds,
                 ),
             )
-            log.info("Extension '$canonicalId' enabled (source=$source)")
+            logger.info { "Extension '$canonicalId' enabled (source=$source)" }
         } catch (e: Throwable) {
             extensionRegistry.updateStatus(canonicalId, ExtensionStatus.FAILED, e.message)
-            log.error("Extension '$canonicalId' failed to enable: ${e.message}")
+            logger.error { "Extension '$canonicalId' failed to enable: ${e.message}" }
         }
     }
 
@@ -228,13 +228,13 @@ class ExtensionLoaderService(
     ) {
         val declared = extension.capabilities()
         if (Capability.CanFetchSeries in declared && connectors.registeredIds.isEmpty()) {
-            log.warn("Extension '${extension.id}' declares CanFetchSeries but registered no connectors")
+            logger.warn { "Extension '${extension.id}' declares CanFetchSeries but registered no connectors" }
         }
         if (Capability.CanEnrichMetadata in declared && enrichers.registeredIds.isEmpty()) {
-            log.warn("Extension '${extension.id}' declares CanEnrichMetadata but registered no enrichers")
+            logger.warn { "Extension '${extension.id}' declares CanEnrichMetadata but registered no enrichers" }
         }
         if (Capability.CanSendNotifications in declared && notifications.registeredTypeIds.isEmpty()) {
-            log.warn("Extension '${extension.id}' declares CanSendNotifications but registered no channels")
+            logger.warn { "Extension '${extension.id}' declares CanSendNotifications but registered no channels" }
         }
     }
 }

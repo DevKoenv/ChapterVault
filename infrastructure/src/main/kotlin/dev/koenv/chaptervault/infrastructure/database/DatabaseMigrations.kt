@@ -4,11 +4,12 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.IntegerColumnType
 import org.jetbrains.exposed.sql.TextColumnType
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.security.MessageDigest
 
+private val logger = KotlinLogging.logger {}
+
 object DatabaseMigrations {
-    private val log = LoggerFactory.getLogger(DatabaseMigrations::class.java)
 
     internal data class Migration(
         val version: Int,
@@ -175,7 +176,7 @@ object DatabaseMigrations {
         }
 
         migrations.filter { it.version !in applied }.forEach { migration ->
-            log.info("Applying migration V${migration.version}: ${migration.name}")
+            logger.info { "Applying migration V${migration.version}: ${migration.name}" }
             migration.statements.forEach { exec(it) }
             exec(
                 "INSERT INTO schema_version (version, name, applied_at, checksum) VALUES (?, ?, datetime('now'), ?)",
@@ -185,7 +186,7 @@ object DatabaseMigrations {
                     TextColumnType() to migration.checksum,
                 ),
             )
-            log.info("Migration V${migration.version} applied, checksum: ${migration.checksum}")
+            logger.info { "Migration V${migration.version} applied, checksum: ${migration.checksum}" }
         }
     }
 }

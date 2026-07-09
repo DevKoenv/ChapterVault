@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":shared"))
     implementation(project(":kernel"))
+    implementation(libs.kotlin.logging.jvm)
     implementation(libs.bundles.exposed)
     implementation(libs.sqlite.jdbc)
     implementation(libs.kotlinx.serialization.json)

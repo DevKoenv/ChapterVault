@@ -1,13 +1,13 @@
 package dev.koenv.chaptervault.server
 
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.nio.file.Files
 import java.nio.file.Paths
 
-object ConfigValidator {
-    private val log = LoggerFactory.getLogger(ConfigValidator::class.java)
+private val logger = KotlinLogging.logger {}
 
+object ConfigValidator {
     fun validate(config: AppConfig) {
         val errors = mutableListOf<String>()
 
@@ -60,15 +60,15 @@ object ConfigValidator {
         errors.addAll(invalidCidrs)
 
         if (errors.isNotEmpty()) {
-            errors.forEach { log.error("Configuration error: $it") }
+            errors.forEach { logger.error { "Configuration error: $it" } }
             error("Server startup aborted due to ${errors.size} configuration error(s)")
         }
 
-        log.info(
+        logger.info {
             "Config: port=${config.server.port} db=${config.database.url} " +
                 "library=${config.storage.libraryPath} thumbnails=${config.storage.thumbnailsPath} " +
                 "refresh=${config.refresh.intervalHours}h debug=${config.debug} " +
-                "rateLimiting=${config.auth.rateLimiting.enabled}",
-        )
+                "rateLimiting=${config.auth.rateLimiting.enabled}"
+        }
     }
 }

@@ -1,20 +1,20 @@
 package dev.koenv.chaptervault.infrastructure.extensions.loader
 
 import dev.koenv.chaptervault.kernel.extension.Extension
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.jar.JarFile
 import kotlin.io.path.extension
 
+private val logger = KotlinLogging.logger {}
+
 class ExternalExtensionLoader(
     val extensionsDir: Path,
     private val serverVersion: String,
     private val parentClassLoader: ClassLoader = Thread.currentThread().contextClassLoader,
 ) {
-    private val log = LoggerFactory.getLogger(ExternalExtensionLoader::class.java)
-
     fun loadAll(): List<LoadedExtension> {
         Files.createDirectories(extensionsDir)
         val seen = mutableMapOf<String, String>() // id -> first jar filename
@@ -27,7 +27,7 @@ class ExternalExtensionLoader(
                 val id = loaded.manifest.id
                 val existing = seen[id]
                 if (existing != null) {
-                    log.warn("Duplicate extension id '$id': already loaded from '$existing', skipping '${jar.fileName}'.")
+                    logger.warn { "Duplicate extension id '$id': already loaded from '$existing', skipping '${jar.fileName}'." }
                     return@mapNotNull null
                 }
                 seen[id] = jar.fileName.toString()
@@ -38,11 +38,11 @@ class ExternalExtensionLoader(
     fun loadSingle(jar: Path): LoadedExtension? {
         val manifest =
             readManifest(jar) ?: run {
-                log.warn("Skipping ${jar.fileName}: missing or invalid extension.yaml")
+                logger.warn { "Skipping ${jar.fileName}: missing or invalid extension.yaml" }
                 return null
             }
         if (!isCompatible(manifest)) {
-            log.warn("Skipping ${manifest.id}: requires server ${manifest.minServerVersion}, running $serverVersion")
+            logger.warn { "Skipping ${manifest.id}: requires server ${manifest.minServerVersion}, running $serverVersion" }
             return null
         }
         val classLoader = URLClassLoader(arrayOf(jar.toUri().toURL()), parentClassLoader)
@@ -50,19 +50,19 @@ class ExternalExtensionLoader(
             val extensionClass = classLoader.loadClass(manifest.entryPoint)
             val extension = extensionClass.getDeclaredConstructor().newInstance() as Extension
             if (extension.id != manifest.id) {
-                log.warn(
+                logger.warn {
                     "Extension '${jar.fileName}' has manifest id '${manifest.id}' but Extension.id returned '${extension.id}'. " +
-                        "The manifest value will be used. Update Extension.id to match the manifest.",
-                )
+                        "The manifest value will be used. Update Extension.id to match the manifest."
+                }
             }
             LoadedExtension(manifest = manifest, extension = extension, classLoader = classLoader, jarPath = jar)
         } catch (e: ClassNotFoundException) {
             classLoader.close()
-            log.warn("Skipping ${manifest.id}: entry point class '${manifest.entryPoint}' not found")
+            logger.warn { "Skipping ${manifest.id}: entry point class '${manifest.entryPoint}' not found" }
             null
         } catch (e: Exception) {
             classLoader.close()
-            log.warn("Skipping ${manifest.id}: failed to instantiate entry point -- ${e.message}")
+            logger.warn { "Skipping ${manifest.id}: failed to instantiate entry point -- ${e.message}" }
             null
         }
     }
@@ -75,7 +75,7 @@ class ExternalExtensionLoader(
                 ManifestParser.parse(content)
             }
         } catch (e: Exception) {
-            log.warn("Failed to read ${jar.fileName}: ${e.message}")
+            logger.warn { "Failed to read ${jar.fileName}: ${e.message}" }
             null
         }
 

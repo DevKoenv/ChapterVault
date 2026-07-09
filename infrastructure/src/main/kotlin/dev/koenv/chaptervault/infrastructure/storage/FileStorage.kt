@@ -6,7 +6,7 @@ import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.IOException
 import java.io.OutputStream
 import java.nio.file.Files
@@ -22,7 +22,7 @@ open class FileStorage(
     private val writerSelector: ArchiveWriterSelector,
     private val thumbnailFormat: ThumbnailFormat = JpegThumbnailFormat,
 ) : ChapterPageSource {
-    private val logger = LoggerFactory.getLogger(FileStorage::class.java)
+    private val logger = KotlinLogging.logger {}
 
     fun ensureDirectories() {
         Files.createDirectories(libraryPath)
@@ -134,7 +134,7 @@ open class FileStorage(
                 Files.deleteIfExists(base)
             }
         } catch (e: IOException) {
-            logger.warn("Failed to delete files for chapter $chapterId: ${e.message}")
+            logger.warn { "Failed to delete files for chapter $chapterId: ${e.message}" }
         }
     }
 
@@ -145,7 +145,7 @@ open class FileStorage(
                 .filter { Files.isDirectory(it) }
                 .filter { it.fileName.toString() !in knownSeriesIds }
                 .forEach { dir ->
-                    logger.info("Removing orphaned library files for series ${dir.fileName}")
+                    logger.info { "Removing orphaned library files for series ${dir.fileName}" }
                     dir.toFile().deleteRecursively()
                 }
         }
@@ -158,7 +158,7 @@ open class FileStorage(
                 .filter { Files.isRegularFile(it) }
                 .filter { it.fileName.toString().substringBeforeLast(".") !in knownSeriesIds }
                 .forEach { file ->
-                    logger.info("Removing orphaned thumbnail for series ${file.fileName}")
+                    logger.info { "Removing orphaned thumbnail for series ${file.fileName}" }
                     Files.deleteIfExists(file)
                 }
         }
@@ -169,7 +169,7 @@ open class FileStorage(
         try {
             if (Files.exists(dir)) dir.toFile().deleteRecursively()
         } catch (e: IOException) {
-            logger.warn("Failed to delete library files for series $seriesId: ${e.message}")
+            logger.warn { "Failed to delete library files for series $seriesId: ${e.message}" }
         }
     }
 

@@ -10,24 +10,24 @@ import dev.koenv.chaptervault.kernel.runtime.TaskType
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.delay
-import org.slf4j.LoggerFactory
 import java.time.Instant
+
+private val logger = KotlinLogging.logger {}
 
 class SeriesRefreshScheduler(
     private val libraryRead: LibraryReadApi,
     private val taskQueue: TaskQueue,
     private val intervalHours: Int,
 ) {
-    private val log = LoggerFactory.getLogger(SeriesRefreshScheduler::class.java)
-
     suspend fun start() {
         if (intervalHours <= 0) {
-            log.info("Series auto-refresh disabled (intervalHours=$intervalHours)")
+            logger.info { "Series auto-refresh disabled (intervalHours=$intervalHours)" }
             return
         }
         val intervalMs = intervalHours * 3_600_000L
-        log.info("Series auto-refresh enabled, interval=${intervalHours}h")
+        logger.info { "Series auto-refresh enabled, interval=${intervalHours}h" }
         while (true) {
             delay(intervalMs)
             enqueueRefreshTasks()
@@ -41,7 +41,7 @@ class SeriesRefreshScheduler(
         while (true) {
             val result = libraryRead.listSeries(PageRequest(page, 100))
             if (result !is Result.Success) {
-                log.error("Auto-refresh: failed to list series on page $page")
+                logger.error { "Auto-refresh: failed to list series on page $page" }
                 break
             }
             val pagination = result.value
@@ -69,6 +69,6 @@ class SeriesRefreshScheduler(
             if (!pagination.hasNext) break
             page++
         }
-        log.info("Auto-refresh: enqueued $enqueued FETCH_SERIES_METADATA tasks")
+        logger.info { "Auto-refresh: enqueued $enqueued FETCH_SERIES_METADATA tasks" }
     }
 }
