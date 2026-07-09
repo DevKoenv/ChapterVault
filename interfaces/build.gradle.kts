@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":shared"))
     implementation(project(":kernel"))
+    implementation(libs.xmlutil.serialization)
     implementation(project(":infrastructure"))
     implementation(libs.bundles.ktor.server)
     implementation(libs.kotlinx.coroutines.core)

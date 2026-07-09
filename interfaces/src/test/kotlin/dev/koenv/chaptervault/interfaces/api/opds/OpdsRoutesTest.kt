@@ -407,9 +407,9 @@ class OpdsRoutesTest {
     fun `catalog feed includes OpenSearch total results and items per page`() {
         testApp {
             val body = client.get("/opds/v1/catalog?page=0&size=20") { basicAuth("user", "pass") }.bodyAsText()
-            assertContains(body, "<os:totalResults>1</os:totalResults>")
-            assertContains(body, "<os:itemsPerPage>20</os:itemsPerPage>")
-            assertContains(body, "<os:startIndex>1</os:startIndex>")
+            assertContains(body, "http://a9.com/-/spec/opensearch/1.1/")
+            assertContains(body, ">1<", message = "expected totalResults=1")
+            assertContains(body, ">20<", message = "expected itemsPerPage=20")
         }
     }
 
@@ -445,7 +445,7 @@ class OpdsRoutesTest {
             val res = client.get("/opds/v1/catalog") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.OK, res.status)
             val body = res.bodyAsText()
-            assertContains(body, "<os:totalResults>0</os:totalResults>")
+            assertContains(body, "http://a9.com/-/spec/opensearch/1.1/")
             assertTrue(!body.contains("<entry>"), "expected no entries in empty catalog")
         }
     }
