@@ -1,8 +1,6 @@
 package dev.koenv.chaptervault.kernel.extension
 
 import org.junit.jupiter.api.io.TempDir
-import org.yaml.snakeyaml.error.YAMLException
-import java.io.File
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,7 +51,7 @@ class YamlConfigTest {
         val f = file()
         f.writeText("server:\n  host: old\n")
         val cfg = YamlConfig(f).load()
-        cfg.set("server.host", "new")  // must not throw ClassCastException
+        cfg.set("server.host", "new") // must not throw ClassCastException
         cfg.save()
 
         val cfg2 = YamlConfig(f).load()
@@ -97,7 +95,7 @@ class YamlConfigTest {
         f.writeText("small: 42\nlarge: 3000000000\n")
         val cfg = YamlConfig(f).load()
         assertEquals(42, cfg.getInt("small"))
-        assertEquals(3000000000L.toInt(), cfg.getInt("large"))  // truncates — that's expected
+        assertEquals(3000000000L.toInt(), cfg.getInt("large")) // truncates — that's expected
     }
 
     @Test

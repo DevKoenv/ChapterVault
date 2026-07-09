@@ -62,11 +62,11 @@ import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.ktor.server.sse.SSE
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
-import io.ktor.server.sse.SSE
-import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level

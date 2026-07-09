@@ -117,6 +117,7 @@ class ExtensionLoaderServiceTest {
             override val config get() = error("not needed in test")
             override val enricherRegistry get() = error("not needed in test")
             override val notificationRegistry get() = error("not needed in test")
+
             override fun rateLimiter(
                 bucket: String,
                 requestsPerSecond: Double,
@@ -184,11 +185,12 @@ class ExtensionLoaderServiceTest {
 
     @Test
     fun `extracts bundled config yml from JAR to dataDir`() {
-        val jar = buildJarWithConfig(
-            testExtManifest,
-            "baseUrl: https://example.com\n",
-            TestExtension::class.java,
-        )
+        val jar =
+            buildJarWithConfig(
+                testExtManifest,
+                "baseUrl: https://example.com\n",
+                TestExtension::class.java,
+            )
         Files.move(jar, tempDir.resolve("test-extension-1.0.jar"))
 
         val extRegistry = DefaultExtensionRegistry()
@@ -202,11 +204,12 @@ class ExtensionLoaderServiceTest {
 
     @Test
     fun `does not overwrite existing config yml during extraction`() {
-        val jar = buildJarWithConfig(
-            testExtManifest,
-            "baseUrl: https://from-jar.com\n",
-            TestExtension::class.java,
-        )
+        val jar =
+            buildJarWithConfig(
+                testExtManifest,
+                "baseUrl: https://from-jar.com\n",
+                TestExtension::class.java,
+            )
         Files.move(jar, tempDir.resolve("test-extension-1.0.jar"))
 
         val dataDir = tempDir.resolve("test-extension").also { Files.createDirectories(it) }
@@ -351,15 +354,41 @@ class ExtensionLoaderServiceTest {
                     val yamlCfg = YamlConfig(dir.resolve("config.yml").toFile()).load()
                     val config =
                         object : ManagedConfig {
-                            override fun reload() { yamlCfg.load() }
+                            override fun reload() {
+                                yamlCfg.load()
+                            }
+
                             override fun save() = yamlCfg.save()
-                            override fun getString(path: String, default: String?) = yamlCfg.getString(path, default)
-                            override fun getInt(path: String, default: Int?) = yamlCfg.getInt(path, default)
-                            override fun getBoolean(path: String, default: Boolean?) = yamlCfg.getBoolean(path, default)
-                            override fun getDouble(path: String, default: Double?) = yamlCfg.getDouble(path, default)
+
+                            override fun getString(
+                                path: String,
+                                default: String?,
+                            ) = yamlCfg.getString(path, default)
+
+                            override fun getInt(
+                                path: String,
+                                default: Int?,
+                            ) = yamlCfg.getInt(path, default)
+
+                            override fun getBoolean(
+                                path: String,
+                                default: Boolean?,
+                            ) = yamlCfg.getBoolean(path, default)
+
+                            override fun getDouble(
+                                path: String,
+                                default: Double?,
+                            ) = yamlCfg.getDouble(path, default)
+
                             override fun get(path: String) = yamlCfg.get(path)
-                            override fun set(path: String, value: Any?) = yamlCfg.set(path, value)
+
+                            override fun set(
+                                path: String,
+                                value: Any?,
+                            ) = yamlCfg.set(path, value)
+
                             override fun remove(path: String) = yamlCfg.remove(path)
+
                             override fun contains(path: String) = yamlCfg.contains(path)
                         }
                     object : ExtensionContext {
@@ -372,7 +401,12 @@ class ExtensionLoaderServiceTest {
                         override val config = config
                         override val enricherRegistry get() = error("not needed in test")
                         override val notificationRegistry get() = error("not needed in test")
-                        override fun rateLimiter(bucket: String, requestsPerSecond: Double) = error("not needed in test")
+
+                        override fun rateLimiter(
+                            bucket: String,
+                            requestsPerSecond: Double,
+                        ) = error("not needed in test")
+
                         override fun logger(name: String) = org.slf4j.LoggerFactory.getLogger(name)
                     }
                 },

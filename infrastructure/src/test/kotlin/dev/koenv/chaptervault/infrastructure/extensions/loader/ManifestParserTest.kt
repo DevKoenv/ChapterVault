@@ -249,5 +249,4 @@ class ManifestParserTest {
             """.trimIndent()
         assertNull(ManifestParser.parse(yaml))
     }
-
 }

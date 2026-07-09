@@ -156,7 +156,11 @@ class ExtensionLoaderService(
                     try {
                         extractBundledConfig(jarPath, configFile)
                     } catch (e: Exception) {
-                        extensionRegistry.updateStatus(canonicalId, ExtensionStatus.FAILED, "Failed to extract bundled config: ${e.message}")
+                        extensionRegistry.updateStatus(
+                            canonicalId,
+                            ExtensionStatus.FAILED,
+                            "Failed to extract bundled config: ${e.message}",
+                        )
                         log.error("Extension '$canonicalId' failed to extract bundled config.yml: ${e.message}")
                         return
                     }
@@ -191,7 +195,10 @@ class ExtensionLoaderService(
         }
     }
 
-    private fun extractBundledConfig(jarPath: Path, targetFile: java.io.File) {
+    private fun extractBundledConfig(
+        jarPath: Path,
+        targetFile: java.io.File,
+    ) {
         JarFile(jarPath.toFile()).use { jar ->
             val entry = jar.getJarEntry("config.yml") ?: return
             targetFile.parentFile?.mkdirs()

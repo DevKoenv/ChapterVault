@@ -187,6 +187,7 @@ private fun makeContext(
         override val config get() = error("not needed in test")
         override val enricherRegistry get() = error("not needed in test")
         override val notificationRegistry get() = error("not needed in test")
+
         override fun rateLimiter(
             bucket: String,
             requestsPerSecond: Double,

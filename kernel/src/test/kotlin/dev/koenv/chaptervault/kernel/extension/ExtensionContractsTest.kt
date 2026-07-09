@@ -25,5 +25,4 @@ class ExtensionContractsTest {
             )
         assertEquals(1, event.newChapters.size)
     }
-
 }
