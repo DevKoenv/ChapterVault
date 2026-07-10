@@ -1,16 +1,15 @@
 package dev.koenv.chaptervault.infrastructure.database
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.IntegerColumnType
 import org.jetbrains.exposed.sql.TextColumnType
 import org.jetbrains.exposed.sql.transactions.transaction
-import io.github.oshai.kotlinlogging.KotlinLogging
 import java.security.MessageDigest
 
 private val logger = KotlinLogging.logger {}
 
 object DatabaseMigrations {
-
     internal data class Migration(
         val version: Int,
         val name: String,

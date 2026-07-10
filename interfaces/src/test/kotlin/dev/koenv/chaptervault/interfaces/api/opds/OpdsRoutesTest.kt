@@ -148,17 +148,26 @@ class OpdsRoutesTest {
 
     private val fakeOpdsRead =
         object : OpdsReadApi {
-            override suspend fun listReadHistory(userId: Id, request: PageRequest) =
-                Result.Success(Pagination(items = emptyList<RecentlyReadEntry>(), page = 0, size = 20, totalItems = 0L))
+            override suspend fun listReadHistory(
+                userId: Id,
+                request: PageRequest,
+            ) = Result.Success(Pagination(items = emptyList<RecentlyReadEntry>(), page = 0, size = 20, totalItems = 0L))
 
             override suspend fun listRecentlyAddedChapters(request: PageRequest) =
                 Result.Success(Pagination(items = emptyList<ChapterWithSeries>(), page = 0, size = 20, totalItems = 0L))
 
             override suspend fun listGenres() = Result.Success(emptyList<GenreCount>())
+
             override suspend fun listLanguages() = Result.Success(emptyList<LanguageCount>())
+
             override suspend fun listUpstreamStatuses() = Result.Success(emptyList<StatusCount>())
-            override suspend fun listSeriesFiltered(filter: OpdsSeriesFilter, request: PageRequest) =
-                Result.Success(Pagination(items = emptyList<dev.koenv.chaptervault.kernel.library.Series>(), page = 0, size = 20, totalItems = 0L))
+
+            override suspend fun listSeriesFiltered(
+                filter: OpdsSeriesFilter,
+                request: PageRequest,
+            ) = Result.Success(
+                Pagination(items = emptyList<dev.koenv.chaptervault.kernel.library.Series>(), page = 0, size = 20, totalItems = 0L),
+            )
         }
 
     private val fakePageSource =
@@ -202,6 +211,30 @@ class OpdsRoutesTest {
             }
             opdsRoutes(libraryRead, fakeOpdsRead, fakePageSource)
             opdsPageRoutes(libraryRead, fakePageSource)
+        }
+        block()
+    }
+
+    private fun testAppWithOpds(
+        opdsRead: OpdsReadApi,
+        block: suspend ApplicationTestBuilder.() -> Unit,
+    ) = testApplication {
+        application {
+            install(ContentNegotiation) { json() }
+            install(Authentication) {
+                basic("auth-basic") {
+                    realm = "ChapterVault"
+                    validate { cred ->
+                        if (cred.name == "user" && cred.password == "pass") {
+                            KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                        } else {
+                            null
+                        }
+                    }
+                }
+            }
+            opdsRoutes(fakeLibraryRead, opdsRead, fakePageSource)
+            opdsPageRoutes(fakeLibraryRead, fakePageSource)
         }
         block()
     }
@@ -422,6 +455,11 @@ class OpdsRoutesTest {
             assertContains(body, "rel=\"start\"")
             assertContains(body, "rel=\"subsection\"")
             assertContains(body, "/opds/v1/catalog")
+            assertContains(body, "/opds/v1/history")
+            assertContains(body, "/opds/v1/library-updates")
+            assertContains(body, "/opds/v1/library/genres")
+            assertContains(body, "/opds/v1/library/languages")
+            assertContains(body, "/opds/v1/library/status")
         }
     }
 
@@ -587,4 +625,184 @@ class OpdsRoutesTest {
             assertTrue(res.contentType()?.match("text/xml") == true)
         }
     }
+
+    // history feed
+
+    @Test
+    fun `history feed returns 401 when unauthenticated`() =
+        testApp {
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/opds/v1/history").status)
+        }
+
+    @Test
+    fun `history feed returns 200 with atom+xml content type`() =
+        testApp {
+            val res = client.get("/opds/v1/history") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertTrue(res.contentType()?.match("application/atom+xml") == true)
+        }
+
+    @Test
+    fun `history feed includes series title from read history`() {
+        val opdsWithHistory =
+            object : OpdsReadApi by fakeOpdsRead {
+                override suspend fun listReadHistory(
+                    userId: Id,
+                    request: PageRequest,
+                ) = Result.Success(
+                    Pagination(
+                        items =
+                            listOf(
+                                RecentlyReadEntry(
+                                    series = fakeSeries,
+                                    lastReadAt = Instant.EPOCH,
+                                    chaptersRead = 3,
+                                    totalChapters = 10,
+                                ),
+                            ),
+                        page = 0,
+                        size = 20,
+                        totalItems = 1L,
+                    ),
+                )
+            }
+        testAppWithOpds(opdsWithHistory) {
+            val body = client.get("/opds/v1/history") { basicAuth("user", "pass") }.bodyAsText()
+            assertContains(body, "Test Series")
+            assertContains(body, "3")
+            assertContains(body, "10")
+        }
+    }
+
+    // library-updates feed
+
+    @Test
+    fun `library-updates feed returns 401 when unauthenticated`() =
+        testApp {
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/opds/v1/library-updates").status)
+        }
+
+    @Test
+    fun `library-updates feed returns 200 with atom+xml content type`() =
+        testApp {
+            val res = client.get("/opds/v1/library-updates") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertTrue(res.contentType()?.match("application/atom+xml") == true)
+        }
+
+    @Test
+    fun `library-updates feed includes chapter title`() {
+        val opdsWithChapters =
+            object : OpdsReadApi by fakeOpdsRead {
+                override suspend fun listRecentlyAddedChapters(request: PageRequest) =
+                    Result.Success(
+                        Pagination(
+                            items = listOf(ChapterWithSeries(chapter = availableChapter, series = fakeSeries)),
+                            page = 0,
+                            size = 20,
+                            totalItems = 1L,
+                        ),
+                    )
+            }
+        testAppWithOpds(opdsWithChapters) {
+            val body = client.get("/opds/v1/library-updates") { basicAuth("user", "pass") }.bodyAsText()
+            assertContains(body, "Chapter 1")
+        }
+    }
+
+    // genres feed
+
+    @Test
+    fun `genres feed returns 401 when unauthenticated`() =
+        testApp {
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/opds/v1/library/genres").status)
+        }
+
+    @Test
+    fun `genres feed returns 200 with genre entries`() {
+        val opdsWithGenres =
+            object : OpdsReadApi by fakeOpdsRead {
+                override suspend fun listGenres() = Result.Success(listOf(GenreCount("Action", 5)))
+            }
+        testAppWithOpds(opdsWithGenres) {
+            val body = client.get("/opds/v1/library/genres") { basicAuth("user", "pass") }.bodyAsText()
+            assertEquals(HttpStatusCode.OK, client.get("/opds/v1/library/genres") { basicAuth("user", "pass") }.status)
+            assertContains(body, "Action")
+        }
+    }
+
+    // languages feed
+
+    @Test
+    fun `languages feed returns 401 when unauthenticated`() =
+        testApp {
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/opds/v1/library/languages").status)
+        }
+
+    @Test
+    fun `languages feed returns 200 with language entries`() {
+        val opdsWithLanguages =
+            object : OpdsReadApi by fakeOpdsRead {
+                override suspend fun listLanguages() = Result.Success(listOf(LanguageCount("en", 8)))
+            }
+        testAppWithOpds(opdsWithLanguages) {
+            val body = client.get("/opds/v1/library/languages") { basicAuth("user", "pass") }.bodyAsText()
+            assertContains(body, "en")
+        }
+    }
+
+    // status feed
+
+    @Test
+    fun `status feed returns 401 when unauthenticated`() =
+        testApp {
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/opds/v1/library/status").status)
+        }
+
+    @Test
+    fun `status feed returns 200 with status entries`() {
+        val opdsWithStatuses =
+            object : OpdsReadApi by fakeOpdsRead {
+                override suspend fun listUpstreamStatuses() = Result.Success(listOf(StatusCount("ONGOING", 3)))
+            }
+        testAppWithOpds(opdsWithStatuses) {
+            val body = client.get("/opds/v1/library/status") { basicAuth("user", "pass") }.bodyAsText()
+            assertContains(body, "ONGOING")
+        }
+    }
+
+    // filtered catalog
+
+    @Test
+    fun `catalog with genre filter uses filtered path`() {
+        val opdsWithFilter =
+            object : OpdsReadApi by fakeOpdsRead {
+                override suspend fun listSeriesFiltered(
+                    filter: OpdsSeriesFilter,
+                    request: PageRequest,
+                ) = Result.Success(
+                    Pagination(
+                        items = listOf(fakeSeries),
+                        page = 0,
+                        size = 20,
+                        totalItems = 1L,
+                    ),
+                )
+            }
+        testAppWithOpds(opdsWithFilter) {
+            val res = client.get("/opds/v1/catalog?genre=Action") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+            val body = res.bodyAsText()
+            assertContains(body, "Test Series")
+            assertContains(body, "genre=Action")
+        }
+    }
+
+    @Test
+    fun `catalog without filter uses normal library path`() =
+        testApp {
+            val res = client.get("/opds/v1/catalog?page=0&size=20") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertContains(res.bodyAsText(), "Test Series")
+        }
 }

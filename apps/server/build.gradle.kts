@@ -1,4 +1,5 @@
 plugins {
+    id("chaptervault.kotlin-library")
     application
     alias(libs.plugins.shadow)
     alias(libs.plugins.buildconfig)

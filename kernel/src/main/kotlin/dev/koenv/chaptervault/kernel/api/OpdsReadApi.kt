@@ -20,9 +20,20 @@ data class ChapterWithSeries(
     val series: Series,
 )
 
-data class GenreCount(val genre: String, val seriesCount: Int)
-data class LanguageCount(val language: String, val seriesCount: Int)
-data class StatusCount(val status: String, val seriesCount: Int)
+data class GenreCount(
+    val genre: String,
+    val seriesCount: Int,
+)
+
+data class LanguageCount(
+    val language: String,
+    val seriesCount: Int,
+)
+
+data class StatusCount(
+    val status: String,
+    val seriesCount: Int,
+)
 
 data class OpdsSeriesFilter(
     val genre: String? = null,
@@ -31,10 +42,21 @@ data class OpdsSeriesFilter(
 )
 
 interface OpdsReadApi {
-    suspend fun listReadHistory(userId: Id, request: PageRequest): Result<Pagination<RecentlyReadEntry>>
+    suspend fun listReadHistory(
+        userId: Id,
+        request: PageRequest,
+    ): Result<Pagination<RecentlyReadEntry>>
+
     suspend fun listRecentlyAddedChapters(request: PageRequest): Result<Pagination<ChapterWithSeries>>
+
     suspend fun listGenres(): Result<List<GenreCount>>
+
     suspend fun listLanguages(): Result<List<LanguageCount>>
+
     suspend fun listUpstreamStatuses(): Result<List<StatusCount>>
-    suspend fun listSeriesFiltered(filter: OpdsSeriesFilter, request: PageRequest): Result<Pagination<Series>>
+
+    suspend fun listSeriesFiltered(
+        filter: OpdsSeriesFilter,
+        request: PageRequest,
+    ): Result<Pagination<Series>>
 }

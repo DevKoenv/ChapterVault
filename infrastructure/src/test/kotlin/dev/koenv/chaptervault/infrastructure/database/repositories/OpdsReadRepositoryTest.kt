@@ -79,7 +79,7 @@ class OpdsReadRepositoryTest {
                 it[SeriesTable.id] = id.toString()
                 it[SeriesTable.title] = title
                 it[SeriesTable.connectorId] = "test"
-                it[SeriesTable.externalId] = "ext-${id}"
+                it[SeriesTable.externalId] = "ext-$id"
                 it[SeriesTable.status] = SeriesStatus.IN_LIBRARY.name
                 it[SeriesTable.autoDownload] = false
                 it[SeriesTable.language] = language
@@ -112,7 +112,11 @@ class OpdsReadRepositoryTest {
         return id
     }
 
-    private fun insertProgress(userId: Id, chapterId: Id, readAt: Instant = Instant.now()) {
+    private fun insertProgress(
+        userId: Id,
+        chapterId: Id,
+        readAt: Instant = Instant.now(),
+    ) {
         transaction {
             ProgressTable.insert {
                 it[ProgressTable.userId] = userId.toString()
@@ -122,7 +126,10 @@ class OpdsReadRepositoryTest {
         }
     }
 
-    private fun insertGenre(seriesId: Id, genre: String) {
+    private fun insertGenre(
+        seriesId: Id,
+        genre: String,
+    ) {
         transaction {
             SeriesGenresTable.insert {
                 it[SeriesGenresTable.seriesId] = seriesId.toString()
@@ -132,169 +139,182 @@ class OpdsReadRepositoryTest {
     }
 
     @Test
-    fun `listReadHistory returns empty pagination when user has no read history`() = runBlocking {
-        val userId = insertUser()
-        val result = repo.listReadHistory(userId, PageRequest())
-        assertIs<Result.Success<*>>(result)
-        val page = (result as Result.Success).value
-        assertEquals(0L, page.totalItems)
-        assertTrue(page.items.isEmpty())
-    }
+    fun `listReadHistory returns empty pagination when user has no read history`() =
+        runBlocking {
+            val userId = insertUser()
+            val result = repo.listReadHistory(userId, PageRequest())
+            assertIs<Result.Success<*>>(result)
+            val page = (result as Result.Success).value
+            assertEquals(0L, page.totalItems)
+            assertTrue(page.items.isEmpty())
+        }
 
     @Test
-    fun `listReadHistory returns series with chaptersRead and totalChapters`() = runBlocking {
-        val userId = insertUser()
-        val seriesId = insertSeries()
-        val ch1 = insertChapter(seriesId, index = 1.0)
-        val ch2 = insertChapter(seriesId, index = 2.0)
-        insertChapter(seriesId, index = 3.0)  // not read
-        insertProgress(userId, ch1)
-        insertProgress(userId, ch2)
+    fun `listReadHistory returns series with chaptersRead and totalChapters`() =
+        runBlocking {
+            val userId = insertUser()
+            val seriesId = insertSeries()
+            val ch1 = insertChapter(seriesId, index = 1.0)
+            val ch2 = insertChapter(seriesId, index = 2.0)
+            insertChapter(seriesId, index = 3.0) // not read
+            insertProgress(userId, ch1)
+            insertProgress(userId, ch2)
 
-        val result = repo.listReadHistory(userId, PageRequest())
-        assertIs<Result.Success<*>>(result)
-        val page = (result as Result.Success).value
-        assertEquals(1L, page.totalItems)
-        assertEquals(1, page.items.size)
-        assertEquals(2, page.items[0].chaptersRead)
-        assertEquals(3, page.items[0].totalChapters)
-    }
-
-    @Test
-    fun `listReadHistory orders by most recently read`() = runBlocking {
-        val userId = insertUser()
-        val series1 = insertSeries(title = "First")
-        val series2 = insertSeries(title = "Second")
-        val ch1 = insertChapter(series1)
-        val ch2 = insertChapter(series2)
-        val earlier = Instant.now().minusSeconds(3600)
-        val later = Instant.now()
-        insertProgress(userId, ch1, earlier)
-        insertProgress(userId, ch2, later)
-
-        val page = (repo.listReadHistory(userId, PageRequest()) as Result.Success).value
-        assertEquals("Second", page.items[0].series.title)
-        assertEquals("First", page.items[1].series.title)
-    }
+            val result = repo.listReadHistory(userId, PageRequest())
+            assertIs<Result.Success<*>>(result)
+            val page = (result as Result.Success).value
+            assertEquals(1L, page.totalItems)
+            assertEquals(1, page.items.size)
+            assertEquals(2, page.items[0].chaptersRead)
+            assertEquals(3, page.items[0].totalChapters)
+        }
 
     @Test
-    fun `listReadHistory is isolated per user`() = runBlocking {
-        val user1 = insertUser()
-        val user2 = insertUser()
-        val seriesId = insertSeries()
-        val chapterId = insertChapter(seriesId)
-        insertProgress(user1, chapterId)
+    fun `listReadHistory orders by most recently read`() =
+        runBlocking {
+            val userId = insertUser()
+            val series1 = insertSeries(title = "First")
+            val series2 = insertSeries(title = "Second")
+            val ch1 = insertChapter(series1)
+            val ch2 = insertChapter(series2)
+            val earlier = Instant.now().minusSeconds(3600)
+            val later = Instant.now()
+            insertProgress(userId, ch1, earlier)
+            insertProgress(userId, ch2, later)
 
-        val page1 = (repo.listReadHistory(user1, PageRequest()) as Result.Success).value
-        val page2 = (repo.listReadHistory(user2, PageRequest()) as Result.Success).value
-        assertEquals(1L, page1.totalItems)
-        assertEquals(0L, page2.totalItems)
-    }
-
-    @Test
-    fun `listRecentlyAddedChapters returns chapters ordered by addedAt desc`() = runBlocking {
-        val seriesId = insertSeries()
-        val older = Instant.now().minusSeconds(3600)
-        val newer = Instant.now()
-        insertChapter(seriesId, index = 1.0, addedAt = older)
-        insertChapter(seriesId, index = 2.0, addedAt = newer)
-
-        val page = (repo.listRecentlyAddedChapters(PageRequest()) as Result.Success).value
-        assertEquals(2L, page.totalItems)
-        assertEquals(2.0, page.items[0].chapter.chapterIndex)
-        assertEquals(1.0, page.items[1].chapter.chapterIndex)
-    }
+            val page = (repo.listReadHistory(userId, PageRequest()) as Result.Success).value
+            assertEquals("Second", page.items[0].series.title)
+            assertEquals("First", page.items[1].series.title)
+        }
 
     @Test
-    fun `listRecentlyAddedChapters includes series data`() = runBlocking {
-        val seriesId = insertSeries(title = "My Manga")
-        insertChapter(seriesId)
+    fun `listReadHistory is isolated per user`() =
+        runBlocking {
+            val user1 = insertUser()
+            val user2 = insertUser()
+            val seriesId = insertSeries()
+            val chapterId = insertChapter(seriesId)
+            insertProgress(user1, chapterId)
 
-        val page = (repo.listRecentlyAddedChapters(PageRequest()) as Result.Success).value
-        assertEquals(1, page.items.size)
-        assertEquals("My Manga", page.items[0].series.title)
-    }
-
-    @Test
-    fun `listGenres returns genres with series counts`() = runBlocking {
-        val s1 = insertSeries()
-        val s2 = insertSeries()
-        val s3 = insertSeries()
-        insertGenre(s1, "Action")
-        insertGenre(s2, "Action")
-        insertGenre(s3, "Romance")
-
-        val genres = (repo.listGenres() as Result.Success).value
-        val actionCount = genres.first { it.genre == "Action" }.seriesCount
-        val romanceCount = genres.first { it.genre == "Romance" }.seriesCount
-        assertEquals(2, actionCount)
-        assertEquals(1, romanceCount)
-        // ordered by count desc
-        assertEquals("Action", genres[0].genre)
-    }
+            val page1 = (repo.listReadHistory(user1, PageRequest()) as Result.Success).value
+            val page2 = (repo.listReadHistory(user2, PageRequest()) as Result.Success).value
+            assertEquals(1L, page1.totalItems)
+            assertEquals(0L, page2.totalItems)
+        }
 
     @Test
-    fun `listLanguages returns languages with series counts`() = runBlocking {
-        insertSeries(language = "en")
-        insertSeries(language = "en")
-        insertSeries(language = "ja")
+    fun `listRecentlyAddedChapters returns chapters ordered by addedAt desc`() =
+        runBlocking {
+            val seriesId = insertSeries()
+            val older = Instant.now().minusSeconds(3600)
+            val newer = Instant.now()
+            insertChapter(seriesId, index = 1.0, addedAt = older)
+            insertChapter(seriesId, index = 2.0, addedAt = newer)
 
-        val languages = (repo.listLanguages() as Result.Success).value
-        val en = languages.first { it.language == "en" }.seriesCount
-        val ja = languages.first { it.language == "ja" }.seriesCount
-        assertEquals(2, en)
-        assertEquals(1, ja)
-    }
-
-    @Test
-    fun `listUpstreamStatuses returns known statuses with counts`() = runBlocking {
-        insertSeries(upstreamStatus = "ONGOING")
-        insertSeries(upstreamStatus = "ONGOING")
-        insertSeries(upstreamStatus = "COMPLETED")
-        insertSeries()  // null upstreamStatus — excluded
-
-        val statuses = (repo.listUpstreamStatuses() as Result.Success).value
-        assertEquals(2, statuses.size)
-        val ongoing = statuses.first { it.status == "ONGOING" }.seriesCount
-        assertEquals(2, ongoing)
-    }
+            val page = (repo.listRecentlyAddedChapters(PageRequest()) as Result.Success).value
+            assertEquals(2L, page.totalItems)
+            assertEquals(2.0, page.items[0].chapter.chapterIndex)
+            assertEquals(1.0, page.items[1].chapter.chapterIndex)
+        }
 
     @Test
-    fun `listSeriesFiltered returns all series when no filter set`() = runBlocking {
-        insertSeries()
-        insertSeries()
+    fun `listRecentlyAddedChapters includes series data`() =
+        runBlocking {
+            val seriesId = insertSeries(title = "My Manga")
+            insertChapter(seriesId)
 
-        val page = (repo.listSeriesFiltered(OpdsSeriesFilter(), PageRequest()) as Result.Success).value
-        assertEquals(2L, page.totalItems)
-    }
-
-    @Test
-    fun `listSeriesFiltered filters by genre`() = runBlocking {
-        val s1 = insertSeries()
-        val s2 = insertSeries()
-        insertGenre(s1, "Action")
-        insertGenre(s2, "Romance")
-
-        val page = (repo.listSeriesFiltered(OpdsSeriesFilter(genre = "Action"), PageRequest()) as Result.Success).value
-        assertEquals(1L, page.totalItems)
-        assertEquals(s1.toString(), page.items[0].id.toString())
-    }
+            val page = (repo.listRecentlyAddedChapters(PageRequest()) as Result.Success).value
+            assertEquals(1, page.items.size)
+            assertEquals("My Manga", page.items[0].series.title)
+        }
 
     @Test
-    fun `listSeriesFiltered filters by language`() = runBlocking {
-        insertSeries(language = "en")
-        insertSeries(language = "ja")
+    fun `listGenres returns genres with series counts`() =
+        runBlocking {
+            val s1 = insertSeries()
+            val s2 = insertSeries()
+            val s3 = insertSeries()
+            insertGenre(s1, "Action")
+            insertGenre(s2, "Action")
+            insertGenre(s3, "Romance")
 
-        val page = (repo.listSeriesFiltered(OpdsSeriesFilter(language = "ja"), PageRequest()) as Result.Success).value
-        assertEquals(1L, page.totalItems)
-    }
+            val genres = (repo.listGenres() as Result.Success).value
+            val actionCount = genres.first { it.genre == "Action" }.seriesCount
+            val romanceCount = genres.first { it.genre == "Romance" }.seriesCount
+            assertEquals(2, actionCount)
+            assertEquals(1, romanceCount)
+            // ordered by count desc
+            assertEquals("Action", genres[0].genre)
+        }
 
     @Test
-    fun `listSeriesFiltered filters by upstreamStatus`() = runBlocking {
-        insertSeries(upstreamStatus = "ONGOING")
-        insertSeries(upstreamStatus = "COMPLETED")
+    fun `listLanguages returns languages with series counts`() =
+        runBlocking {
+            insertSeries(language = "en")
+            insertSeries(language = "en")
+            insertSeries(language = "ja")
 
-        val page = (repo.listSeriesFiltered(OpdsSeriesFilter(upstreamStatus = "ONGOING"), PageRequest()) as Result.Success).value
-        assertEquals(1L, page.totalItems)
-    }
+            val languages = (repo.listLanguages() as Result.Success).value
+            val en = languages.first { it.language == "en" }.seriesCount
+            val ja = languages.first { it.language == "ja" }.seriesCount
+            assertEquals(2, en)
+            assertEquals(1, ja)
+        }
+
+    @Test
+    fun `listUpstreamStatuses returns known statuses with counts`() =
+        runBlocking {
+            insertSeries(upstreamStatus = "ONGOING")
+            insertSeries(upstreamStatus = "ONGOING")
+            insertSeries(upstreamStatus = "COMPLETED")
+            insertSeries() // null upstreamStatus — excluded
+
+            val statuses = (repo.listUpstreamStatuses() as Result.Success).value
+            assertEquals(2, statuses.size)
+            val ongoing = statuses.first { it.status == "ONGOING" }.seriesCount
+            assertEquals(2, ongoing)
+        }
+
+    @Test
+    fun `listSeriesFiltered returns all series when no filter set`() =
+        runBlocking {
+            insertSeries()
+            insertSeries()
+
+            val page = (repo.listSeriesFiltered(OpdsSeriesFilter(), PageRequest()) as Result.Success).value
+            assertEquals(2L, page.totalItems)
+        }
+
+    @Test
+    fun `listSeriesFiltered filters by genre`() =
+        runBlocking {
+            val s1 = insertSeries()
+            val s2 = insertSeries()
+            insertGenre(s1, "Action")
+            insertGenre(s2, "Romance")
+
+            val page = (repo.listSeriesFiltered(OpdsSeriesFilter(genre = "Action"), PageRequest()) as Result.Success).value
+            assertEquals(1L, page.totalItems)
+            assertEquals(s1.toString(), page.items[0].id.toString())
+        }
+
+    @Test
+    fun `listSeriesFiltered filters by language`() =
+        runBlocking {
+            insertSeries(language = "en")
+            insertSeries(language = "ja")
+
+            val page = (repo.listSeriesFiltered(OpdsSeriesFilter(language = "ja"), PageRequest()) as Result.Success).value
+            assertEquals(1L, page.totalItems)
+        }
+
+    @Test
+    fun `listSeriesFiltered filters by upstreamStatus`() =
+        runBlocking {
+            insertSeries(upstreamStatus = "ONGOING")
+            insertSeries(upstreamStatus = "COMPLETED")
+
+            val page = (repo.listSeriesFiltered(OpdsSeriesFilter(upstreamStatus = "ONGOING"), PageRequest()) as Result.Success).value
+            assertEquals(1L, page.totalItems)
+        }
 }

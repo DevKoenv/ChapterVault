@@ -127,7 +127,7 @@ object ConfigLoader {
                 AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh, debug = debug, auth = auth)
             }
 
-        return applyEnv(base, env)
+        return applyEnv(base, env).also { it.validate() }
     }
 
     fun defaultConfigContent(): String =

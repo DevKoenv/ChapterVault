@@ -1,4 +1,5 @@
 plugins {
+    id("chaptervault.kotlin-library")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -10,7 +11,7 @@ dependencies {
     implementation(libs.sqlite.jdbc)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.kotlinx.coroutines.core)

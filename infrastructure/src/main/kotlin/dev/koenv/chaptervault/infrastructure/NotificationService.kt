@@ -19,7 +19,6 @@ class NotificationService(
     private val notificationApi: NotificationApi,
     private val channelRegistry: NotificationChannelRegistry,
 ) : NotificationDispatchApi {
-
     fun start() {
         eventBus.on<NewChaptersDiscovered> { event -> dispatch(event) }
         logger.info { "NotificationService started" }

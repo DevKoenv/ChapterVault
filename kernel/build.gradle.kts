@@ -1,4 +1,5 @@
 plugins {
+    id("chaptervault.kotlin-library")
     alias(libs.plugins.kotlin.serialization)
 }
 

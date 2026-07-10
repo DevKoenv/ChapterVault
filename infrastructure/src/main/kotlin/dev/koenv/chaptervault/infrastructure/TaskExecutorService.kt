@@ -24,13 +24,13 @@ import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.readRawBytes
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
-import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
 
@@ -190,7 +190,10 @@ class TaskExecutorService(
                             )
                     ) {
                         is Result.Success -> Unit
-                        is Result.Failure -> logger.warn { "Failed to persist enriched fields for series ${task.targetId}: ${dbResult.error}" }
+                        is Result.Failure ->
+                            logger.warn {
+                                "Failed to persist enriched fields for series ${task.targetId}: ${dbResult.error}"
+                            }
                     }
                 }
                 is Result.Failure -> logger.warn { "Enricher '${enricher.id}' failed for series ${task.targetId}: ${r.error}" }

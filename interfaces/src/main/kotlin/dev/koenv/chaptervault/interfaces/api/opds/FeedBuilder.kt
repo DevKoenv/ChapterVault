@@ -10,6 +10,12 @@ import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import java.net.URLEncoder
 
+private val SORT_FACETS =
+    listOf(
+        OpdsFacet(title = "By Title (A–Z)", href = "/opds/v1/catalog?sort=title&order=asc", group = "Sort"),
+        OpdsFacet(title = "By Date Added", href = "/opds/v1/catalog?sort=date&order=desc", group = "Sort"),
+    )
+
 class FeedBuilder {
     fun buildNavigationFeed(now: String): OpdsFeed =
         OpdsFeed(
@@ -18,50 +24,51 @@ class FeedBuilder {
             updated = now,
             selfHref = "/opds/v1",
             kind = "navigation",
-            entries = listOf(
-                OpdsEntry(
-                    id = "urn:chaptervault:catalog",
-                    title = "Library",
-                    updated = now,
-                    content = "Browse the manga library",
-                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/catalog", type = TYPE_ACQUISITION)),
+            entries =
+                listOf(
+                    OpdsEntry(
+                        id = "urn:chaptervault:catalog",
+                        title = "Library",
+                        updated = now,
+                        content = "Browse the manga library",
+                        links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/catalog", type = TYPE_ACQUISITION)),
+                    ),
+                    OpdsEntry(
+                        id = "urn:chaptervault:history",
+                        title = "Reading History",
+                        updated = now,
+                        content = "Series you have been reading",
+                        links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/history", type = TYPE_ACQUISITION)),
+                    ),
+                    OpdsEntry(
+                        id = "urn:chaptervault:library-updates",
+                        title = "Library Updates",
+                        updated = now,
+                        content = "Recently added chapters",
+                        links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library-updates", type = TYPE_ACQUISITION)),
+                    ),
+                    OpdsEntry(
+                        id = "urn:chaptervault:library:genres",
+                        title = "Browse by Genre",
+                        updated = now,
+                        content = "Browse series by genre",
+                        links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/genres", type = TYPE_NAVIGATION)),
+                    ),
+                    OpdsEntry(
+                        id = "urn:chaptervault:library:languages",
+                        title = "Browse by Language",
+                        updated = now,
+                        content = "Browse series by language",
+                        links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/languages", type = TYPE_NAVIGATION)),
+                    ),
+                    OpdsEntry(
+                        id = "urn:chaptervault:library:status",
+                        title = "Browse by Status",
+                        updated = now,
+                        content = "Browse series by upstream status",
+                        links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/status", type = TYPE_NAVIGATION)),
+                    ),
                 ),
-                OpdsEntry(
-                    id = "urn:chaptervault:history",
-                    title = "Reading History",
-                    updated = now,
-                    content = "Series you have been reading",
-                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/history", type = TYPE_ACQUISITION)),
-                ),
-                OpdsEntry(
-                    id = "urn:chaptervault:library-updates",
-                    title = "Library Updates",
-                    updated = now,
-                    content = "Recently added chapters",
-                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library-updates", type = TYPE_ACQUISITION)),
-                ),
-                OpdsEntry(
-                    id = "urn:chaptervault:library:genres",
-                    title = "Browse by Genre",
-                    updated = now,
-                    content = "Browse series by genre",
-                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/genres", type = TYPE_NAVIGATION)),
-                ),
-                OpdsEntry(
-                    id = "urn:chaptervault:library:languages",
-                    title = "Browse by Language",
-                    updated = now,
-                    content = "Browse series by language",
-                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/languages", type = TYPE_NAVIGATION)),
-                ),
-                OpdsEntry(
-                    id = "urn:chaptervault:library:status",
-                    title = "Browse by Status",
-                    updated = now,
-                    content = "Browse series by upstream status",
-                    links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library/status", type = TYPE_NAVIGATION)),
-                ),
-            ),
         )
 
     fun buildCatalogFeed(
@@ -83,6 +90,7 @@ class FeedBuilder {
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
+            facets = SORT_FACETS,
             entries = series.map { buildSeriesEntry(it, now) },
         )
     }
@@ -106,20 +114,22 @@ class FeedBuilder {
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
-            entries = entries.map { entry ->
-                val series = entry.series
-                val links = mutableListOf(
-                    OpdsLink(rel = "subsection", href = "/opds/v1/series/${series.id}", type = TYPE_ACQUISITION),
-                )
-                series.coverUrl?.let { links.add(OpdsLink(rel = REL_IMAGE, href = it, type = "image/jpeg")) }
-                OpdsEntry(
-                    id = "urn:chaptervault:history:series:${series.id}",
-                    title = series.title,
-                    updated = entry.lastReadAt.toString(),
-                    summary = "${entry.chaptersRead} of ${entry.totalChapters} chapters read",
-                    links = links,
-                )
-            },
+            entries =
+                entries.map { entry ->
+                    val series = entry.series
+                    val links =
+                        mutableListOf(
+                            OpdsLink(rel = "subsection", href = "/opds/v1/series/${series.id}", type = TYPE_ACQUISITION),
+                        )
+                    series.coverUrl?.let { links.add(OpdsLink(rel = REL_IMAGE, href = it, type = "image/jpeg")) }
+                    OpdsEntry(
+                        id = "urn:chaptervault:history:series:${series.id}",
+                        title = series.title,
+                        updated = entry.lastReadAt.toString(),
+                        summary = "${entry.chaptersRead} of ${entry.totalChapters} chapters read",
+                        links = links,
+                    )
+                },
         )
     }
 
@@ -142,79 +152,95 @@ class FeedBuilder {
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
-            entries = chapters.map { (chapter, series) ->
-                buildChapterEntry(chapter, now, coverUrl = series.coverUrl)
-            },
+            entries =
+                chapters.map { (chapter, series) ->
+                    buildChapterEntry(chapter, now, coverUrl = series.coverUrl)
+                },
         )
     }
 
-    fun buildGenreNavFeed(genres: List<GenreCount>, now: String): OpdsFeed =
+    fun buildGenreNavFeed(
+        genres: List<GenreCount>,
+        now: String,
+    ): OpdsFeed =
         OpdsFeed(
             id = "urn:chaptervault:library:genres",
             title = "Browse by Genre",
             updated = now,
             selfHref = "/opds/v1/library/genres",
             kind = "navigation",
-            entries = genres.map { g ->
-                OpdsEntry(
-                    id = "urn:chaptervault:library:genre:${g.genre}",
-                    title = "${g.genre} (${g.seriesCount})",
-                    updated = now,
-                    links = listOf(
-                        OpdsLink(
-                            rel = "subsection",
-                            href = "/opds/v1/catalog?genre=${encodeParam(g.genre)}",
-                            type = TYPE_ACQUISITION,
-                        ),
-                    ),
-                )
-            },
+            entries =
+                genres.map { g ->
+                    OpdsEntry(
+                        id = "urn:chaptervault:library:genre:${g.genre}",
+                        title = "${g.genre} (${g.seriesCount})",
+                        updated = now,
+                        links =
+                            listOf(
+                                OpdsLink(
+                                    rel = "subsection",
+                                    href = "/opds/v1/catalog?genre=${encodeParam(g.genre)}",
+                                    type = TYPE_ACQUISITION,
+                                ),
+                            ),
+                    )
+                },
         )
 
-    fun buildLanguageNavFeed(languages: List<LanguageCount>, now: String): OpdsFeed =
+    fun buildLanguageNavFeed(
+        languages: List<LanguageCount>,
+        now: String,
+    ): OpdsFeed =
         OpdsFeed(
             id = "urn:chaptervault:library:languages",
             title = "Browse by Language",
             updated = now,
             selfHref = "/opds/v1/library/languages",
             kind = "navigation",
-            entries = languages.map { l ->
-                OpdsEntry(
-                    id = "urn:chaptervault:library:language:${l.language}",
-                    title = "${l.language} (${l.seriesCount})",
-                    updated = now,
-                    links = listOf(
-                        OpdsLink(
-                            rel = "subsection",
-                            href = "/opds/v1/catalog?language=${encodeParam(l.language)}",
-                            type = TYPE_ACQUISITION,
-                        ),
-                    ),
-                )
-            },
+            entries =
+                languages.map { l ->
+                    OpdsEntry(
+                        id = "urn:chaptervault:library:language:${l.language}",
+                        title = "${l.language} (${l.seriesCount})",
+                        updated = now,
+                        links =
+                            listOf(
+                                OpdsLink(
+                                    rel = "subsection",
+                                    href = "/opds/v1/catalog?language=${encodeParam(l.language)}",
+                                    type = TYPE_ACQUISITION,
+                                ),
+                            ),
+                    )
+                },
         )
 
-    fun buildStatusNavFeed(statuses: List<StatusCount>, now: String): OpdsFeed =
+    fun buildStatusNavFeed(
+        statuses: List<StatusCount>,
+        now: String,
+    ): OpdsFeed =
         OpdsFeed(
             id = "urn:chaptervault:library:status",
             title = "Browse by Status",
             updated = now,
             selfHref = "/opds/v1/library/status",
             kind = "navigation",
-            entries = statuses.map { s ->
-                OpdsEntry(
-                    id = "urn:chaptervault:library:status:${s.status}",
-                    title = "${s.status} (${s.seriesCount})",
-                    updated = now,
-                    links = listOf(
-                        OpdsLink(
-                            rel = "subsection",
-                            href = "/opds/v1/catalog?upstreamStatus=${encodeParam(s.status)}",
-                            type = TYPE_ACQUISITION,
-                        ),
-                    ),
-                )
-            },
+            entries =
+                statuses.map { s ->
+                    OpdsEntry(
+                        id = "urn:chaptervault:library:status:${s.status}",
+                        title = "${s.status} (${s.seriesCount})",
+                        updated = now,
+                        links =
+                            listOf(
+                                OpdsLink(
+                                    rel = "subsection",
+                                    href = "/opds/v1/catalog?upstreamStatus=${encodeParam(s.status)}",
+                                    type = TYPE_ACQUISITION,
+                                ),
+                            ),
+                    )
+                },
         )
 
     fun buildFilteredCatalogFeed(
@@ -228,12 +254,50 @@ class FeedBuilder {
         upstreamStatus: String? = null,
     ): OpdsFeed {
         val totalPages = if (size > 0) (totalItems + size - 1) / size else 1
-        val filterParams = buildList {
-            genre?.let { add("genre=${encodeParam(it)}") }
-            language?.let { add("language=${encodeParam(it)}") }
-            upstreamStatus?.let { add("upstreamStatus=${encodeParam(it)}") }
-        }.joinToString("&")
+        val filterParams =
+            buildList {
+                genre?.let { add("genre=${encodeParam(it)}") }
+                language?.let { add("language=${encodeParam(it)}") }
+                upstreamStatus?.let { add("upstreamStatus=${encodeParam(it)}") }
+            }.joinToString("&")
         val baseQuery = if (filterParams.isNotEmpty()) "$filterParams&" else ""
+        val facets =
+            buildList {
+                addAll(SORT_FACETS)
+                genre?.let {
+                    add(
+                        OpdsFacet(
+                            title = "Genre: $it",
+                            href = "/opds/v1/catalog?genre=${encodeParam(it)}",
+                            group = "Genre",
+                            isActive = true,
+                        ),
+                    )
+                    add(OpdsFacet(title = "All Genres", href = "/opds/v1/library/genres", group = "Genre"))
+                }
+                language?.let {
+                    add(
+                        OpdsFacet(
+                            title = "Language: $it",
+                            href = "/opds/v1/catalog?language=${encodeParam(it)}",
+                            group = "Language",
+                            isActive = true,
+                        ),
+                    )
+                    add(OpdsFacet(title = "All Languages", href = "/opds/v1/library/languages", group = "Language"))
+                }
+                upstreamStatus?.let {
+                    add(
+                        OpdsFacet(
+                            title = "Status: $it",
+                            href = "/opds/v1/catalog?upstreamStatus=${encodeParam(it)}",
+                            group = "Status",
+                            isActive = true,
+                        ),
+                    )
+                    add(OpdsFacet(title = "All Statuses", href = "/opds/v1/library/status", group = "Status"))
+                }
+            }
         return OpdsFeed(
             id = "urn:chaptervault:catalog:filtered",
             title = "Library",
@@ -245,6 +309,7 @@ class FeedBuilder {
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
+            facets = facets,
             entries = series.map { buildSeriesEntry(it, now) },
         )
     }

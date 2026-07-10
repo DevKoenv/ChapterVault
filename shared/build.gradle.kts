@@ -1,3 +1,7 @@
+plugins {
+    id("chaptervault.kotlin-library")
+}
+
 dependencies {
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.kotlinx.coroutines.core)

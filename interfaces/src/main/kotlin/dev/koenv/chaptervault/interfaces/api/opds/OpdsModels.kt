@@ -1,5 +1,12 @@
 package dev.koenv.chaptervault.interfaces.api.opds
 
+data class OpdsFacet(
+    val title: String,
+    val href: String,
+    val group: String,
+    val isActive: Boolean = false,
+)
+
 data class OpdsFeed(
     val id: String,
     val title: String,
@@ -12,6 +19,7 @@ data class OpdsFeed(
     val totalResults: Long? = null,
     val itemsPerPage: Int? = null,
     val startIndex: Int? = null,
+    val facets: List<OpdsFacet> = emptyList(),
     val entries: List<OpdsEntry>,
 )
 

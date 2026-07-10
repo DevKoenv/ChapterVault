@@ -7,7 +7,10 @@ import kotlin.test.assertFalse
 class OpdsXmlSerializerTest {
     private val serializer = OpdsV1()
 
-    private fun minimalFeed(title: String = "ChapterVault", entries: List<OpdsEntry> = emptyList()) = OpdsFeed(
+    private fun minimalFeed(
+        title: String = "ChapterVault",
+        entries: List<OpdsEntry> = emptyList(),
+    ) = OpdsFeed(
         id = "urn:chaptervault:root",
         title = title,
         updated = "2026-07-08T12:00:00Z",
@@ -45,10 +48,11 @@ class OpdsXmlSerializerTest {
 
     @Test
     fun `serializes next and previous pagination links when present`() {
-        val feed = minimalFeed().copy(
-            nextHref = "/opds/v1/catalog?page=2",
-            prevHref = "/opds/v1/catalog?page=0",
-        )
+        val feed =
+            minimalFeed().copy(
+                nextHref = "/opds/v1/catalog?page=2",
+                prevHref = "/opds/v1/catalog?page=0",
+            )
         val xml = serializer.serialize(feed)
         assertContains(xml, "rel=\"next\"")
         assertContains(xml, "rel=\"previous\"")
@@ -65,15 +69,26 @@ class OpdsXmlSerializerTest {
 
     @Test
     fun `serializes entry with id, title, updated, summary`() {
-        val feed = minimalFeed(entries = listOf(
-            OpdsEntry(
-                id = "urn:chaptervault:catalog",
-                title = "Library",
-                updated = "2026-07-08T12:00:00Z",
-                summary = "Browse the manga library",
-                links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/catalog", type = "application/atom+xml;profile=opds-catalog;kind=acquisition")),
+        val feed =
+            minimalFeed(
+                entries =
+                    listOf(
+                        OpdsEntry(
+                            id = "urn:chaptervault:catalog",
+                            title = "Library",
+                            updated = "2026-07-08T12:00:00Z",
+                            summary = "Browse the manga library",
+                            links =
+                                listOf(
+                                    OpdsLink(
+                                        rel = "subsection",
+                                        href = "/opds/v1/catalog",
+                                        type = "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                                    ),
+                                ),
+                        ),
+                    ),
             )
-        ))
         val xml = serializer.serialize(feed)
         assertContains(xml, "<entry>")
         assertContains(xml, "urn:chaptervault:catalog")
@@ -83,21 +98,26 @@ class OpdsXmlSerializerTest {
 
     @Test
     fun `serializes PSE count attribute in pse namespace`() {
-        val feed = minimalFeed(entries = listOf(
-            OpdsEntry(
-                id = "urn:chapter:1",
-                title = "Chapter 1",
-                updated = "2026-07-08T12:00:00Z",
-                links = listOf(
-                    OpdsLink(
-                        rel = "http://vaemendis.net/opds-pse/stream",
-                        href = "/opds/v1/chapters/1/pages/{pageNumber}",
-                        type = "image/jpeg",
-                        pseCount = 42,
-                    )
-                ),
+        val feed =
+            minimalFeed(
+                entries =
+                    listOf(
+                        OpdsEntry(
+                            id = "urn:chapter:1",
+                            title = "Chapter 1",
+                            updated = "2026-07-08T12:00:00Z",
+                            links =
+                                listOf(
+                                    OpdsLink(
+                                        rel = "http://vaemendis.net/opds-pse/stream",
+                                        href = "/opds/v1/chapters/1/pages/{pageNumber}",
+                                        type = "image/jpeg",
+                                        pseCount = 42,
+                                    ),
+                                ),
+                        ),
+                    ),
             )
-        ))
         val xml = serializer.serialize(feed)
         assertContains(xml, "42")
         assertContains(xml, "http://vaemendis.net/opds-pse/ns")
@@ -105,18 +125,20 @@ class OpdsXmlSerializerTest {
 
     @Test
     fun `escapes XML-special characters in element text content`() {
-        val feed = minimalFeed(
-            title = "A & B",
-            entries = listOf(
-                OpdsEntry(
-                    id = "urn:entry",
-                    title = "Entry with <tags> and \"quotes\" and /slash/",
-                    updated = "2026-07-08T12:00:00Z",
-                    summary = "Summary & more < less > equal",
-                    links = emptyList(),
-                )
-            ),
-        )
+        val feed =
+            minimalFeed(
+                title = "A & B",
+                entries =
+                    listOf(
+                        OpdsEntry(
+                            id = "urn:entry",
+                            title = "Entry with <tags> and \"quotes\" and /slash/",
+                            updated = "2026-07-08T12:00:00Z",
+                            summary = "Summary & more < less > equal",
+                            links = emptyList(),
+                        ),
+                    ),
+            )
         val xml = serializer.serialize(feed)
         assertContains(xml, "&amp;")
         assertContains(xml, "&lt;")

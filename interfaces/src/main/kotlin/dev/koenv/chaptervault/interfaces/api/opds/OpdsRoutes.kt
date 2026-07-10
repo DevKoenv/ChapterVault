@@ -65,16 +65,17 @@ fun Application.opdsRoutes(
                     when (val result = opdsRead.listSeriesFiltered(filter, pageRequest)) {
                         is Result.Success -> {
                             val p = result.value
-                            val feed = feedBuilder.buildFilteredCatalogFeed(
-                                series = p.items,
-                                page = page,
-                                size = p.size,
-                                totalItems = p.totalItems,
-                                now = now,
-                                genre = genre,
-                                language = language,
-                                upstreamStatus = upstreamStatus,
-                            )
+                            val feed =
+                                feedBuilder.buildFilteredCatalogFeed(
+                                    series = p.items,
+                                    page = page,
+                                    size = p.size,
+                                    totalItems = p.totalItems,
+                                    now = now,
+                                    genre = genre,
+                                    language = language,
+                                    upstreamStatus = upstreamStatus,
+                                )
                             call.respondText(opdsV1.serialize(feed), opdsContentType(call))
                         }
                         is Result.Failure -> call.respondError(result.error)
@@ -83,13 +84,14 @@ fun Application.opdsRoutes(
                     when (val result = libraryRead.listSeries(pageRequest)) {
                         is Result.Success -> {
                             val p = result.value
-                            val feed = feedBuilder.buildCatalogFeed(
-                                series = p.items,
-                                page = page,
-                                size = p.size,
-                                totalItems = p.totalItems,
-                                now = now,
-                            )
+                            val feed =
+                                feedBuilder.buildCatalogFeed(
+                                    series = p.items,
+                                    page = page,
+                                    size = p.size,
+                                    totalItems = p.totalItems,
+                                    now = now,
+                                )
                             call.respondText(opdsV1.serialize(feed), opdsContentType(call))
                         }
                         is Result.Failure -> call.respondError(result.error)
@@ -98,22 +100,24 @@ fun Application.opdsRoutes(
             }
 
             get("/opds/v1/history") {
-                val principal = call.principal<KtorPrincipal>() ?: run {
-                    call.respond(HttpStatusCode.Unauthorized)
-                    return@get
-                }
+                val principal =
+                    call.principal<KtorPrincipal>() ?: run {
+                        call.respond(HttpStatusCode.Unauthorized)
+                        return@get
+                    }
                 val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
                 val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
                 when (val result = opdsRead.listReadHistory(principal.user.id, PageRequest(page, size.coerceIn(1, 100)))) {
                     is Result.Success -> {
                         val p = result.value
-                        val feed = feedBuilder.buildHistoryFeed(
-                            entries = p.items,
-                            page = page,
-                            size = p.size,
-                            totalItems = p.totalItems,
-                            now = Instant.now().toString(),
-                        )
+                        val feed =
+                            feedBuilder.buildHistoryFeed(
+                                entries = p.items,
+                                page = page,
+                                size = p.size,
+                                totalItems = p.totalItems,
+                                now = Instant.now().toString(),
+                            )
                         call.respondText(opdsV1.serialize(feed), opdsContentType(call))
                     }
                     is Result.Failure -> call.respondError(result.error)
@@ -126,13 +130,14 @@ fun Application.opdsRoutes(
                 when (val result = opdsRead.listRecentlyAddedChapters(PageRequest(page, size.coerceIn(1, 100)))) {
                     is Result.Success -> {
                         val p = result.value
-                        val feed = feedBuilder.buildLibraryUpdatesFeed(
-                            chapters = p.items,
-                            page = page,
-                            size = p.size,
-                            totalItems = p.totalItems,
-                            now = Instant.now().toString(),
-                        )
+                        val feed =
+                            feedBuilder.buildLibraryUpdatesFeed(
+                                chapters = p.items,
+                                page = page,
+                                size = p.size,
+                                totalItems = p.totalItems,
+                                now = Instant.now().toString(),
+                            )
                         call.respondText(opdsV1.serialize(feed), opdsContentType(call))
                     }
                     is Result.Failure -> call.respondError(result.error)

@@ -1,10 +1,9 @@
 group = "dev.koenv.chaptervault"
+version = "0.5.0"
 
 plugins {
-    alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.kover)
-    alias(libs.plugins.ktlint) apply false
     alias(libs.plugins.detekt)
     alias(libs.plugins.shadow) apply false
     alias(libs.plugins.buildconfig) apply false
@@ -47,29 +46,6 @@ detekt {
     )
 }
 
-subprojects {
-    apply(plugin = "org.jetbrains.kotlin.jvm")
-    apply(plugin = "org.jlleitschuh.gradle.ktlint")
-
-    extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-            freeCompilerArgs.addAll(
-                "-opt-in=kotlin.RequiresOptIn",
-                "-Xjsr305=strict"
-            )
-        }
-    }
-
-    tasks.withType<JavaCompile> {
-        sourceCompatibility = "21"
-        targetCompatibility = "21"
-    }
-
-    tasks.withType<Test> {
-        useJUnitPlatform()
-    }
-}
 
 tasks.register("coverage") {
     group = "verification"
