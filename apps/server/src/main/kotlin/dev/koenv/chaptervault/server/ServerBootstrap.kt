@@ -6,29 +6,35 @@ import dev.koenv.chaptervault.infrastructure.TaskExecutorService
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
 import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
+import dev.koenv.chaptervault.infrastructure.update.UpdateCheckerService
 import dev.koenv.chaptervault.interfaces.api.opds.opdsPageRoutes
 import dev.koenv.chaptervault.interfaces.api.opds.opdsRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.backupRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.bookmarkRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionReloadRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.metadataOverrideRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.readingStatusRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.respondBadRequest
 import dev.koenv.chaptervault.interfaces.api.rest.respondError
+import dev.koenv.chaptervault.interfaces.api.rest.systemRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
 import dev.koenv.chaptervault.interfaces.api.sse.sseRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.kernel.api.AuthApi
+import dev.koenv.chaptervault.kernel.api.BackupApi
 import dev.koenv.chaptervault.kernel.api.BookmarkApi
 import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.MetadataOverrideApi
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.OpdsReadApi
@@ -40,6 +46,7 @@ import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -68,7 +75,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
-import io.github.oshai.kotlinlogging.KotlinLogging
 import org.koin.ktor.ext.inject
 import org.slf4j.event.Level
 import java.security.MessageDigest
@@ -143,12 +149,15 @@ fun Application.bootstrap() {
     val executor by inject<TaskExecutorService>()
     val refreshScheduler by inject<SeriesRefreshScheduler>()
     val progressApi by inject<ProgressApi>()
+    val metadataOverrideApi by inject<MetadataOverrideApi>()
+    val backupApi by inject<BackupApi>()
     val bookmarkApi by inject<BookmarkApi>()
     val readingStatusApi by inject<ReadingStatusApi>()
     val notificationService by inject<NotificationService>()
     val notificationApi by inject<NotificationApi>()
     val notificationDispatch by inject<NotificationDispatchApi>()
     val extensionLoaderService by inject<ExtensionLoaderService>()
+    val updateCheckerService by inject<UpdateCheckerService>()
 
     install(Authentication) {
         bearer("auth-bearer") {
@@ -186,6 +195,8 @@ fun Application.bootstrap() {
             taskRoutes(system)
             connectorRoutes(connectorRegistry, libraryRead)
             progressRoutes(progressApi)
+            metadataOverrideRoutes(metadataOverrideApi)
+            backupRoutes(backupApi)
             bookmarkRoutes(bookmarkApi)
             readingStatusRoutes(readingStatusApi)
             notificationRoutes(notificationApi, notificationDispatch)
@@ -250,6 +261,12 @@ fun Application.bootstrap() {
         }
     }
 
+    routing {
+        authenticate("auth-bearer") {
+            systemRoutes(updateCheckerService)
+        }
+    }
+
     notificationService.start()
 
     launch { projectionService.start() }
@@ -258,6 +275,7 @@ fun Application.bootstrap() {
         executor.start()
     }
     launch { refreshScheduler.start() }
+    updateCheckerService.startAsync()
 
     routing {
         swaggerUI(path = "swagger", swaggerFile = "openapi/documentation.yaml")

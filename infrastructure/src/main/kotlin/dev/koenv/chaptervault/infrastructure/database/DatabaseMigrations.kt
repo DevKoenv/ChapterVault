@@ -128,6 +128,51 @@ object DatabaseMigrations {
                     "DROP TABLE IF EXISTS extension_registries",
                 ),
             ),
+            Migration(
+                10,
+                "reading_progress_rework",
+                listOf(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_series_progress (
+                        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+                        latest_chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+                        latest_page INTEGER NOT NULL DEFAULT 0,
+                        read_at TEXT NOT NULL,
+                        CONSTRAINT pk_user_series_progress PRIMARY KEY (user_id, series_id)
+                    )
+                    """.trimIndent(),
+                    "CREATE INDEX IF NOT EXISTS idx_usp_user_id ON user_series_progress (user_id)",
+                    """
+                    INSERT OR IGNORE INTO user_series_progress (user_id, series_id, latest_chapter_id, latest_page, read_at)
+                    SELECT p.user_id, c.series_id, p.chapter_id, 0, p.read_at
+                    FROM progress p
+                    JOIN chapters c ON c.id = p.chapter_id
+                    WHERE c.chapter_index = (
+                        SELECT MAX(c2.chapter_index)
+                        FROM progress p2
+                        JOIN chapters c2 ON c2.id = p2.chapter_id
+                        WHERE p2.user_id = p.user_id AND c2.series_id = c.series_id
+                    )
+                    """.trimIndent(),
+                    "DROP TABLE IF EXISTS progress",
+                ),
+            ),
+            Migration(
+                11,
+                "series_overrides",
+                listOf(
+                    """
+                    CREATE TABLE IF NOT EXISTS series_overrides (
+                        series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+                        field TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        CONSTRAINT pk_series_overrides PRIMARY KEY (series_id, field)
+                    )
+                    """.trimIndent(),
+                    "CREATE INDEX IF NOT EXISTS idx_series_overrides_series_id ON series_overrides (series_id)",
+                ),
+            ),
         )
 
     fun migrate(db: Database) {

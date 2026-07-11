@@ -2,10 +2,11 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
-import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
+import dev.koenv.chaptervault.infrastructure.database.entities.SeriesOverridesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
+import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
 import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
@@ -52,7 +53,16 @@ class SeriesRepositoryTest {
                 setupConnection = { it.createStatement().execute("PRAGMA foreign_keys = ON") },
             )
             transaction {
-                SchemaUtils.create(UserTable, SeriesTable, SeriesGenresTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
+                SchemaUtils.create(
+                    UserTable,
+                    SeriesTable,
+                    SeriesGenresTable,
+                    SeriesOverridesTable,
+                    ChapterTable,
+                    TaskTable,
+                    UserSeriesProgressTable,
+                    BookmarkTable,
+                )
             }
         }
     }
@@ -61,8 +71,26 @@ class SeriesRepositoryTest {
     fun cleanTables() {
         mockStorage.reset()
         transaction {
-            SchemaUtils.drop(BookmarkTable, ProgressTable, TaskTable, ChapterTable, SeriesGenresTable, SeriesTable, UserTable)
-            SchemaUtils.create(UserTable, SeriesTable, SeriesGenresTable, ChapterTable, TaskTable, ProgressTable, BookmarkTable)
+            SchemaUtils.drop(
+                BookmarkTable,
+                UserSeriesProgressTable,
+                TaskTable,
+                ChapterTable,
+                SeriesOverridesTable,
+                SeriesGenresTable,
+                SeriesTable,
+                UserTable,
+            )
+            SchemaUtils.create(
+                UserTable,
+                SeriesTable,
+                SeriesGenresTable,
+                SeriesOverridesTable,
+                ChapterTable,
+                TaskTable,
+                UserSeriesProgressTable,
+                BookmarkTable,
+            )
         }
     }
 
@@ -72,7 +100,7 @@ class SeriesRepositoryTest {
             val userId = insertUser()
             val series = (repo.addToLibrary("mangadex", "ext-cascade", autoDownload = false) as Result.Success).value
             val chapterId = insertChapter(Id.from(series.id.toString()))
-            insertProgress(userId, chapterId)
+            insertProgress(userId, series.id, chapterId)
             insertBookmark(userId, chapterId)
             insertTask(chapterId.toString())
             insertTask(series.id.toString())
@@ -82,7 +110,7 @@ class SeriesRepositoryTest {
 
             transaction {
                 assertEquals(0L, ChapterTable.selectAll().where { ChapterTable.seriesId eq series.id.toString() }.count())
-                assertEquals(0L, ProgressTable.selectAll().count())
+                assertEquals(0L, UserSeriesProgressTable.selectAll().count())
                 assertEquals(0L, BookmarkTable.selectAll().count())
                 assertEquals(2L, TaskTable.selectAll().count())
             }
@@ -383,13 +411,16 @@ class SeriesRepositoryTest {
 
     private fun insertProgress(
         userId: Id,
+        seriesId: Id,
         chapterId: Id,
     ) {
         transaction {
-            ProgressTable.insert {
-                it[ProgressTable.userId] = userId.toString()
-                it[ProgressTable.chapterId] = chapterId.toString()
-                it[ProgressTable.readAt] = Instant.now().toKotlinInstant()
+            UserSeriesProgressTable.insert {
+                it[UserSeriesProgressTable.userId] = userId.toString()
+                it[UserSeriesProgressTable.seriesId] = seriesId.toString()
+                it[UserSeriesProgressTable.latestChapterId] = chapterId.toString()
+                it[UserSeriesProgressTable.latestPage] = 0
+                it[UserSeriesProgressTable.readAt] = Instant.now().toKotlinInstant()
             }
         }
     }

@@ -5,13 +5,17 @@ plugins {
     alias(libs.plugins.buildconfig)
 }
 
-val gitRevision: String = try {
-    providers.exec {
-        commandLine("git", "rev-parse", "--short", "HEAD")
-    }.standardOutput.asText.get().trim()
-} catch (e: Exception) {
-    "unknown"
-}
+val gitRevision: String =
+    try {
+        providers
+            .exec {
+                commandLine("git", "rev-parse", "--short", "HEAD")
+            }.standardOutput.asText
+            .get()
+            .trim()
+    } catch (e: Exception) {
+        "unknown"
+    }
 
 buildConfig {
     packageName("dev.koenv.chaptervault.server.generated")

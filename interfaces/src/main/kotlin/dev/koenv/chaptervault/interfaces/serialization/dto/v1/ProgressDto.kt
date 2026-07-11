@@ -5,6 +5,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ProgressDto(
     val seriesId: String,
-    val readCount: Int,
+    val latestChapterId: String?,
+    val latestPage: Int,
+    val unreadCount: Int,
     val totalCount: Int,
 )

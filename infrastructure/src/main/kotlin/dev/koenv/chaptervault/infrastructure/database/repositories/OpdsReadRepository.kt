@@ -1,9 +1,9 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
-import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
+import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
 import dev.koenv.chaptervault.kernel.api.ChapterWithSeries
 import dev.koenv.chaptervault.kernel.api.GenreCount
 import dev.koenv.chaptervault.kernel.api.LanguageCount
@@ -33,7 +33,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.count
-import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 
@@ -47,22 +46,16 @@ class OpdsReadRepository : OpdsReadApi {
         request: PageRequest,
     ): Result<Pagination<RecentlyReadEntry>> =
         dbQuery {
-            val maxReadAt = ProgressTable.readAt.max()
-            val chaptersReadCount = ProgressTable.chapterId.count()
-
-            // Single aggregate query — no N+1 for either chaptersRead or totalChapters
-            val allAggRows =
-                ProgressTable
-                    .join(ChapterTable, JoinType.INNER, ProgressTable.chapterId, ChapterTable.id)
-                    .select(ChapterTable.seriesId, maxReadAt, chaptersReadCount)
-                    .where { ProgressTable.userId eq userId.toString() }
-                    .groupBy(ChapterTable.seriesId)
-                    .orderBy(maxReadAt, SortOrder.DESC)
+            val allProgressRows =
+                UserSeriesProgressTable
+                    .selectAll()
+                    .where { UserSeriesProgressTable.userId eq userId.toString() }
+                    .orderBy(UserSeriesProgressTable.readAt, SortOrder.DESC)
                     .toList()
 
-            val total = allAggRows.size.toLong()
-            val pageRows = allAggRows.drop(request.page * request.size).take(request.size)
-            val pageSeriesIds = pageRows.map { it[ChapterTable.seriesId] }
+            val total = allProgressRows.size.toLong()
+            val pageRows = allProgressRows.drop(request.page * request.size).take(request.size)
+            val pageSeriesIds = pageRows.map { it[UserSeriesProgressTable.seriesId] }
 
             if (pageSeriesIds.isEmpty()) {
                 return@dbQuery Result.Success(Pagination(emptyList(), request.page, request.size, total))
@@ -85,14 +78,40 @@ class OpdsReadRepository : OpdsReadApi {
                         .associate { it[ChapterTable.seriesId] to it[countExpr] }
                 }
 
+            val latestChapterIndexMap: Map<String, Double> =
+                pageRows
+                    .mapNotNull { row ->
+                        val cid = row[UserSeriesProgressTable.latestChapterId] ?: return@mapNotNull null
+                        val sid = row[UserSeriesProgressTable.seriesId]
+                        ChapterTable
+                            .selectAll()
+                            .where { ChapterTable.id eq cid }
+                            .singleOrNull()
+                            ?.let { sid to it[ChapterTable.chapterIndex] }
+                    }.toMap()
+
+            val readCountMap: Map<String, Int> =
+                pageSeriesIds
+                    .associateWith { sid ->
+                        val latestIndex = latestChapterIndexMap[sid] ?: -1.0
+                        if (latestIndex < 0.0) {
+                            0
+                        } else {
+                            ChapterTable
+                                .selectAll()
+                                .where { ChapterTable.seriesId eq sid }
+                                .count { it[ChapterTable.chapterIndex] <= latestIndex }
+                        }
+                    }
+
             val items =
                 pageRows.mapNotNull { row ->
-                    val seriesId = row[ChapterTable.seriesId]
+                    val seriesId = row[UserSeriesProgressTable.seriesId]
                     val seriesRow = seriesMap[seriesId] ?: return@mapNotNull null
                     RecentlyReadEntry(
                         series = seriesRow.toSeries(genreMap[seriesId].orEmpty()),
-                        lastReadAt = row[maxReadAt]?.toJavaInstant() ?: return@mapNotNull null,
-                        chaptersRead = row[chaptersReadCount].toInt(),
+                        lastReadAt = row[UserSeriesProgressTable.readAt].toJavaInstant(),
+                        chaptersRead = readCountMap[seriesId] ?: 0,
                         totalChapters = totalChaptersMap[seriesId]?.toInt() ?: 0,
                     )
                 }

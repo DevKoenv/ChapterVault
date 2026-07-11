@@ -1,21 +1,21 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
-import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
+import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.ReadProgress
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.toKotlinInstant
-import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.sql.upsert
 import java.time.Instant
 
 class ProgressRepository : ProgressApi {
@@ -26,18 +26,49 @@ class ProgressRepository : ProgressApi {
         chapterId: Id,
     ): Result<Unit> =
         dbQuery {
-            val u = userId.toString()
-            val c = chapterId.toString()
-            val exists =
-                ProgressTable
+            val chapter =
+                ChapterTable
                     .selectAll()
-                    .where { (ProgressTable.userId eq u) and (ProgressTable.chapterId eq c) }
-                    .count() > 0
-            if (!exists) {
-                ProgressTable.insert {
-                    it[ProgressTable.userId] = u
-                    it[ProgressTable.chapterId] = c
-                    it[ProgressTable.readAt] = Instant.now().toKotlinInstant()
+                    .where { ChapterTable.id eq chapterId.toString() }
+                    .singleOrNull() ?: return@dbQuery Result.Success(Unit)
+
+            val seriesId = chapter[ChapterTable.seriesId]
+            val newIndex = chapter[ChapterTable.chapterIndex]
+
+            val current =
+                UserSeriesProgressTable
+                    .selectAll()
+                    .where {
+                        (UserSeriesProgressTable.userId eq userId.toString()) and
+                            (UserSeriesProgressTable.seriesId eq seriesId)
+                    }.singleOrNull()
+
+            val shouldUpdate =
+                if (current == null) {
+                    true
+                } else {
+                    val currentChapterId = current[UserSeriesProgressTable.latestChapterId]
+                    if (currentChapterId == null) {
+                        true
+                    } else {
+                        val currentIndex =
+                            ChapterTable
+                                .selectAll()
+                                .where { ChapterTable.id eq currentChapterId }
+                                .singleOrNull()
+                                ?.get(ChapterTable.chapterIndex)
+                                ?: -1.0
+                        newIndex >= currentIndex
+                    }
+                }
+
+            if (shouldUpdate) {
+                UserSeriesProgressTable.upsert {
+                    it[UserSeriesProgressTable.userId] = userId.toString()
+                    it[UserSeriesProgressTable.seriesId] = seriesId
+                    it[UserSeriesProgressTable.latestChapterId] = chapterId.toString()
+                    it[UserSeriesProgressTable.latestPage] = 0
+                    it[UserSeriesProgressTable.readAt] = Instant.now().toKotlinInstant()
                 }
             }
             Result.Success(Unit)
@@ -48,8 +79,27 @@ class ProgressRepository : ProgressApi {
         chapterId: Id,
     ): Result<Unit> =
         dbQuery {
-            ProgressTable.deleteWhere {
-                (ProgressTable.userId eq userId.toString()) and (ProgressTable.chapterId eq chapterId.toString())
+            val chapter =
+                ChapterTable
+                    .selectAll()
+                    .where { ChapterTable.id eq chapterId.toString() }
+                    .singleOrNull() ?: return@dbQuery Result.Success(Unit)
+
+            val seriesId = chapter[ChapterTable.seriesId]
+
+            val current =
+                UserSeriesProgressTable
+                    .selectAll()
+                    .where {
+                        (UserSeriesProgressTable.userId eq userId.toString()) and
+                            (UserSeriesProgressTable.seriesId eq seriesId)
+                    }.singleOrNull()
+
+            if (current != null && current[UserSeriesProgressTable.latestChapterId] == chapterId.toString()) {
+                UserSeriesProgressTable.deleteWhere {
+                    (UserSeriesProgressTable.userId eq userId.toString()) and
+                        (UserSeriesProgressTable.seriesId eq seriesId)
+                }
             }
             Result.Success(Unit)
         }
@@ -66,16 +116,56 @@ class ProgressRepository : ProgressApi {
                     .count()
                     .toInt()
 
-            val readCount =
-                ProgressTable
-                    .join(ChapterTable, JoinType.INNER, ProgressTable.chapterId, ChapterTable.id)
+            val progressRow =
+                UserSeriesProgressTable
                     .selectAll()
                     .where {
-                        (ProgressTable.userId eq userId.toString()) and
-                            (ChapterTable.seriesId eq seriesId.toString())
-                    }.count()
-                    .toInt()
+                        (UserSeriesProgressTable.userId eq userId.toString()) and
+                            (UserSeriesProgressTable.seriesId eq seriesId.toString())
+                    }.singleOrNull()
 
-            Result.Success(ReadProgress(seriesId = seriesId, readCount = readCount, totalCount = totalCount))
+            if (progressRow == null) {
+                return@dbQuery Result.Success(
+                    ReadProgress(
+                        seriesId = seriesId,
+                        latestChapterId = null,
+                        latestPage = 0,
+                        unreadCount = totalCount,
+                        totalCount = totalCount,
+                    ),
+                )
+            }
+
+            val latestChapterId = progressRow[UserSeriesProgressTable.latestChapterId]
+            val latestPage = progressRow[UserSeriesProgressTable.latestPage]
+
+            val unreadCount =
+                if (latestChapterId == null) {
+                    totalCount
+                } else {
+                    val latestIndex =
+                        ChapterTable
+                            .selectAll()
+                            .where { ChapterTable.id eq latestChapterId }
+                            .singleOrNull()
+                            ?.get(ChapterTable.chapterIndex)
+                            ?: 0.0
+                    val readCount =
+                        ChapterTable
+                            .selectAll()
+                            .where { ChapterTable.seriesId eq seriesId.toString() }
+                            .count { it[ChapterTable.chapterIndex] <= latestIndex }
+                    (totalCount - readCount).coerceAtLeast(0)
+                }
+
+            Result.Success(
+                ReadProgress(
+                    seriesId = seriesId,
+                    latestChapterId = latestChapterId?.let { Id.from(it) },
+                    latestPage = latestPage,
+                    unreadCount = unreadCount,
+                    totalCount = totalCount,
+                ),
+            )
         }
 }

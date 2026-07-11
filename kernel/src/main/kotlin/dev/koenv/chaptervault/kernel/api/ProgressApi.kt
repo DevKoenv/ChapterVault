@@ -5,7 +5,9 @@ import dev.koenv.chaptervault.shared.utils.Id
 
 data class ReadProgress(
     val seriesId: Id,
-    val readCount: Int,
+    val latestChapterId: Id?,
+    val latestPage: Int,
+    val unreadCount: Int,
     val totalCount: Int,
 )
 

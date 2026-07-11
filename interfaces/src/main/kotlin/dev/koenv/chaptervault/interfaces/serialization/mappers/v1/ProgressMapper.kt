@@ -6,6 +6,8 @@ import dev.koenv.chaptervault.kernel.api.ReadProgress
 fun ReadProgress.toDto() =
     ProgressDto(
         seriesId = seriesId.toString(),
-        readCount = readCount,
+        latestChapterId = latestChapterId?.toString(),
+        latestPage = latestPage,
+        unreadCount = unreadCount,
         totalCount = totalCount,
     )

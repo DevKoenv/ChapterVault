@@ -2,8 +2,8 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
-import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
+import dev.koenv.chaptervault.infrastructure.database.entities.SeriesOverridesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
@@ -50,7 +50,8 @@ class SeriesRepository(
                     .singleOrNull()
                     ?: return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
             val genres = genresFor(id.toString())
-            Result.Success(row.toSeries(genres))
+            val overrides = overridesFor(id.toString())
+            Result.Success(row.toSeries(genres, overrides))
         }
 
     override suspend fun listSeries(request: PageRequest): Result<Pagination<Series>> =
@@ -61,8 +62,10 @@ class SeriesRepository(
                     .selectAll()
                     .limit(request.size, (request.page * request.size).toLong())
                     .toList()
-            val genreMap = genresForIds(rows.map { it[SeriesTable.id] })
-            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
+            val ids = rows.map { it[SeriesTable.id] }
+            val genreMap = genresForIds(ids)
+            val overrideMap = overridesForIds(ids)
+            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty(), overrideMap[it[SeriesTable.id]].orEmpty()) }
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
@@ -78,8 +81,10 @@ class SeriesRepository(
                     .where { SeriesTable.title like "%$query%" }
                     .limit(request.size, (request.page * request.size).toLong())
                     .toList()
-            val genreMap = genresForIds(rows.map { it[SeriesTable.id] })
-            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
+            val ids = rows.map { it[SeriesTable.id] }
+            val genreMap = genresForIds(ids)
+            val overrideMap = overridesForIds(ids)
+            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty(), overrideMap[it[SeriesTable.id]].orEmpty()) }
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
@@ -212,7 +217,6 @@ class SeriesRepository(
 
                 if (chapterIds.isNotEmpty()) {
                     BookmarkTable.deleteWhere { chapterId inList chapterIds }
-                    ProgressTable.deleteWhere { chapterId inList chapterIds }
                 }
                 ChapterTable.deleteWhere { seriesId eq id.toString() }
 
@@ -314,7 +318,7 @@ class SeriesRepository(
                     .selectAll()
                     .where { SeriesTable.id eq id.toString() }
                     .single()
-            Result.Success(row.toSeries(genresFor(id.toString())))
+            Result.Success(row.toSeries(genresFor(id.toString()), overridesFor(id.toString())))
         }
 
     private fun org.jetbrains.exposed.sql.Transaction.genresFor(seriesId: String): List<String> =
@@ -331,26 +335,47 @@ class SeriesRepository(
             .groupBy({ it[SeriesGenresTable.seriesId] }, { it[SeriesGenresTable.genre] })
     }
 
-    private fun ResultRow.toSeries(genres: List<String> = emptyList()) =
-        Series(
-            id = Id.from(this[SeriesTable.id]),
-            title = this[SeriesTable.title],
-            connectorId = this[SeriesTable.connectorId],
-            externalId = this[SeriesTable.externalId],
-            language = this[SeriesTable.language],
-            status = SeriesStatus.valueOf(this[SeriesTable.status]),
-            autoDownload = this[SeriesTable.autoDownload],
-            defaultFormat = this[SeriesTable.defaultFormat]?.let { ChapterFormat.fromString(it) },
-            coverUrl = this[SeriesTable.coverUrl],
-            description = this[SeriesTable.description],
-            author = this[SeriesTable.author],
-            artist = this[SeriesTable.artist],
-            year = this[SeriesTable.year],
-            upstreamStatus = this[SeriesTable.upstreamStatus]?.let { runCatching { UpstreamStatus.valueOf(it.uppercase()) }.getOrNull() },
-            genres = genres,
-            addedAt = this[SeriesTable.addedAt].toJavaInstant(),
-            updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
-        )
+    private fun org.jetbrains.exposed.sql.Transaction.overridesFor(seriesId: String): Map<String, String> =
+        SeriesOverridesTable
+            .selectAll()
+            .where { SeriesOverridesTable.seriesId eq seriesId }
+            .associate { it[SeriesOverridesTable.field] to it[SeriesOverridesTable.value] }
+
+    private fun org.jetbrains.exposed.sql.Transaction.overridesForIds(ids: List<String>): Map<String, Map<String, String>> {
+        if (ids.isEmpty()) return emptyMap()
+        return SeriesOverridesTable
+            .selectAll()
+            .where { SeriesOverridesTable.seriesId inList ids }
+            .groupBy({ it[SeriesOverridesTable.seriesId] }, { it[SeriesOverridesTable.field] to it[SeriesOverridesTable.value] })
+            .mapValues { (_, pairs) -> pairs.toMap() }
+    }
+
+    private fun ResultRow.toSeries(
+        genres: List<String> = emptyList(),
+        overrides: Map<String, String> = emptyMap(),
+    ) = Series(
+        id = Id.from(this[SeriesTable.id]),
+        title = overrides["title"] ?: this[SeriesTable.title],
+        connectorId = this[SeriesTable.connectorId],
+        externalId = this[SeriesTable.externalId],
+        language = this[SeriesTable.language],
+        status =
+            overrides["status"]?.let { runCatching { SeriesStatus.valueOf(it.uppercase()) }.getOrNull() }
+                ?: SeriesStatus.valueOf(this[SeriesTable.status]),
+        autoDownload = this[SeriesTable.autoDownload],
+        defaultFormat = this[SeriesTable.defaultFormat]?.let { ChapterFormat.fromString(it) },
+        coverUrl = overrides["coverUrl"] ?: this[SeriesTable.coverUrl],
+        description = overrides["description"] ?: this[SeriesTable.description],
+        author = overrides["author"] ?: this[SeriesTable.author],
+        artist = overrides["artist"] ?: this[SeriesTable.artist],
+        year = this[SeriesTable.year],
+        upstreamStatus =
+            overrides["upstreamStatus"]?.let { runCatching { UpstreamStatus.valueOf(it.uppercase()) }.getOrNull() }
+                ?: this[SeriesTable.upstreamStatus]?.let { runCatching { UpstreamStatus.valueOf(it.uppercase()) }.getOrNull() },
+        genres = genres,
+        addedAt = this[SeriesTable.addedAt].toJavaInstant(),
+        updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
+    )
 
     // removes storage dirs with no matching DB entry
     // called on startup to cover crash window between DB delete and file delete

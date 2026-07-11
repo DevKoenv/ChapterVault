@@ -64,12 +64,12 @@ class ProgressRoutesTest {
                     override suspend fun getProgress(
                         userId: Id,
                         seriesId: Id,
-                    ) = Result.Success(ReadProgress(seriesId, readCount = 3, totalCount = 10))
+                    ) = Result.Success(ReadProgress(seriesId, latestChapterId = null, latestPage = 0, unreadCount = 7, totalCount = 10))
                 },
         ) {
             val response = client.get("/library/series/$seriesId/progress") { bearerAuth("user-token") }
             assertEquals(HttpStatusCode.OK, response.status)
-            assertContains(response.bodyAsText(), "readCount")
+            assertContains(response.bodyAsText(), "unreadCount")
             assertContains(response.bodyAsText(), "totalCount")
         }
     }

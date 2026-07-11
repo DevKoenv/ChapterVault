@@ -10,8 +10,10 @@ import dev.koenv.chaptervault.infrastructure.connectors.CustomConnector
 import dev.koenv.chaptervault.infrastructure.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.infrastructure.connectors.MockConnector
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.MangaDexConnector
+import dev.koenv.chaptervault.infrastructure.database.repositories.BackupRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.BookmarkRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
+import dev.koenv.chaptervault.infrastructure.database.repositories.MetadataOverrideRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.NotificationRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.OpdsReadRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ProgressRepository
@@ -33,11 +35,14 @@ import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.infrastructure.storage.FolderWriter
 import dev.koenv.chaptervault.infrastructure.storage.JpegThumbnailFormat
+import dev.koenv.chaptervault.infrastructure.update.UpdateCheckerService
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.kernel.api.AuthApi
+import dev.koenv.chaptervault.kernel.api.BackupApi
 import dev.koenv.chaptervault.kernel.api.BookmarkApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.MetadataOverrideApi
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.OpdsReadApi
@@ -80,6 +85,10 @@ val infrastructureModule =
         single { ChapterRepository() }
         single { ProgressRepository() }
         single<ProgressApi> { get<ProgressRepository>() }
+        single { MetadataOverrideRepository() }
+        single<MetadataOverrideApi> { get<MetadataOverrideRepository>() }
+        single { BackupRepository() }
+        single<BackupApi> { get<BackupRepository>() }
         single { BookmarkRepository() }
         single<BookmarkApi> { get<BookmarkRepository>() }
         single { UserSeriesStatusRepository() }
@@ -114,6 +123,7 @@ val infrastructureModule =
                 thumbnailFormat = JpegThumbnailFormat,
             )
         }
+        single { UpdateCheckerService(get(), BuildConfig.VERSION) }
         single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
         single {
             TaskExecutorService(

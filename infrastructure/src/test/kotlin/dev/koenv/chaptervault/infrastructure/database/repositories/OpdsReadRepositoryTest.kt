@@ -1,9 +1,9 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
-import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
+import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
 import dev.koenv.chaptervault.kernel.api.OpdsSeriesFilter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
@@ -17,6 +17,7 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.upsert
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -41,7 +42,7 @@ class OpdsReadRepositoryTest {
                 setupConnection = { it.createStatement().execute("PRAGMA foreign_keys = ON") },
             )
             transaction {
-                SchemaUtils.create(UserTable, SeriesTable, SeriesGenresTable, ChapterTable, ProgressTable)
+                SchemaUtils.create(UserTable, SeriesTable, SeriesGenresTable, ChapterTable, UserSeriesProgressTable)
             }
         }
     }
@@ -49,8 +50,8 @@ class OpdsReadRepositoryTest {
     @AfterEach
     fun cleanTables() {
         transaction {
-            SchemaUtils.drop(ProgressTable, ChapterTable, SeriesGenresTable, SeriesTable, UserTable)
-            SchemaUtils.create(UserTable, SeriesTable, SeriesGenresTable, ChapterTable, ProgressTable)
+            SchemaUtils.drop(UserSeriesProgressTable, ChapterTable, SeriesGenresTable, SeriesTable, UserTable)
+            SchemaUtils.create(UserTable, SeriesTable, SeriesGenresTable, ChapterTable, UserSeriesProgressTable)
         }
     }
 
@@ -114,14 +115,17 @@ class OpdsReadRepositoryTest {
 
     private fun insertProgress(
         userId: Id,
-        chapterId: Id,
+        seriesId: Id,
+        latestChapterId: Id,
         readAt: Instant = Instant.now(),
     ) {
         transaction {
-            ProgressTable.insert {
-                it[ProgressTable.userId] = userId.toString()
-                it[ProgressTable.chapterId] = chapterId.toString()
-                it[ProgressTable.readAt] = readAt.toKotlinInstant()
+            UserSeriesProgressTable.upsert {
+                it[UserSeriesProgressTable.userId] = userId.toString()
+                it[UserSeriesProgressTable.seriesId] = seriesId.toString()
+                it[UserSeriesProgressTable.latestChapterId] = latestChapterId.toString()
+                it[UserSeriesProgressTable.latestPage] = 0
+                it[UserSeriesProgressTable.readAt] = readAt.toKotlinInstant()
             }
         }
     }
@@ -157,8 +161,8 @@ class OpdsReadRepositoryTest {
             val ch1 = insertChapter(seriesId, index = 1.0)
             val ch2 = insertChapter(seriesId, index = 2.0)
             insertChapter(seriesId, index = 3.0) // not read
-            insertProgress(userId, ch1)
-            insertProgress(userId, ch2)
+            insertProgress(userId, seriesId, ch1)
+            insertProgress(userId, seriesId, ch2) // latest = ch2 (index 2.0), so 2 chapters read
 
             val result = repo.listReadHistory(userId, PageRequest())
             assertIs<Result.Success<*>>(result)
@@ -179,8 +183,8 @@ class OpdsReadRepositoryTest {
             val ch2 = insertChapter(series2)
             val earlier = Instant.now().minusSeconds(3600)
             val later = Instant.now()
-            insertProgress(userId, ch1, earlier)
-            insertProgress(userId, ch2, later)
+            insertProgress(userId, series1, ch1, earlier)
+            insertProgress(userId, series2, ch2, later)
 
             val page = (repo.listReadHistory(userId, PageRequest()) as Result.Success).value
             assertEquals("Second", page.items[0].series.title)
@@ -194,7 +198,7 @@ class OpdsReadRepositoryTest {
             val user2 = insertUser()
             val seriesId = insertSeries()
             val chapterId = insertChapter(seriesId)
-            insertProgress(user1, chapterId)
+            insertProgress(user1, seriesId, chapterId)
 
             val page1 = (repo.listReadHistory(user1, PageRequest()) as Result.Success).value
             val page2 = (repo.listReadHistory(user2, PageRequest()) as Result.Success).value

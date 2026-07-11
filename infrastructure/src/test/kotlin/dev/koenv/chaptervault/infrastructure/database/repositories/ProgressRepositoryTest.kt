@@ -2,9 +2,9 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
-import dev.koenv.chaptervault.infrastructure.database.entities.ProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SessionTable
+import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
@@ -23,6 +23,7 @@ import java.nio.file.Files
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class ProgressRepositoryTest {
     private val repo = ProgressRepository()
@@ -35,7 +36,7 @@ class ProgressRepositoryTest {
             dbFile.deleteOnExit()
             Database.connect("jdbc:sqlite:${dbFile.absolutePath}", driver = "org.sqlite.JDBC")
             transaction {
-                SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, ProgressTable, BookmarkTable)
+                SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, UserSeriesProgressTable, BookmarkTable)
             }
         }
     }
@@ -43,8 +44,8 @@ class ProgressRepositoryTest {
     @AfterEach
     fun cleanTables() {
         transaction {
-            SchemaUtils.drop(BookmarkTable, ProgressTable, ChapterTable, SeriesTable, SessionTable, UserTable)
-            SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, ProgressTable, BookmarkTable)
+            SchemaUtils.drop(BookmarkTable, UserSeriesProgressTable, ChapterTable, SeriesTable, SessionTable, UserTable)
+            SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, UserSeriesProgressTable, BookmarkTable)
         }
     }
 
@@ -101,7 +102,7 @@ class ProgressRepositoryTest {
     }
 
     @Test
-    fun `markRead adds a progress entry`() {
+    fun `markRead sets latest chapter`() {
         runBlocking {
             val userId = insertUser()
             val seriesId = insertSeries()
@@ -111,8 +112,9 @@ class ProgressRepositoryTest {
             assertIs<Result.Success<Unit>>(result)
 
             val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
-            assertEquals(1, progress.readCount)
+            assertEquals(chapterId, progress.latestChapterId)
             assertEquals(1, progress.totalCount)
+            assertEquals(0, progress.unreadCount)
         }
     }
 
@@ -128,12 +130,44 @@ class ProgressRepositoryTest {
             assertIs<Result.Success<Unit>>(result)
 
             val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
-            assertEquals(1, progress.readCount)
+            assertEquals(chapterId, progress.latestChapterId)
         }
     }
 
     @Test
-    fun `markUnread removes a progress entry`() {
+    fun `markRead advances to higher chapter`() {
+        runBlocking {
+            val userId = insertUser()
+            val seriesId = insertSeries()
+            val ch1 = insertChapter(seriesId, index = 1.0)
+            val ch2 = insertChapter(seriesId, index = 2.0)
+
+            repo.markRead(userId, ch1)
+            repo.markRead(userId, ch2)
+
+            val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
+            assertEquals(ch2, progress.latestChapterId)
+        }
+    }
+
+    @Test
+    fun `markRead does not regress to lower chapter`() {
+        runBlocking {
+            val userId = insertUser()
+            val seriesId = insertSeries()
+            val ch1 = insertChapter(seriesId, index = 1.0)
+            val ch2 = insertChapter(seriesId, index = 2.0)
+
+            repo.markRead(userId, ch2)
+            repo.markRead(userId, ch1)
+
+            val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
+            assertEquals(ch2, progress.latestChapterId)
+        }
+    }
+
+    @Test
+    fun `markUnread clears progress when latest chapter`() {
         runBlocking {
             val userId = insertUser()
             val seriesId = insertSeries()
@@ -144,12 +178,30 @@ class ProgressRepositoryTest {
             assertIs<Result.Success<Unit>>(result)
 
             val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
-            assertEquals(0, progress.readCount)
+            assertNull(progress.latestChapterId)
+            assertEquals(1, progress.unreadCount)
         }
     }
 
     @Test
-    fun `markUnread on unread chapter is a no-op`() {
+    fun `markUnread on non-latest chapter is no-op`() {
+        runBlocking {
+            val userId = insertUser()
+            val seriesId = insertSeries()
+            val ch1 = insertChapter(seriesId, index = 1.0)
+            val ch2 = insertChapter(seriesId, index = 2.0)
+
+            repo.markRead(userId, ch2)
+            val result = repo.markUnread(userId, ch1)
+            assertIs<Result.Success<Unit>>(result)
+
+            val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
+            assertEquals(ch2, progress.latestChapterId)
+        }
+    }
+
+    @Test
+    fun `markUnread on unread series is a no-op`() {
         runBlocking {
             val userId = insertUser()
             val seriesId = insertSeries()
@@ -161,20 +213,20 @@ class ProgressRepositoryTest {
     }
 
     @Test
-    fun `getProgress returns correct counts across multiple chapters`() {
+    fun `getProgress returns correct unread count`() {
         runBlocking {
             val userId = insertUser()
             val seriesId = insertSeries()
             val ch1 = insertChapter(seriesId, index = 1.0)
-            val ch2 = insertChapter(seriesId, index = 2.0)
-            val ch3 = insertChapter(seriesId, index = 3.0)
+            insertChapter(seriesId, index = 2.0)
+            insertChapter(seriesId, index = 3.0)
 
             repo.markRead(userId, ch1)
-            repo.markRead(userId, ch2)
 
             val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
             assertEquals(seriesId, progress.seriesId)
-            assertEquals(2, progress.readCount)
+            assertEquals(ch1, progress.latestChapterId)
+            assertEquals(2, progress.unreadCount)
             assertEquals(3, progress.totalCount)
         }
     }
@@ -191,19 +243,33 @@ class ProgressRepositoryTest {
 
             val p1 = (repo.getProgress(user1, seriesId) as Result.Success).value
             val p2 = (repo.getProgress(user2, seriesId) as Result.Success).value
-            assertEquals(1, p1.readCount)
-            assertEquals(0, p2.readCount)
+            assertEquals(chapterId, p1.latestChapterId)
+            assertNull(p2.latestChapterId)
         }
     }
 
     @Test
-    fun `getProgress returns zero counts for series with no chapters`() {
+    fun `getProgress returns all unread for series with no progress`() {
+        runBlocking {
+            val userId = insertUser()
+            val seriesId = insertSeries()
+            insertChapter(seriesId)
+
+            val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
+            assertNull(progress.latestChapterId)
+            assertEquals(1, progress.unreadCount)
+            assertEquals(1, progress.totalCount)
+        }
+    }
+
+    @Test
+    fun `getProgress returns zeros for series with no chapters`() {
         runBlocking {
             val userId = insertUser()
             val seriesId = insertSeries()
 
             val progress = (repo.getProgress(userId, seriesId) as Result.Success).value
-            assertEquals(0, progress.readCount)
+            assertEquals(0, progress.unreadCount)
             assertEquals(0, progress.totalCount)
         }
     }
