@@ -86,11 +86,12 @@ class SeriesRepository(
         request: PageRequest,
     ): Result<Pagination<Series>> =
         dbQuery {
-            val total = SeriesTable.selectAll().where { SeriesTable.title like "%$query%" }.count()
+            val escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            val total = SeriesTable.selectAll().where { SeriesTable.title like "%$escaped%" }.count()
             val rows =
                 SeriesTable
                     .selectAll()
-                    .where { SeriesTable.title like "%$query%" }
+                    .where { SeriesTable.title like "%$escaped%" }
                     .limit(request.size, (request.page * request.size).toLong())
                     .toList()
             val ids = rows.map { it[SeriesTable.id] }
@@ -243,8 +244,6 @@ class SeriesRepository(
     override suspend fun removeSeries(id: Id): Result<Unit> {
         val result =
             dbQuery {
-                ChapterTable.deleteWhere { seriesId eq id.toString() }
-
                 val deleted = SeriesTable.deleteWhere { SeriesTable.id eq id.toString() }
                 if (deleted == 0) {
                     Result.Failure(AppError.NotFound("Series", id.toString()))

@@ -107,8 +107,10 @@ fun Application.authRoutes(
                         call.respondError(AppError.Unauthorized("No token provided"))
                         return@post
                     }
-            auth.invalidateSession(token)
-            call.respond(HttpStatusCode.NoContent)
+            when (val result = auth.invalidateSession(token)) {
+                is Result.Success -> call.respond(HttpStatusCode.NoContent)
+                is Result.Failure -> call.respondError(result.error)
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.library.ReadingStatus
+import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
@@ -46,8 +47,10 @@ fun Route.readingStatusRoutes(readingStatusApi: ReadingStatusApi) {
                     )
                     return@put
                 }
-        readingStatusApi.setStatus(principal.user.id, seriesId, status)
-        call.respond(HttpStatusCode.NoContent)
+        when (val result = readingStatusApi.setStatus(principal.user.id, seriesId, status)) {
+            is Result.Success -> call.respond(HttpStatusCode.NoContent)
+            is Result.Failure -> call.respondError(result.error)
+        }
     }
 
     delete("/library/series/{id}/status") {
@@ -63,7 +66,9 @@ fun Route.readingStatusRoutes(readingStatusApi: ReadingStatusApi) {
                 call.respondBadRequest("Invalid series ID")
                 return@delete
             }
-        readingStatusApi.clearStatus(principal.user.id, seriesId)
-        call.respond(HttpStatusCode.NoContent)
+        when (val result = readingStatusApi.clearStatus(principal.user.id, seriesId)) {
+            is Result.Success -> call.respond(HttpStatusCode.NoContent)
+            is Result.Failure -> call.respondError(result.error)
+        }
     }
 }

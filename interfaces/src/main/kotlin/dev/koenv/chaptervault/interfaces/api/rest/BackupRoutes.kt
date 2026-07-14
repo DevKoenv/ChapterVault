@@ -83,7 +83,13 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                 call.respondForbidden()
                 return@post
             }
-        val dto = call.receive<LibraryBackupDto>()
+        val dto =
+            try {
+                call.receive<LibraryBackupDto>()
+            } catch (e: Exception) {
+                call.respondBadRequest("Invalid request body")
+                return@post
+            }
         val backup =
             LibraryBackup(
                 exportedAt = dto.exportedAt,
