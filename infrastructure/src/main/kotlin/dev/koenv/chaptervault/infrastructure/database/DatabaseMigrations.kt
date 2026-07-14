@@ -25,6 +25,7 @@ object DatabaseMigrations {
     internal val migrations: List<Migration> =
         listOf(
             Migration(1, "initial_schema", v1Statements()),
+            Migration(2, "editable_metadata_fields", v2Statements()),
         )
 
     fun migrate(db: Database) {
@@ -211,4 +212,25 @@ private fun v1Statements(): List<String> =
         "CREATE INDEX IF NOT EXISTS idx_series_genres_series_id ON series_genres (series_id)",
         "CREATE INDEX IF NOT EXISTS idx_usp_user_id ON user_series_progress (user_id)",
         "CREATE INDEX IF NOT EXISTS idx_series_overrides_series_id ON series_overrides (series_id)",
+    )
+
+private fun v2Statements(): List<String> =
+    listOf(
+        "ALTER TABLE series ADD COLUMN user_edited_fields TEXT NOT NULL DEFAULT ''",
+        """
+        UPDATE series SET
+          title = COALESCE((SELECT value FROM series_overrides WHERE series_id = series.id AND field = 'title'), title),
+          cover_url = COALESCE((SELECT value FROM series_overrides WHERE series_id = series.id AND field = 'coverUrl'), cover_url),
+          description = COALESCE((SELECT value FROM series_overrides WHERE series_id = series.id AND field = 'description'), description),
+          author = COALESCE((SELECT value FROM series_overrides WHERE series_id = series.id AND field = 'author'), author),
+          artist = COALESCE((SELECT value FROM series_overrides WHERE series_id = series.id AND field = 'artist'), artist),
+          upstream_status = COALESCE((SELECT value FROM series_overrides WHERE series_id = series.id AND field = 'upstreamStatus'), upstream_status),
+          user_edited_fields = COALESCE(
+            (SELECT GROUP_CONCAT(field, ',') FROM series_overrides
+             WHERE series_id = series.id AND field IN ('title', 'coverUrl', 'description', 'author', 'artist', 'upstreamStatus')),
+            ''
+          )
+        WHERE EXISTS (SELECT 1 FROM series_overrides WHERE series_id = series.id)
+        """.trimIndent(),
+        "DROP TABLE IF EXISTS series_overrides",
     )

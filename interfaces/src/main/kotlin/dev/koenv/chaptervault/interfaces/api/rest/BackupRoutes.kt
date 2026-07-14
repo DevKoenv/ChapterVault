@@ -1,8 +1,12 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.kernel.api.BackupApi
+import dev.koenv.chaptervault.kernel.api.BackupProgress
+import dev.koenv.chaptervault.kernel.api.BackupReadingStatus
 import dev.koenv.chaptervault.kernel.api.LibraryBackup
 import dev.koenv.chaptervault.shared.result.Result
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
@@ -29,20 +33,13 @@ data class BackupReadingStatusDto(
 )
 
 @Serializable
-data class BackupOverrideDto(
-    val connectorId: String,
-    val externalId: String,
-    val field: String,
-    val value: String,
-)
-
-@Serializable
 data class LibraryBackupDto(
     val version: Int = 1,
     val exportedAt: String,
     val progress: List<BackupProgressDto>,
     val readingStatuses: List<BackupReadingStatusDto>,
-    val overrides: List<BackupOverrideDto>,
+    // kept for backward compat when importing old backup files; ignored on import
+    val overrides: List<JsonElement> = emptyList(),
 )
 
 @Serializable
@@ -51,8 +48,6 @@ data class BackupImportSummaryDto(
     val progressSkipped: Int,
     val statusesRestored: Int,
     val statusesSkipped: Int,
-    val overridesRestored: Int,
-    val overridesSkipped: Int,
 )
 
 fun Route.backupRoutes(backupApi: BackupApi) {
@@ -62,10 +57,7 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                 call.respondForbidden()
                 return@get
             }
-        val now =
-            java.time.Instant
-                .now()
-                .toString()
+        val now = java.time.Instant.now().toString()
         when (val result = backupApi.exportBackup(principal.user.id, now)) {
             is Result.Success -> {
                 val backup = result.value
@@ -78,7 +70,6 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                                 BackupProgressDto(it.connectorId, it.externalId, it.latestChapterExternalId, it.latestPage, it.readAt)
                             },
                         readingStatuses = backup.readingStatuses.map { BackupReadingStatusDto(it.connectorId, it.externalId, it.status) },
-                        overrides = backup.overrides.map { BackupOverrideDto(it.connectorId, it.externalId, it.field, it.value) },
                     ),
                 )
             }
@@ -98,27 +89,11 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                 exportedAt = dto.exportedAt,
                 progress =
                     dto.progress.map {
-                        dev.koenv.chaptervault.kernel.api.BackupProgress(
-                            it.connectorId,
-                            it.externalId,
-                            it.latestChapterExternalId,
-                            it.latestPage,
-                            it.readAt,
-                        )
+                        BackupProgress(it.connectorId, it.externalId, it.latestChapterExternalId, it.latestPage, it.readAt)
                     },
                 readingStatuses =
                     dto.readingStatuses.map {
-                        dev.koenv.chaptervault.kernel.api
-                            .BackupReadingStatus(it.connectorId, it.externalId, it.status)
-                    },
-                overrides =
-                    dto.overrides.map {
-                        dev.koenv.chaptervault.kernel.api.BackupOverride(
-                            it.connectorId,
-                            it.externalId,
-                            it.field,
-                            it.value,
-                        )
+                        BackupReadingStatus(it.connectorId, it.externalId, it.status)
                     },
             )
         when (val result = backupApi.importBackup(principal.user.id, backup)) {
@@ -131,8 +106,6 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                         progressSkipped = s.progressSkipped,
                         statusesRestored = s.statusesRestored,
                         statusesSkipped = s.statusesSkipped,
-                        overridesRestored = s.overridesRestored,
-                        overridesSkipped = s.overridesSkipped,
                     ),
                 )
             }

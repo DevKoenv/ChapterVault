@@ -18,6 +18,7 @@ object SeriesTable : Table("series") {
     val artist = varchar("artist", 200).nullable()
     val year = integer("year").nullable()
     val upstreamStatus = varchar("upstream_status", 50).nullable()
+    val userEditedFields = varchar("user_edited_fields", 500).default("")
     val addedAt = timestamp("added_at")
     val updatedAt = timestamp("updated_at")
 

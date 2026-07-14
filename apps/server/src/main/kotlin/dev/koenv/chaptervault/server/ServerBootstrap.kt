@@ -16,7 +16,6 @@ import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionReloadRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
-import dev.koenv.chaptervault.interfaces.api.rest.metadataOverrideRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.readingStatusRoutes
@@ -33,7 +32,6 @@ import dev.koenv.chaptervault.kernel.api.BackupApi
 import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
-import dev.koenv.chaptervault.kernel.api.MetadataOverrideApi
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.OpdsReadApi
@@ -150,7 +148,6 @@ fun Application.bootstrap() {
     val executor by inject<TaskExecutorService>()
     val refreshScheduler by inject<SeriesRefreshScheduler>()
     val progressApi by inject<ProgressApi>()
-    val metadataOverrideApi by inject<MetadataOverrideApi>()
     val backupApi by inject<BackupApi>()
     val readingStatusApi by inject<ReadingStatusApi>()
     val notificationService by inject<NotificationService>()
@@ -196,7 +193,6 @@ fun Application.bootstrap() {
             taskRoutes(system)
             connectorRoutes(connectorRegistry, libraryRead)
             progressRoutes(progressApi)
-            metadataOverrideRoutes(metadataOverrideApi)
             backupRoutes(backupApi)
             readingStatusRoutes(readingStatusApi)
             notificationRoutes(notificationApi, notificationDispatch)

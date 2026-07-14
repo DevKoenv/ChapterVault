@@ -1,13 +1,11 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
-import dev.koenv.chaptervault.infrastructure.database.entities.SeriesOverridesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesStatusTable
 import dev.koenv.chaptervault.kernel.api.BackupApi
 import dev.koenv.chaptervault.kernel.api.BackupImportSummary
-import dev.koenv.chaptervault.kernel.api.BackupOverride
 import dev.koenv.chaptervault.kernel.api.BackupProgress
 import dev.koenv.chaptervault.kernel.api.BackupReadingStatus
 import dev.koenv.chaptervault.kernel.api.LibraryBackup
@@ -76,27 +74,11 @@ class BackupRepository : BackupApi {
                         )
                     }
 
-            val overrides =
-                SeriesOverridesTable
-                    .join(SeriesTable, JoinType.INNER, SeriesOverridesTable.seriesId, SeriesTable.id)
-                    .selectAll()
-                    .mapNotNull { row ->
-                        val connectorId = row[SeriesTable.connectorId] ?: return@mapNotNull null
-                        val externalId = row[SeriesTable.externalId] ?: return@mapNotNull null
-                        BackupOverride(
-                            connectorId = connectorId,
-                            externalId = externalId,
-                            field = row[SeriesOverridesTable.field],
-                            value = row[SeriesOverridesTable.value],
-                        )
-                    }
-
             Result.Success(
                 LibraryBackup(
                     exportedAt = exportedAt,
                     progress = progress,
                     readingStatuses = readingStatuses,
-                    overrides = overrides,
                 ),
             )
         }
@@ -111,8 +93,6 @@ class BackupRepository : BackupApi {
             var progressSkipped = 0
             var statusesRestored = 0
             var statusesSkipped = 0
-            var overridesRestored = 0
-            var overridesSkipped = 0
 
             for (p in backup.progress) {
                 val series =
@@ -167,32 +147,12 @@ class BackupRepository : BackupApi {
                 statusesRestored++
             }
 
-            for (o in backup.overrides) {
-                val series =
-                    SeriesTable
-                        .selectAll()
-                        .where { (SeriesTable.connectorId eq o.connectorId) and (SeriesTable.externalId eq o.externalId) }
-                        .singleOrNull()
-                if (series == null) {
-                    overridesSkipped++
-                    continue
-                }
-                SeriesOverridesTable.upsert {
-                    it[SeriesOverridesTable.seriesId] = series[SeriesTable.id]
-                    it[SeriesOverridesTable.field] = o.field
-                    it[SeriesOverridesTable.value] = o.value
-                }
-                overridesRestored++
-            }
-
             Result.Success(
                 BackupImportSummary(
                     progressRestored = progressRestored,
                     progressSkipped = progressSkipped,
                     statusesRestored = statusesRestored,
                     statusesSkipped = statusesSkipped,
-                    overridesRestored = overridesRestored,
-                    overridesSkipped = overridesSkipped,
                 ),
             )
         }

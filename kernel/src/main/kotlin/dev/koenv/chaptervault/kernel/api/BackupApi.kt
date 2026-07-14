@@ -17,19 +17,11 @@ data class BackupReadingStatus(
     val status: String,
 )
 
-data class BackupOverride(
-    val connectorId: String,
-    val externalId: String,
-    val field: String,
-    val value: String,
-)
-
 data class LibraryBackup(
     val version: Int = 1,
     val exportedAt: String,
     val progress: List<BackupProgress>,
     val readingStatuses: List<BackupReadingStatus>,
-    val overrides: List<BackupOverride>,
 )
 
 interface BackupApi {
@@ -49,6 +41,4 @@ data class BackupImportSummary(
     val progressSkipped: Int,
     val statusesRestored: Int,
     val statusesSkipped: Int,
-    val overridesRestored: Int,
-    val overridesSkipped: Int,
 )

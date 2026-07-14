@@ -12,6 +12,7 @@ import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.kernel.library.ReadingStatus
+import dev.koenv.chaptervault.kernel.library.UpstreamStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
 import dev.koenv.chaptervault.kernel.runtime.Task
@@ -370,6 +371,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Success(fakeSeries)
                 },
         ) {
@@ -408,6 +418,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Success(fakeSeries)
                 },
         ) {
@@ -446,6 +465,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Success(fakeSeries)
                 },
             taskQueue = capturingQueue,
@@ -556,6 +584,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Failure(AppError.InternalError("not implemented"))
                 },
         ) {
@@ -590,6 +627,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Failure(AppError.InternalError("not implemented"))
                 },
         ) {
@@ -730,6 +776,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Failure(AppError.InternalError("not implemented"))
                 },
         ) {
@@ -764,6 +819,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Failure(AppError.InternalError("not implemented"))
                 },
         ) {
@@ -860,6 +924,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Success(fakeSeries)
                 },
         ) {
@@ -898,6 +971,15 @@ class LibraryRoutesTest {
                         id: Id,
                         autoDownload: Boolean?,
                         defaultFormat: ChapterFormat?,
+                        title: String?,
+                        coverUrl: String?,
+                        description: String?,
+                        author: String?,
+                        artist: String?,
+                        year: Int?,
+                        upstreamStatus: UpstreamStatus?,
+                        genres: List<String>?,
+                        clearFields: Set<String>,
                     ) = Result.Failure(AppError.NotFound("Series", id.toString()))
                 },
         ) {
@@ -966,6 +1048,15 @@ private class NoOpCommandApi : LibraryCommandApi {
         id: Id,
         autoDownload: Boolean?,
         defaultFormat: ChapterFormat?,
+        title: String?,
+        coverUrl: String?,
+        description: String?,
+        author: String?,
+        artist: String?,
+        year: Int?,
+        upstreamStatus: UpstreamStatus?,
+        genres: List<String>?,
+        clearFields: Set<String>,
     ) = Result.Failure(AppError.InternalError("not implemented"))
 }
 

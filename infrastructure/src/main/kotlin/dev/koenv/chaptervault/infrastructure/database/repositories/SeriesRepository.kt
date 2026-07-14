@@ -2,7 +2,6 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
-import dev.koenv.chaptervault.infrastructure.database.entities.SeriesOverridesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
@@ -48,9 +47,7 @@ class SeriesRepository(
                     .where { SeriesTable.id eq id.toString() }
                     .singleOrNull()
                     ?: return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
-            val genres = genresFor(id.toString())
-            val overrides = overridesFor(id.toString())
-            Result.Success(row.toSeries(genres, overrides))
+            Result.Success(row.toSeries(genresFor(id.toString())))
         }
 
     override suspend fun listSeries(request: PageRequest): Result<Pagination<Series>> =
@@ -63,8 +60,7 @@ class SeriesRepository(
                     .toList()
             val ids = rows.map { it[SeriesTable.id] }
             val genreMap = genresForIds(ids)
-            val overrideMap = overridesForIds(ids)
-            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty(), overrideMap[it[SeriesTable.id]].orEmpty()) }
+            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
@@ -81,8 +77,7 @@ class SeriesRepository(
                     .toList()
             val rowIds = rows.map { it[SeriesTable.id] }
             val genreMap = genresForIds(rowIds)
-            val overrideMap = overridesForIds(rowIds)
-            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty(), overrideMap[it[SeriesTable.id]].orEmpty()) }
+            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
@@ -100,8 +95,7 @@ class SeriesRepository(
                     .toList()
             val ids = rows.map { it[SeriesTable.id] }
             val genreMap = genresForIds(ids)
-            val overrideMap = overridesForIds(ids)
-            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty(), overrideMap[it[SeriesTable.id]].orEmpty()) }
+            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
@@ -271,18 +265,17 @@ class SeriesRepository(
         description: String?,
     ): Result<Unit> =
         dbQuery {
-            val updated =
-                SeriesTable.update({ SeriesTable.id eq id.toString() }) {
-                    it[SeriesTable.title] = title
-                    it[SeriesTable.coverUrl] = coverUrl
-                    it[SeriesTable.description] = description
-                    it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
-                }
-            if (updated == 0) {
-                Result.Failure(AppError.NotFound("Series", id.toString()))
-            } else {
-                Result.Success(Unit)
+            val current =
+                SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.singleOrNull()
+                    ?: return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
+            val userEdited = current[SeriesTable.userEditedFields].split(",").filter { it.isNotBlank() }.toSet()
+            SeriesTable.update({ SeriesTable.id eq id.toString() }) {
+                if ("title" !in userEdited) it[SeriesTable.title] = title
+                if ("coverUrl" !in userEdited) it[SeriesTable.coverUrl] = coverUrl
+                if ("description" !in userEdited) it[SeriesTable.description] = description
+                it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
             }
+            Result.Success(Unit)
         }
 
     suspend fun updateEnrichedFields(
@@ -294,21 +287,24 @@ class SeriesRepository(
         genres: List<String>,
     ): Result<Unit> =
         dbQuery {
-            val updated =
-                SeriesTable.update({ SeriesTable.id eq id.toString() }) {
-                    it[SeriesTable.author] = author
-                    it[SeriesTable.artist] = artist
-                    it[SeriesTable.year] = year
-                    it[SeriesTable.upstreamStatus] = upstreamStatus?.name
-                    it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
-                }
-            if (updated == 0) return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
-
-            SeriesGenresTable.deleteWhere { SeriesGenresTable.seriesId eq id.toString() }
-            genres.forEach { genre ->
-                SeriesGenresTable.insert {
-                    it[SeriesGenresTable.seriesId] = id.toString()
-                    it[SeriesGenresTable.genre] = genre
+            val current =
+                SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.singleOrNull()
+                    ?: return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
+            val userEdited = current[SeriesTable.userEditedFields].split(",").filter { it.isNotBlank() }.toSet()
+            SeriesTable.update({ SeriesTable.id eq id.toString() }) {
+                if ("author" !in userEdited) it[SeriesTable.author] = author
+                if ("artist" !in userEdited) it[SeriesTable.artist] = artist
+                if ("year" !in userEdited) it[SeriesTable.year] = year
+                if ("upstreamStatus" !in userEdited) it[SeriesTable.upstreamStatus] = upstreamStatus?.name
+                it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
+            }
+            if ("genres" !in userEdited) {
+                SeriesGenresTable.deleteWhere { SeriesGenresTable.seriesId eq id.toString() }
+                genres.forEach { genre ->
+                    SeriesGenresTable.insert {
+                        it[SeriesGenresTable.seriesId] = id.toString()
+                        it[SeriesGenresTable.genre] = genre
+                    }
                 }
             }
             Result.Success(Unit)
@@ -333,23 +329,60 @@ class SeriesRepository(
         id: Id,
         autoDownload: Boolean?,
         defaultFormat: ChapterFormat?,
+        title: String?,
+        coverUrl: String?,
+        description: String?,
+        author: String?,
+        artist: String?,
+        year: Int?,
+        upstreamStatus: UpstreamStatus?,
+        genres: List<String>?,
+        clearFields: Set<String>,
     ): Result<Series> =
         dbQuery {
-            val count = SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.count()
-            if (count == 0L) return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
+            val current =
+                SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.singleOrNull()
+                    ?: return@dbQuery Result.Failure(AppError.NotFound("Series", id.toString()))
+
+            val tracked = current[SeriesTable.userEditedFields].split(",").filter { it.isNotBlank() }.toMutableSet()
+            clearFields.forEach { tracked.remove(it) }
+            if (title != null) tracked.add("title")
+            if (coverUrl != null) tracked.add("coverUrl")
+            if (description != null) tracked.add("description")
+            if (author != null) tracked.add("author")
+            if (artist != null) tracked.add("artist")
+            if (year != null) tracked.add("year")
+            if (upstreamStatus != null) tracked.add("upstreamStatus")
+            if (genres != null) tracked.add("genres")
 
             SeriesTable.update({ SeriesTable.id eq id.toString() }) {
                 if (autoDownload != null) it[SeriesTable.autoDownload] = autoDownload
                 if (defaultFormat != null) it[SeriesTable.defaultFormat] = defaultFormat.toString()
+                if (title != null) it[SeriesTable.title] = title
+                if (coverUrl != null) it[SeriesTable.coverUrl] = coverUrl else if ("coverUrl" in clearFields) it[SeriesTable.coverUrl] = null
+                if (description != null) it[SeriesTable.description] = description else if ("description" in clearFields) it[SeriesTable.description] = null
+                if (author != null) it[SeriesTable.author] = author else if ("author" in clearFields) it[SeriesTable.author] = null
+                if (artist != null) it[SeriesTable.artist] = artist else if ("artist" in clearFields) it[SeriesTable.artist] = null
+                if (year != null) it[SeriesTable.year] = year else if ("year" in clearFields) it[SeriesTable.year] = null
+                if (upstreamStatus != null) it[SeriesTable.upstreamStatus] = upstreamStatus.name else if ("upstreamStatus" in clearFields) it[SeriesTable.upstreamStatus] = null
+                it[SeriesTable.userEditedFields] = tracked.joinToString(",")
                 it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
             }
 
-            val row =
-                SeriesTable
-                    .selectAll()
-                    .where { SeriesTable.id eq id.toString() }
-                    .single()
-            Result.Success(row.toSeries(genresFor(id.toString()), overridesFor(id.toString())))
+            if (genres != null) {
+                SeriesGenresTable.deleteWhere { SeriesGenresTable.seriesId eq id.toString() }
+                genres.forEach { genre ->
+                    SeriesGenresTable.insert {
+                        it[SeriesGenresTable.seriesId] = id.toString()
+                        it[SeriesGenresTable.genre] = genre
+                    }
+                }
+            } else if ("genres" in clearFields) {
+                SeriesGenresTable.deleteWhere { SeriesGenresTable.seriesId eq id.toString() }
+            }
+
+            val row = SeriesTable.selectAll().where { SeriesTable.id eq id.toString() }.single()
+            Result.Success(row.toSeries(genresFor(id.toString())))
         }
 
     suspend fun stampUpdatedAt(id: Id): Unit =
@@ -373,47 +406,26 @@ class SeriesRepository(
             .groupBy({ it[SeriesGenresTable.seriesId] }, { it[SeriesGenresTable.genre] })
     }
 
-    private fun org.jetbrains.exposed.sql.Transaction.overridesFor(seriesId: String): Map<String, String> =
-        SeriesOverridesTable
-            .selectAll()
-            .where { SeriesOverridesTable.seriesId eq seriesId }
-            .associate { it[SeriesOverridesTable.field] to it[SeriesOverridesTable.value] }
-
-    private fun org.jetbrains.exposed.sql.Transaction.overridesForIds(ids: List<String>): Map<String, Map<String, String>> {
-        if (ids.isEmpty()) return emptyMap()
-        return SeriesOverridesTable
-            .selectAll()
-            .where { SeriesOverridesTable.seriesId inList ids }
-            .groupBy({ it[SeriesOverridesTable.seriesId] }, { it[SeriesOverridesTable.field] to it[SeriesOverridesTable.value] })
-            .mapValues { (_, pairs) -> pairs.toMap() }
-    }
-
-    private fun ResultRow.toSeries(
-        genres: List<String> = emptyList(),
-        overrides: Map<String, String> = emptyMap(),
-    ) = Series(
-        id = Id.from(this[SeriesTable.id]),
-        title = overrides["title"] ?: this[SeriesTable.title],
-        connectorId = this[SeriesTable.connectorId],
-        externalId = this[SeriesTable.externalId],
-        language = this[SeriesTable.language],
-        status =
-            overrides["status"]?.let { runCatching { SeriesStatus.valueOf(it.uppercase()) }.getOrNull() }
-                ?: SeriesStatus.valueOf(this[SeriesTable.status]),
-        autoDownload = this[SeriesTable.autoDownload],
-        defaultFormat = this[SeriesTable.defaultFormat]?.let { ChapterFormat.fromString(it) },
-        coverUrl = overrides["coverUrl"] ?: this[SeriesTable.coverUrl],
-        description = overrides["description"] ?: this[SeriesTable.description],
-        author = overrides["author"] ?: this[SeriesTable.author],
-        artist = overrides["artist"] ?: this[SeriesTable.artist],
-        year = this[SeriesTable.year],
-        upstreamStatus =
-            overrides["upstreamStatus"]?.let { runCatching { UpstreamStatus.valueOf(it.uppercase()) }.getOrNull() }
-                ?: this[SeriesTable.upstreamStatus]?.let { runCatching { UpstreamStatus.valueOf(it.uppercase()) }.getOrNull() },
-        genres = genres,
-        addedAt = this[SeriesTable.addedAt].toJavaInstant(),
-        updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
-    )
+    private fun ResultRow.toSeries(genres: List<String> = emptyList()) =
+        Series(
+            id = Id.from(this[SeriesTable.id]),
+            title = this[SeriesTable.title],
+            connectorId = this[SeriesTable.connectorId],
+            externalId = this[SeriesTable.externalId],
+            language = this[SeriesTable.language],
+            status = SeriesStatus.valueOf(this[SeriesTable.status]),
+            autoDownload = this[SeriesTable.autoDownload],
+            defaultFormat = this[SeriesTable.defaultFormat]?.let { ChapterFormat.fromString(it) },
+            coverUrl = this[SeriesTable.coverUrl],
+            description = this[SeriesTable.description],
+            author = this[SeriesTable.author],
+            artist = this[SeriesTable.artist],
+            year = this[SeriesTable.year],
+            upstreamStatus = this[SeriesTable.upstreamStatus]?.let { runCatching { UpstreamStatus.valueOf(it.uppercase()) }.getOrNull() },
+            genres = genres,
+            addedAt = this[SeriesTable.addedAt].toJavaInstant(),
+            updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
+        )
 
     // removes storage dirs with no matching DB entry
     // called on startup to cover crash window between DB delete and file delete

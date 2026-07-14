@@ -14,6 +14,7 @@ import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.ReadingStatus
+import dev.koenv.chaptervault.kernel.library.UpstreamStatus
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskPayloadKeys
@@ -564,7 +565,30 @@ fun Route.libraryRoutes(
                 call.respondBadRequest("Invalid defaultFormat value")
                 return@patch
             }
-        when (val result = libraryCommand.updateSeries(id, request.autoDownload, defaultFormat)) {
+        val upstreamStatus =
+            try {
+                request.upstreamStatus?.let { UpstreamStatus.valueOf(it.uppercase()) }
+            } catch (e: IllegalArgumentException) {
+                call.respondBadRequest("Invalid upstreamStatus value")
+                return@patch
+            }
+        when (
+            val result =
+                libraryCommand.updateSeries(
+                    id = id,
+                    autoDownload = request.autoDownload,
+                    defaultFormat = defaultFormat,
+                    title = request.title,
+                    coverUrl = request.coverUrl,
+                    description = request.description,
+                    author = request.author,
+                    artist = request.artist,
+                    year = request.year,
+                    upstreamStatus = upstreamStatus,
+                    genres = request.genres,
+                    clearFields = request.clearFields?.toSet() ?: emptySet(),
+                )
+        ) {
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
             is Result.Failure -> call.respondError(result.error)
         }

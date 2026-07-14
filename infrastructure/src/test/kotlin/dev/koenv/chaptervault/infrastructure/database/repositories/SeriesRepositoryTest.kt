@@ -2,7 +2,6 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
-import dev.koenv.chaptervault.infrastructure.database.entities.SeriesOverridesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
@@ -56,7 +55,6 @@ class SeriesRepositoryTest {
                     UserTable,
                     SeriesTable,
                     SeriesGenresTable,
-                    SeriesOverridesTable,
                     ChapterTable,
                     TaskTable,
                     UserSeriesProgressTable,
@@ -73,7 +71,6 @@ class SeriesRepositoryTest {
                 UserSeriesProgressTable,
                 TaskTable,
                 ChapterTable,
-                SeriesOverridesTable,
                 SeriesGenresTable,
                 SeriesTable,
                 UserTable,
@@ -82,7 +79,6 @@ class SeriesRepositoryTest {
                 UserTable,
                 SeriesTable,
                 SeriesGenresTable,
-                SeriesOverridesTable,
                 ChapterTable,
                 TaskTable,
                 UserSeriesProgressTable,

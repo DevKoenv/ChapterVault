@@ -3,7 +3,6 @@ package dev.koenv.chaptervault.infrastructure
 import dev.koenv.chaptervault.infrastructure.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
-import dev.koenv.chaptervault.infrastructure.database.entities.SeriesOverridesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesRepository
@@ -75,7 +74,7 @@ class TaskExecutorServiceTest {
             dbFile.deleteOnExit()
             Database.connect("jdbc:sqlite:${dbFile.absolutePath}", driver = "org.sqlite.JDBC")
             transaction {
-                SchemaUtils.create(SeriesTable, SeriesGenresTable, SeriesOverridesTable, ChapterTable)
+                SchemaUtils.create(SeriesTable, SeriesGenresTable, ChapterTable)
             }
         }
     }
@@ -83,8 +82,8 @@ class TaskExecutorServiceTest {
     @AfterEach
     fun cleanTables() {
         transaction {
-            SchemaUtils.drop(ChapterTable, SeriesOverridesTable, SeriesGenresTable, SeriesTable)
-            SchemaUtils.create(SeriesTable, SeriesGenresTable, SeriesOverridesTable, ChapterTable)
+            SchemaUtils.drop(ChapterTable, SeriesGenresTable, SeriesTable)
+            SchemaUtils.create(SeriesTable, SeriesGenresTable, ChapterTable)
         }
     }
 
