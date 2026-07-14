@@ -148,20 +148,6 @@ components:
         chapterIndex: { type: number, format: double }
         pageCount:    { type: integer, nullable: true }
 
-    BookmarkDto:
-      type: object
-      properties:
-        id:        { type: string, format: uuid }
-        chapterId: { type: string, format: uuid }
-        page:      { type: integer }
-        createdAt: { type: string, format: date-time }
-
-    CreateBookmarkRequest:
-      type: object
-      required: [page]
-      properties:
-        page: { type: integer, example: 5 }
-
     ProgressDto:
       type: object
       properties:
@@ -587,23 +573,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProgressDto" }
 
-  /library/series/{id}/bookmarks:
-    get:
-      tags: [library]
-      summary: List bookmarks across all chapters of a series (current user)
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/BookmarkDto" }
-
   /library/chapters/{id}/download:
     post:
       tags: [library]
@@ -703,40 +672,6 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "204": { description: Marked as unread }
-
-  /library/chapters/{id}/bookmarks:
-    post:
-      tags: [library]
-      summary: Create a bookmark on a chapter page (current user)
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CreateBookmarkRequest" }
-      responses:
-        "201":
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/BookmarkDto" }
-        "400": { description: Invalid request body }
-
-  /library/bookmarks/{id}:
-    delete:
-      tags: [library]
-      summary: Delete a bookmark (current user)
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        "204": { description: Bookmark deleted }
-        "404": { description: Bookmark not found }
 
   /notifications:
     get:
@@ -1095,7 +1030,7 @@ paths:
       tags: [system]
       summary: Export a backup of all user reading data
       description: |
-        Exports reading progress, reading statuses, metadata overrides, and bookmarks for the current user.
+        Exports reading progress, reading statuses, and metadata overrides for the current user.
         Series with no connector identity (local series) are excluded from the export.
       responses:
         "200":
@@ -1110,14 +1045,13 @@ paths:
                   progress:       { type: array, items: { type: object } }
                   readingStatuses: { type: array, items: { type: object } }
                   overrides:      { type: array, items: { type: object } }
-                  bookmarks:      { type: array, items: { type: object } }
         "401": { description: Not authenticated }
 
   /backup/import:
     post:
       tags: [system]
       summary: Import a backup of user reading data
-      description: Restores reading progress, statuses, overrides, and bookmarks. Entries for series not present in the library are skipped.
+      description: Restores reading progress, statuses, and overrides. Entries for series not present in the library are skipped.
       requestBody:
         required: true
         content:
@@ -1138,8 +1072,6 @@ paths:
                   statusesSkipped:   { type: integer }
                   overridesRestored: { type: integer }
                   overridesSkipped:  { type: integer }
-                  bookmarksRestored: { type: integer }
-                  bookmarksSkipped:  { type: integer }
         "400": { description: Invalid backup payload }
         "401": { description: Not authenticated }
 

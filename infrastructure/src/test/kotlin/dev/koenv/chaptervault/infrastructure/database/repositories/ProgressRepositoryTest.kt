@@ -1,6 +1,5 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
-import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SessionTable
@@ -36,7 +35,7 @@ class ProgressRepositoryTest {
             dbFile.deleteOnExit()
             Database.connect("jdbc:sqlite:${dbFile.absolutePath}", driver = "org.sqlite.JDBC")
             transaction {
-                SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, UserSeriesProgressTable, BookmarkTable)
+                SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, UserSeriesProgressTable)
             }
         }
     }
@@ -44,8 +43,8 @@ class ProgressRepositoryTest {
     @AfterEach
     fun cleanTables() {
         transaction {
-            SchemaUtils.drop(BookmarkTable, UserSeriesProgressTable, ChapterTable, SeriesTable, SessionTable, UserTable)
-            SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, UserSeriesProgressTable, BookmarkTable)
+            SchemaUtils.drop(UserSeriesProgressTable, ChapterTable, SeriesTable, SessionTable, UserTable)
+            SchemaUtils.create(UserTable, SessionTable, SeriesTable, ChapterTable, UserSeriesProgressTable)
         }
     }
 

@@ -1,13 +1,11 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
-import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesOverridesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesStatusTable
 import dev.koenv.chaptervault.kernel.api.BackupApi
-import dev.koenv.chaptervault.kernel.api.BackupBookmark
 import dev.koenv.chaptervault.kernel.api.BackupImportSummary
 import dev.koenv.chaptervault.kernel.api.BackupOverride
 import dev.koenv.chaptervault.kernel.api.BackupProgress
@@ -93,32 +91,12 @@ class BackupRepository : BackupApi {
                         )
                     }
 
-            val bookmarks =
-                BookmarkTable
-                    .join(ChapterTable, JoinType.INNER, BookmarkTable.chapterId, ChapterTable.id)
-                    .join(SeriesTable, JoinType.INNER, ChapterTable.seriesId, SeriesTable.id)
-                    .selectAll()
-                    .where { BookmarkTable.userId eq uid }
-                    .mapNotNull { row ->
-                        val seriesConnectorId = row[SeriesTable.connectorId] ?: return@mapNotNull null
-                        val seriesExternalId = row[SeriesTable.externalId] ?: return@mapNotNull null
-                        val chapterExternalId = row[ChapterTable.externalId] ?: return@mapNotNull null
-                        BackupBookmark(
-                            chapterSeriesConnectorId = seriesConnectorId,
-                            chapterSeriesExternalId = seriesExternalId,
-                            chapterExternalId = chapterExternalId,
-                            page = row[BookmarkTable.page],
-                            createdAt = row[BookmarkTable.createdAt].toJavaInstant().toString(),
-                        )
-                    }
-
             Result.Success(
                 LibraryBackup(
                     exportedAt = exportedAt,
                     progress = progress,
                     readingStatuses = readingStatuses,
                     overrides = overrides,
-                    bookmarks = bookmarks,
                 ),
             )
         }
@@ -135,8 +113,6 @@ class BackupRepository : BackupApi {
             var statusesSkipped = 0
             var overridesRestored = 0
             var overridesSkipped = 0
-            var bookmarksRestored = 0
-            var bookmarksSkipped = 0
 
             for (p in backup.progress) {
                 val series =
@@ -209,42 +185,6 @@ class BackupRepository : BackupApi {
                 overridesRestored++
             }
 
-            for (b in backup.bookmarks) {
-                val series =
-                    SeriesTable
-                        .selectAll()
-                        .where {
-                            (SeriesTable.connectorId eq b.chapterSeriesConnectorId) and
-                                (SeriesTable.externalId eq b.chapterSeriesExternalId)
-                        }.singleOrNull()
-                if (series == null) {
-                    bookmarksSkipped++
-                    continue
-                }
-                val chapter =
-                    ChapterTable
-                        .selectAll()
-                        .where { (ChapterTable.seriesId eq series[SeriesTable.id]) and (ChapterTable.externalId eq b.chapterExternalId) }
-                        .singleOrNull()
-                if (chapter == null) {
-                    bookmarksSkipped++
-                    continue
-                }
-                BookmarkTable.upsert(BookmarkTable.id) {
-                    it[BookmarkTable.id] = Id.generate().toString()
-                    it[BookmarkTable.userId] = uid
-                    it[BookmarkTable.chapterId] = chapter[ChapterTable.id]
-                    it[BookmarkTable.page] = b.page
-                    it[BookmarkTable.createdAt] =
-                        runCatching {
-                            java.time.Instant
-                                .parse(b.createdAt)
-                                .toKotlinInstant()
-                        }.getOrElse { Instant.now().toKotlinInstant() }
-                }
-                bookmarksRestored++
-            }
-
             Result.Success(
                 BackupImportSummary(
                     progressRestored = progressRestored,
@@ -253,8 +193,6 @@ class BackupRepository : BackupApi {
                     statusesSkipped = statusesSkipped,
                     overridesRestored = overridesRestored,
                     overridesSkipped = overridesSkipped,
-                    bookmarksRestored = bookmarksRestored,
-                    bookmarksSkipped = bookmarksSkipped,
                 ),
             )
         }

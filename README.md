@@ -8,7 +8,7 @@ Self-hosted manga library server. Tracks series, automatically downloads new cha
 
 ## Features
 
-- **Multi-user:** each user has their own read progress and bookmarks; the library is shared
+- **Multi-user:** each user has their own read progress and reading status; the library is shared
 - **Automatic downloads:** a background worker polls connected sources for new chapters and downloads them
 - **MangaDex connector:** search and download from MangaDex out of the box
 - **CBZ and folder output:** download chapters as `.cbz` archives or plain image folders
@@ -16,7 +16,7 @@ Self-hosted manga library server. Tracks series, automatically downloads new cha
 - **REST JSON API:** headless; bring your own frontend
 - **SQLite:** embedded, no external database required
 - **Metadata overrides:** override any series field (title, cover, description, status) without losing upstream data
-- **Backup / export:** export and import all reading progress, statuses, overrides, and bookmarks as JSON
+- **Backup / export:** export and import all reading progress, statuses, and overrides as JSON
 - **Update checker:** server logs a warning when a newer release is available on GitHub
 - **Unread count:** per-series unread chapter count available via reading progress API
 - **Reading status tracking:** per-user per-series status (`PLAN_TO_READ`, `READING`, `COMPLETED`, `DROPPED`, `ON_HOLD`)
@@ -131,14 +131,6 @@ Authorization: Bearer <token>
 | `DELETE` | `/library/chapters/{id}/read` | Mark a chapter as unread |
 | `PUT` | `/library/series/{id}/status` | Set reading status for a series |
 | `DELETE` | `/library/series/{id}/status` | Clear reading status |
-
-### Bookmarks
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/library/series/{id}/bookmarks` | List bookmarks for a series |
-| `POST` | `/library/chapters/{id}/bookmarks` | Create a bookmark |
-| `DELETE` | `/library/bookmarks/{id}` | Delete a bookmark |
 
 ### Connectors
 

@@ -1,6 +1,5 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
-import dev.koenv.chaptervault.infrastructure.database.entities.BookmarkTable
 import dev.koenv.chaptervault.infrastructure.database.entities.ChapterTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesOverridesTable
@@ -209,15 +208,6 @@ class SeriesRepository(
     override suspend fun removeSeries(id: Id): Result<Unit> {
         val result =
             dbQuery {
-                val chapterIds =
-                    ChapterTable
-                        .selectAll()
-                        .where { ChapterTable.seriesId eq id.toString() }
-                        .map { it[ChapterTable.id] }
-
-                if (chapterIds.isNotEmpty()) {
-                    BookmarkTable.deleteWhere { chapterId inList chapterIds }
-                }
                 ChapterTable.deleteWhere { seriesId eq id.toString() }
 
                 val deleted = SeriesTable.deleteWhere { SeriesTable.id eq id.toString() }

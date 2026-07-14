@@ -37,22 +37,12 @@ data class BackupOverrideDto(
 )
 
 @Serializable
-data class BackupBookmarkDto(
-    val chapterSeriesConnectorId: String,
-    val chapterSeriesExternalId: String,
-    val chapterExternalId: String,
-    val page: Int,
-    val createdAt: String,
-)
-
-@Serializable
 data class LibraryBackupDto(
     val version: Int = 1,
     val exportedAt: String,
     val progress: List<BackupProgressDto>,
     val readingStatuses: List<BackupReadingStatusDto>,
     val overrides: List<BackupOverrideDto>,
-    val bookmarks: List<BackupBookmarkDto>,
 )
 
 @Serializable
@@ -63,8 +53,6 @@ data class BackupImportSummaryDto(
     val statusesSkipped: Int,
     val overridesRestored: Int,
     val overridesSkipped: Int,
-    val bookmarksRestored: Int,
-    val bookmarksSkipped: Int,
 )
 
 fun Route.backupRoutes(backupApi: BackupApi) {
@@ -91,16 +79,6 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                             },
                         readingStatuses = backup.readingStatuses.map { BackupReadingStatusDto(it.connectorId, it.externalId, it.status) },
                         overrides = backup.overrides.map { BackupOverrideDto(it.connectorId, it.externalId, it.field, it.value) },
-                        bookmarks =
-                            backup.bookmarks.map {
-                                BackupBookmarkDto(
-                                    it.chapterSeriesConnectorId,
-                                    it.chapterSeriesExternalId,
-                                    it.chapterExternalId,
-                                    it.page,
-                                    it.createdAt,
-                                )
-                            },
                     ),
                 )
             }
@@ -142,16 +120,6 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                             it.value,
                         )
                     },
-                bookmarks =
-                    dto.bookmarks.map {
-                        dev.koenv.chaptervault.kernel.api.BackupBookmark(
-                            it.chapterSeriesConnectorId,
-                            it.chapterSeriesExternalId,
-                            it.chapterExternalId,
-                            it.page,
-                            it.createdAt,
-                        )
-                    },
             )
         when (val result = backupApi.importBackup(principal.user.id, backup)) {
             is Result.Success -> {
@@ -165,8 +133,6 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                         statusesSkipped = s.statusesSkipped,
                         overridesRestored = s.overridesRestored,
                         overridesSkipped = s.overridesSkipped,
-                        bookmarksRestored = s.bookmarksRestored,
-                        bookmarksSkipped = s.bookmarksSkipped,
                     ),
                 )
             }

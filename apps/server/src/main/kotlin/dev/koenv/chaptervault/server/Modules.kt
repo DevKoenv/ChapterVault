@@ -11,7 +11,6 @@ import dev.koenv.chaptervault.infrastructure.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.infrastructure.connectors.MockConnector
 import dev.koenv.chaptervault.infrastructure.connectors.mangadex.MangaDexConnector
 import dev.koenv.chaptervault.infrastructure.database.repositories.BackupRepository
-import dev.koenv.chaptervault.infrastructure.database.repositories.BookmarkRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.MetadataOverrideRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.NotificationRepository
@@ -39,7 +38,6 @@ import dev.koenv.chaptervault.infrastructure.update.UpdateCheckerService
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.BackupApi
-import dev.koenv.chaptervault.kernel.api.BookmarkApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.MetadataOverrideApi
@@ -89,8 +87,6 @@ val infrastructureModule =
         single<MetadataOverrideApi> { get<MetadataOverrideRepository>() }
         single { BackupRepository() }
         single<BackupApi> { get<BackupRepository>() }
-        single { BookmarkRepository() }
-        single<BookmarkApi> { get<BookmarkRepository>() }
         single { UserSeriesStatusRepository() }
         single<ReadingStatusApi> { get<UserSeriesStatusRepository>() }
         single { OpdsReadRepository() }

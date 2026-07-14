@@ -24,21 +24,12 @@ data class BackupOverride(
     val value: String,
 )
 
-data class BackupBookmark(
-    val chapterSeriesConnectorId: String,
-    val chapterSeriesExternalId: String,
-    val chapterExternalId: String,
-    val page: Int,
-    val createdAt: String,
-)
-
 data class LibraryBackup(
     val version: Int = 1,
     val exportedAt: String,
     val progress: List<BackupProgress>,
     val readingStatuses: List<BackupReadingStatus>,
     val overrides: List<BackupOverride>,
-    val bookmarks: List<BackupBookmark>,
 )
 
 interface BackupApi {
@@ -60,6 +51,4 @@ data class BackupImportSummary(
     val statusesSkipped: Int,
     val overridesRestored: Int,
     val overridesSkipped: Int,
-    val bookmarksRestored: Int,
-    val bookmarksSkipped: Int,
 )
