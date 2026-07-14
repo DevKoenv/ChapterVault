@@ -12,4 +12,6 @@ fun Chapter.toDto(): ChapterDto =
         downloadStatus = downloadStatus.name,
         format = format?.toString(),
         pageCount = pageCount,
+        addedAt = addedAt.toString(),
+        updatedAt = updatedAt.toString(),
     )

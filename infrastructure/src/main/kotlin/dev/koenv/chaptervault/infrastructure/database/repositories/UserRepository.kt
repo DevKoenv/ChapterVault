@@ -16,6 +16,7 @@ import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
@@ -175,6 +176,12 @@ class UserRepository : AuthApi {
             UserTable.update({ UserTable.id eq userId.toString() }) {
                 it[UserTable.passwordHash] = newHash
             }
+            Result.Success(Unit)
+        }
+
+    override suspend fun cleanupExpiredSessions(): Result<Unit> =
+        dbQuery {
+            SessionTable.deleteWhere { SessionTable.expiresAt less Instant.now().toKotlinInstant() }
             Result.Success(Unit)
         }
 

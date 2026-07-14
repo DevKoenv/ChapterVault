@@ -15,5 +15,12 @@ fun Series.toDto(readingStatus: ReadingStatus? = null): SeriesDto =
         autoDownload = autoDownload,
         coverUrl = coverUrl,
         description = description,
+        author = author,
+        artist = artist,
+        year = year,
+        upstreamStatus = upstreamStatus?.name,
+        genres = genres,
         readingStatus = readingStatus?.name,
+        addedAt = addedAt.toString(),
+        updatedAt = updatedAt.toString(),
     )

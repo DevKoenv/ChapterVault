@@ -251,6 +251,7 @@ class TaskExecutorService(
             }
 
         if (insertedChapters.isNotEmpty()) {
+            seriesRepository.stampUpdatedAt(task.targetId)
             eventBus.publish(NewChaptersDiscovered(series = series, chapters = insertedChapters))
         }
 

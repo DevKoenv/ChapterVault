@@ -71,6 +71,7 @@ import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -274,6 +275,13 @@ fun Application.bootstrap() {
         executor.start()
     }
     launch { refreshScheduler.start() }
+    launch {
+        auth.cleanupExpiredSessions()
+        while (true) {
+            delay(24 * 60 * 60 * 1000L)
+            auth.cleanupExpiredSessions()
+        }
+    }
     logger.info { "ChapterVault v${BuildConfig.VERSION} (rev ${BuildConfig.REVISION}) listening on http://${config.server.host}:${config.server.port}" }
     updateCheckerService.startAsync()
 

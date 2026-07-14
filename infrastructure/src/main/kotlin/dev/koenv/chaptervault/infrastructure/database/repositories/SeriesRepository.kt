@@ -352,6 +352,13 @@ class SeriesRepository(
             Result.Success(row.toSeries(genresFor(id.toString()), overridesFor(id.toString())))
         }
 
+    suspend fun stampUpdatedAt(id: Id): Unit =
+        dbQuery {
+            SeriesTable.update({ SeriesTable.id eq id.toString() }) {
+                it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
+            }
+        }
+
     private fun org.jetbrains.exposed.sql.Transaction.genresFor(seriesId: String): List<String> =
         SeriesGenresTable
             .selectAll()

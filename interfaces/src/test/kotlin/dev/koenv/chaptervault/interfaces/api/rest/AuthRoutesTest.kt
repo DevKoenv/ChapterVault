@@ -72,6 +72,8 @@ class AuthRoutesTest {
                 currentPassword: String,
                 newPassword: String,
             ) = Result.Success(Unit)
+
+            override suspend fun cleanupExpiredSessions() = Result.Success(Unit)
         }
 
     private val failAuth =
@@ -103,6 +105,8 @@ class AuthRoutesTest {
                 currentPassword: String,
                 newPassword: String,
             ) = Result.Failure(AppError.Unauthorized("Current password is incorrect"))
+
+            override suspend fun cleanupExpiredSessions() = Result.Success(Unit)
         }
 
     private fun ApplicationTestBuilder.install(auth: AuthApi) {

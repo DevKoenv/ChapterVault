@@ -11,4 +11,6 @@ data class ChapterDto(
     val downloadStatus: String,
     val format: String? = null,
     val pageCount: Int? = null,
+    val addedAt: String,
+    val updatedAt: String,
 )

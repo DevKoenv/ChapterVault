@@ -46,4 +46,6 @@ interface AuthApi {
         currentPassword: String,
         newPassword: String,
     ): Result<Unit>
+
+    suspend fun cleanupExpiredSessions(): Result<Unit>
 }
