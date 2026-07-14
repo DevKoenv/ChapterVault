@@ -167,6 +167,40 @@ Authorization: Bearer <token>
 
 Supported notification types: **ntfy**, **Gotify**, **Discord** (webhook), **generic webhook**.
 
+### Metadata overrides
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/library/series/{id}/overrides` | List metadata overrides for a series |
+| `PUT` | `/library/series/{id}/overrides/{field}` | Set a metadata override |
+| `DELETE` | `/library/series/{id}/overrides/{field}` | Remove a metadata override |
+
+Overridable fields: `title`, `coverUrl`, `description`, `status`, `author`, `artist`, `upstreamStatus`.
+
+### Backup
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/backup/export` | Export reading progress, statuses, and overrides as JSON |
+| `POST` | `/backup/import` | Import a previously exported backup |
+
+### Extensions
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/extensions` | List loaded extensions |
+| `GET` | `/extensions/{id}` | Get extension details |
+| `POST` | `/extensions/{id}/enable` | Enable an extension |
+| `POST` | `/extensions/{id}/disable` | Disable an extension |
+| `POST` | `/extensions/{id}/reload` | Reload an extension from disk |
+| `POST` | `/extensions/{id}/unload` | Unload an extension |
+
+### System
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/system/updates` | Check for a newer server version on GitHub |
+
 ---
 
 ## Swagger UI

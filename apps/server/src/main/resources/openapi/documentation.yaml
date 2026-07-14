@@ -62,8 +62,8 @@ components:
       properties:
         id:            { type: string, format: uuid }
         title:         { type: string }
-        connectorId:   { type: string }
-        externalId:    { type: string }
+        connectorId:   { type: string, nullable: true }
+        externalId:    { type: string, nullable: true }
         language:      { type: string, example: en, description: "BCP 47 language tag; defaults to 'en'" }
         status:        { type: string, enum: [IN_LIBRARY, REMOVED] }
         autoDownload:  { type: boolean }

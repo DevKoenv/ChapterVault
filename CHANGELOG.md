@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Series language**: Series now carry a `language` field (BCP 47 tag, default `en`). `POST /library/series` accepts `language` in the request body. The language is validated against the connector's supported languages before the series is added.
 - **MangaDex connector language support**: `MangaDexConnector` exposes 30 supported languages and uses the series language when fetching chapters.
 
+### Removed
+
+- **Bookmarks**: Per-chapter page bookmarks removed. Reading progression (`ProgressApi`) and per-series reading status (`PLAN_TO_READ`, `READING`, `COMPLETED`, etc.) cover the same use-case with less API surface.
+
 ### Changed
 
 - **Breaking:** Unified data root layout — all persistent data now lives under a single configurable directory (`CHAPTERVAULT_DATA_DIR`, default `./data`). Sub-directories: `db/` (database), `library/` (chapter files), `thumbnails/` (cover images). Docker deployments now need a single volume mount (`./data:/app/data`) instead of separate `data` and `downloads` mounts.
@@ -34,19 +38,19 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - **Six-module Gradle project** with enforced one-way dependency graph: `:shared` -> `:kernel` -> `:extensions` / `:infrastructure` / `:interfaces` -> `:apps:server`; `:interfaces` and `:infrastructure` additionally depend on `:extensions` for connector types
 - **`:shared`**: `Result<T>` / `AppError` sealed hierarchy, `Pagination<T>` / `PageRequest`, `Id` (UUID value class), `Time`, `ChapterFormat` sealed class (`Cbz`, `Folder`), `RateLimiter` (sliding-window with Mutex and burst support)
 - **`:kernel` contracts**: domain models, runtime types, auth types, event bus, extension lifecycle
-- **`kernel.api` as sole public surface**: `LibraryReadApi`, `LibraryCommandApi`, `ProgressApi`, `BookmarkApi`, `SystemApi`, `AuthApi`; no duplication with internal service interfaces
+- **`kernel.api` as sole public surface**: `LibraryReadApi`, `LibraryCommandApi`, `ProgressApi`, `ReadingStatusApi`, `SystemApi`, `AuthApi`; no duplication with internal service interfaces
 - **`:extensions` connector infrastructure**: `Connector` interface, `ConnectorRegistry`, `DefaultConnectorContext` (rate-limit buckets, retry, content negotiation)
 - **`MockConnector`**: deterministic fake connector for tests; no HTTP calls
 - **`MangaDexConnector`**: full HTTP implementation (MangaDex API v5): search, metadata, paginated chapters, at-home download
 - **`CustomConnector`**: template connector for self-hosted sources
-- **`:infrastructure` repositories**: `SeriesRepository`, `ChapterRepository`, `UserRepository` (bcrypt, 30-day session TTL), `TaskRepository` (implements `TaskReadStore`), `ProgressRepository`, `BookmarkRepository`
+- **`:infrastructure` repositories**: `SeriesRepository`, `ChapterRepository`, `UserRepository` (bcrypt, 30-day session TTL), `TaskRepository` (implements `TaskReadStore`), `ProgressRepository`, `UserSeriesStatusRepository`
 - **`:infrastructure` storage**: `CbzWriter`, `FolderWriter`, `ArchiveWriterSelector`, `FileStorage` (cover transcoding, page streaming, orphan cleanup)
 - **`TaskExecutorService`**: coroutine dequeue loop with supervisor scope; dispatches FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER, DOWNLOAD_SERIES
 - **Task retry**: up to 3 attempts with exponential backoff (30s, 120s, 600s)
 - **`HttpClientFactory`**: upgraded with ContentNegotiation (JSON ignoreUnknownKeys), DefaultRequest (User-Agent: ChapterVault/1.0), HttpRequestRetry (3 retries, exponential delay, 429+5xx)
-- **`:interfaces` REST routes** (42 endpoints): full library management (series + chapters), connector browsing, task management, per-user progress and bookmarks, page serving with ETag + immutable cache headers, health check, SSE event stream, Swagger UI
+- **`:interfaces` REST routes** (53 endpoints): full library management (series + chapters), connector browsing, task management, per-user progress and reading status, page serving with ETag + immutable cache headers, health check, SSE event stream, Swagger UI
 - **OPDS 1.0 feed**: navigation feed, paginated catalog feed, per-series chapter feed, CBZ streaming download endpoint; Basic Auth
-- **`:interfaces` DTOs**: `ConnectorDto`, `SeriesSearchResultDto`, `SeriesMetadataDto`, `ChapterMetadataDto`, `TaskDto` (with payload map), `ReadProgressDto`, `BookmarkDto`, `ErrorResponse`
+- **`:interfaces` DTOs**: `ConnectorDto`, `SeriesSearchResultDto`, `SeriesMetadataDto`, `ChapterMetadataDto`, `TaskDto` (with payload map), `ReadProgressDto`, `ErrorResponse`
 - **Auth**: BCrypt password hashing, 48-byte random session tokens (30-day TTL), bearer token auth for REST, basic auth for OPDS, ADMIN/USER role enforcement on all write routes
 - **Real-time events**: `EventProjectionService` subscribes to `EventBus`; emits task state changes and chapter download status changes via SSE at `/events`
 - **Health check** at `/health`: reports `ok` or `degraded` with separate `database` and `executor` sub-checks; returns 503 when degraded
@@ -60,7 +64,7 @@ Complete rebuild from scratch with strict layered architecture and a kernel-base
 - Kotlin 2.2.0, Gradle 9.5.1, JVM target 21 (JDK 26 runtime)
 - Ktor 3.0.3 (server + client), Koin 4.0.0, Exposed 0.57.0 + SQLite JDBC 3.47.0.0
 - kotlinx-coroutines 1.9.0, kotlinx-serialization 1.7.3, Logback 1.5.12
-- 27 tests passing
+- 488 tests passing
 
 ---
 

@@ -17,7 +17,7 @@ The kernel is the system core. It owns all domain state and exposes stable APIs.
 - `kernel.api`: the sole public surface; all external callers use only these interfaces
   - `LibraryReadApi`, `LibraryCommandApi`: series and chapter access
   - `AuthApi`: authentication and session management
-  - `ProgressApi`, `BookmarkApi`: per-user reading data
+  - `ProgressApi`: per-user reading progress (chapter/page level)
   - `ReadingStatusApi`: per-user series reading status (PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD)
   - `NotificationApi`: CRUD for notification targets
   - `NotificationDispatchApi`: send notifications and test dispatch
