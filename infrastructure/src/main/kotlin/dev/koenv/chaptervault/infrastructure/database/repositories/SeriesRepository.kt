@@ -293,7 +293,7 @@ class SeriesRepository(
                 SeriesTable
                     .selectAll()
                     .where { (SeriesTable.connectorId eq connectorId) and (SeriesTable.externalId inList externalIds) }
-                    .map { it[SeriesTable.externalId] }
+                    .mapNotNull { it[SeriesTable.externalId] }
                     .toSet()
             Result.Success(found)
         }

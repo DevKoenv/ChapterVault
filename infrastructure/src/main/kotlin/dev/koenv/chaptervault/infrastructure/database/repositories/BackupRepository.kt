@@ -43,6 +43,8 @@ class BackupRepository : BackupApi {
                     .selectAll()
                     .where { UserSeriesProgressTable.userId eq uid }
                     .mapNotNull { row ->
+                        val connectorId = row[SeriesTable.connectorId] ?: return@mapNotNull null
+                        val externalId = row[SeriesTable.externalId] ?: return@mapNotNull null
                         val latestChapterId = row[UserSeriesProgressTable.latestChapterId]
                         val latestChapterExternalId =
                             latestChapterId?.let { cid ->
@@ -53,8 +55,8 @@ class BackupRepository : BackupApi {
                                     ?.get(ChapterTable.externalId)
                             }
                         BackupProgress(
-                            connectorId = row[SeriesTable.connectorId],
-                            externalId = row[SeriesTable.externalId],
+                            connectorId = connectorId,
+                            externalId = externalId,
                             latestChapterExternalId = latestChapterExternalId,
                             latestPage = row[UserSeriesProgressTable.latestPage],
                             readAt = row[UserSeriesProgressTable.readAt].toJavaInstant().toString(),
@@ -66,10 +68,12 @@ class BackupRepository : BackupApi {
                     .join(SeriesTable, JoinType.INNER, UserSeriesStatusTable.seriesId, SeriesTable.id)
                     .selectAll()
                     .where { UserSeriesStatusTable.userId eq uid }
-                    .map { row ->
+                    .mapNotNull { row ->
+                        val connectorId = row[SeriesTable.connectorId] ?: return@mapNotNull null
+                        val externalId = row[SeriesTable.externalId] ?: return@mapNotNull null
                         BackupReadingStatus(
-                            connectorId = row[SeriesTable.connectorId],
-                            externalId = row[SeriesTable.externalId],
+                            connectorId = connectorId,
+                            externalId = externalId,
                             status = row[UserSeriesStatusTable.status],
                         )
                     }
@@ -78,10 +82,12 @@ class BackupRepository : BackupApi {
                 SeriesOverridesTable
                     .join(SeriesTable, JoinType.INNER, SeriesOverridesTable.seriesId, SeriesTable.id)
                     .selectAll()
-                    .map { row ->
+                    .mapNotNull { row ->
+                        val connectorId = row[SeriesTable.connectorId] ?: return@mapNotNull null
+                        val externalId = row[SeriesTable.externalId] ?: return@mapNotNull null
                         BackupOverride(
-                            connectorId = row[SeriesTable.connectorId],
-                            externalId = row[SeriesTable.externalId],
+                            connectorId = connectorId,
+                            externalId = externalId,
                             field = row[SeriesOverridesTable.field],
                             value = row[SeriesOverridesTable.value],
                         )
@@ -93,11 +99,14 @@ class BackupRepository : BackupApi {
                     .join(SeriesTable, JoinType.INNER, ChapterTable.seriesId, SeriesTable.id)
                     .selectAll()
                     .where { BookmarkTable.userId eq uid }
-                    .map { row ->
+                    .mapNotNull { row ->
+                        val seriesConnectorId = row[SeriesTable.connectorId] ?: return@mapNotNull null
+                        val seriesExternalId = row[SeriesTable.externalId] ?: return@mapNotNull null
+                        val chapterExternalId = row[ChapterTable.externalId] ?: return@mapNotNull null
                         BackupBookmark(
-                            chapterSeriesConnectorId = row[SeriesTable.connectorId],
-                            chapterSeriesExternalId = row[SeriesTable.externalId],
-                            chapterExternalId = row[ChapterTable.externalId],
+                            chapterSeriesConnectorId = seriesConnectorId,
+                            chapterSeriesExternalId = seriesExternalId,
+                            chapterExternalId = chapterExternalId,
                             page = row[BookmarkTable.page],
                             createdAt = row[BookmarkTable.createdAt].toJavaInstant().toString(),
                         )

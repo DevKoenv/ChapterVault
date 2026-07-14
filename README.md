@@ -4,8 +4,6 @@
 
 Self-hosted manga library server. Tracks series, automatically downloads new chapters, and serves your collection over a JSON API and OPDS feed.
 
-> **Status:** Active development - v1 not yet released.
-
 ---
 
 ## Features
@@ -17,6 +15,14 @@ Self-hosted manga library server. Tracks series, automatically downloads new cha
 - **OPDS v1.2 feed:** connect any OPDS-capable reading app (Panels, Chunky, Moon+ Reader, etc.)
 - **REST JSON API:** headless; bring your own frontend
 - **SQLite:** embedded, no external database required
+- **Metadata overrides:** override any series field (title, cover, description, status) without losing upstream data
+- **Backup / export:** export and import all reading progress, statuses, overrides, and bookmarks as JSON
+- **Update checker:** server logs a warning when a newer release is available on GitHub
+- **Unread count:** per-series unread chapter count available via reading progress API
+- **Reading status tracking:** per-user per-series status (`PLAN_TO_READ`, `READING`, `COMPLETED`, `DROPPED`, `ON_HOLD`)
+- **Push notifications:** ntfy, Gotify, Discord webhook, and generic webhook targets for new chapter alerts
+- **Extension system:** load third-party connectors and metadata enrichers at runtime from the extensions directory
+- **OPDS facets:** genre, language, and status navigation feeds for compatible OPDS clients
 
 ---
 
@@ -25,9 +31,16 @@ Self-hosted manga library server. Tracks series, automatically downloads new cha
 **Requirements:** Docker and Docker Compose.
 
 ```bash
+curl -o docker-compose.yml https://raw.githubusercontent.com/DevKoenv/ChapterVault/master/docker-compose.yml
+docker compose up -d
+```
+
+Or clone the repo and use the dev compose file to build locally:
+
+```bash
 git clone https://github.com/DevKoenv/ChapterVault.git
 cd ChapterVault
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 The server starts on port `8080`. On first boot a default admin account is created and a `data/config.yaml` file is auto-generated with commented defaults.
@@ -161,6 +174,12 @@ Authorization: Bearer <token>
 | `POST` | `/notifications/{id}/test` | Send a test notification |
 
 Supported notification types: **ntfy**, **Gotify**, **Discord** (webhook), **generic webhook**.
+
+---
+
+## Swagger UI
+
+Interactive API documentation is available at `/swagger` without authentication. This is intentional for an open-source self-hosted tool — the API itself is protected by bearer tokens; the schema is not sensitive.
 
 ---
 

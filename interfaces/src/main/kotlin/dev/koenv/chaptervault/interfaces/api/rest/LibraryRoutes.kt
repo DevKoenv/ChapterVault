@@ -253,8 +253,8 @@ fun Route.libraryRoutes(
                         targetId = series.id,
                         payload =
                             mapOf(
-                                TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
-                                TaskPayloadKeys.EXTERNAL_ID to series.externalId,
+                                TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
+                                TaskPayloadKeys.EXTERNAL_ID to (series.externalId ?: ""),
                                 TaskPayloadKeys.LANGUAGE to series.language,
                             ),
                         createdAt = now,
@@ -332,7 +332,7 @@ fun Route.libraryRoutes(
                     targetId = chapter.id,
                     payload =
                         mapOf(
-                            TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                            TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
                             TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
                             TaskPayloadKeys.FORMAT to format.toString(),
                         ),
@@ -385,7 +385,7 @@ fun Route.libraryRoutes(
                 targetId = chapter.id,
                 payload =
                     mapOf(
-                        TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                        TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
                         TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
                         TaskPayloadKeys.FORMAT to format.toString(),
                     ),
@@ -437,7 +437,7 @@ fun Route.libraryRoutes(
                 targetId = chapter.id,
                 payload =
                     mapOf(
-                        TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                        TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
                         TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
                         TaskPayloadKeys.FORMAT to format.toString(),
                     ),
@@ -498,8 +498,8 @@ fun Route.libraryRoutes(
                 targetId = series.id,
                 payload =
                     mapOf(
-                        TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
-                        TaskPayloadKeys.EXTERNAL_ID to series.externalId,
+                        TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
+                        TaskPayloadKeys.EXTERNAL_ID to (series.externalId ?: ""),
                         TaskPayloadKeys.LANGUAGE to series.language,
                     ),
                 createdAt = now,

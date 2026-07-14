@@ -46,6 +46,8 @@ class SeriesRefreshScheduler(
             }
             val pagination = result.value
             for (series in pagination.items) {
+                val connectorId = series.connectorId ?: continue
+                val externalId = series.externalId ?: continue
                 val now = Instant.now()
                 taskQueue.enqueue(
                     Task(
@@ -56,8 +58,8 @@ class SeriesRefreshScheduler(
                         targetId = series.id,
                         payload =
                             mapOf(
-                                TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
-                                TaskPayloadKeys.EXTERNAL_ID to series.externalId,
+                                TaskPayloadKeys.CONNECTOR_ID to connectorId,
+                                TaskPayloadKeys.EXTERNAL_ID to externalId,
                                 TaskPayloadKeys.LANGUAGE to series.language,
                             ),
                         createdAt = now,

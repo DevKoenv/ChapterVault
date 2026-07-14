@@ -1,7 +1,7 @@
 openapi: "3.0.3"
 info:
   title: ChapterVault API
-  version: "0.5.0"
+  version: "1.0.0"
   description: Self-hosted manga/comic library server with connector-based download pipeline.
 
 servers:
@@ -1089,3 +1089,248 @@ paths:
         "400": { description: Invalid chapter ID or non-integer page number }
         "401": { description: Not authenticated }
         "404": { description: Chapter not found, not downloaded, or page index out of range }
+
+  /backup/export:
+    get:
+      tags: [system]
+      summary: Export a backup of all user reading data
+      description: |
+        Exports reading progress, reading statuses, metadata overrides, and bookmarks for the current user.
+        Series with no connector identity (local series) are excluded from the export.
+      responses:
+        "200":
+          description: Backup JSON
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:        { type: integer, example: 1 }
+                  exportedAt:     { type: string, format: date-time }
+                  progress:       { type: array, items: { type: object } }
+                  readingStatuses: { type: array, items: { type: object } }
+                  overrides:      { type: array, items: { type: object } }
+                  bookmarks:      { type: array, items: { type: object } }
+        "401": { description: Not authenticated }
+
+  /backup/import:
+    post:
+      tags: [system]
+      summary: Import a backup of user reading data
+      description: Restores reading progress, statuses, overrides, and bookmarks. Entries for series not present in the library are skipped.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Import summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  progressRestored:  { type: integer }
+                  progressSkipped:   { type: integer }
+                  statusesRestored:  { type: integer }
+                  statusesSkipped:   { type: integer }
+                  overridesRestored: { type: integer }
+                  overridesSkipped:  { type: integer }
+                  bookmarksRestored: { type: integer }
+                  bookmarksSkipped:  { type: integer }
+        "400": { description: Invalid backup payload }
+        "401": { description: Not authenticated }
+
+  /library/series/{id}/overrides:
+    get:
+      tags: [library]
+      summary: List metadata overrides for a series
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Map of field name to override value
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: string }
+        "401": { description: Not authenticated }
+        "404": { description: Series not found }
+
+  /library/series/{id}/overrides/{field}:
+    put:
+      tags: [library]
+      summary: Set a metadata override for a series field (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: field
+          required: true
+          schema: { type: string, example: title }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string }
+      responses:
+        "204": { description: Override set }
+        "400": { description: Invalid field or value }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Series not found }
+
+    delete:
+      tags: [library]
+      summary: Remove a metadata override for a series field (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: field
+          required: true
+          schema: { type: string, example: title }
+      responses:
+        "204": { description: Override removed }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Series or override not found }
+
+  /extensions:
+    get:
+      tags: [system]
+      summary: List loaded extensions (ADMIN)
+      responses:
+        "200":
+          description: List of loaded extensions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:      { type: string }
+                    name:    { type: string }
+                    version: { type: string }
+                    enabled: { type: boolean }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+
+  /extensions/{id}:
+    get:
+      tags: [system]
+      summary: Get details for a single extension (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Extension details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:      { type: string }
+                  name:    { type: string }
+                  version: { type: string }
+                  enabled: { type: boolean }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Extension not found }
+
+  /extensions/{id}/enable:
+    post:
+      tags: [system]
+      summary: Enable an extension (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Extension enabled }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Extension not found }
+
+  /extensions/{id}/disable:
+    post:
+      tags: [system]
+      summary: Disable an extension (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Extension disabled }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Extension not found }
+
+  /extensions/{id}/reload:
+    post:
+      tags: [system]
+      summary: Reload an extension from disk (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Extension reloaded }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Extension not found }
+
+  /extensions/{id}/unload:
+    post:
+      tags: [system]
+      summary: Unload an extension (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Extension unloaded }
+        "401": { description: Not authenticated }
+        "403": { description: Requires ADMIN role }
+        "404": { description: Extension not found }
+
+  /system/updates:
+    get:
+      tags: [system]
+      summary: Check for available updates
+      description: Returns the current version, latest published release, and whether an update is available.
+      responses:
+        "200":
+          description: Update status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currentVersion:  { type: string, example: "1.0.0" }
+                  latestVersion:   { type: string, nullable: true, example: "1.1.0" }
+                  releaseUrl:      { type: string, nullable: true }
+                  updateAvailable: { type: boolean }
+        "401": { description: Not authenticated }

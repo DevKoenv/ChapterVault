@@ -19,7 +19,7 @@ val gitRevision: String =
 
 buildConfig {
     packageName("dev.koenv.chaptervault.server.generated")
-    buildConfigField("String", "VERSION", "\"${project.version}\"")
+    buildConfigField("String", "VERSION", "\"${rootProject.version}\"")
     buildConfigField("long", "BUILD_TIME", System.currentTimeMillis().toString())
     buildConfigField("String", "REVISION", "\"$gitRevision\"")
     buildConfigField("String", "PROJECT_NAME", "\"${project.name}\"")

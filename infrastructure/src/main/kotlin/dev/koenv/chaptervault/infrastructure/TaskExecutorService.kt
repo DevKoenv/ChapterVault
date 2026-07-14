@@ -308,7 +308,7 @@ class TaskExecutorService(
                     targetId = chapter.id,
                     payload =
                         mapOf(
-                            TaskPayloadKeys.CONNECTOR_ID to series.connectorId,
+                            TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
                             TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
                             TaskPayloadKeys.FORMAT to format.toString(),
                         ),

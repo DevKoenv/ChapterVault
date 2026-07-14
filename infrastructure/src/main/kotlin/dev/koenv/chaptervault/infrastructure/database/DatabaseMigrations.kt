@@ -25,154 +25,6 @@ object DatabaseMigrations {
     internal val migrations: List<Migration> =
         listOf(
             Migration(1, "initial_schema", v1Statements()),
-            Migration(
-                2,
-                "fix_series_language_default",
-                listOf(
-                    "UPDATE series SET language = 'en' WHERE language = '' OR language IS NULL",
-                ),
-            ),
-            Migration(
-                3,
-                "create_user_series_status",
-                listOf(
-                    """
-                    CREATE TABLE IF NOT EXISTS user_series_status (
-                        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                        series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
-                        status TEXT NOT NULL,
-                        updated_at TEXT NOT NULL,
-                        CONSTRAINT pk_user_series_status PRIMARY KEY (user_id, series_id)
-                    )
-                    """.trimIndent(),
-                    "CREATE INDEX IF NOT EXISTS idx_uss_user_id ON user_series_status (user_id)",
-                ),
-            ),
-            Migration(
-                4,
-                "create_notification_targets",
-                listOf(
-                    """
-                    CREATE TABLE IF NOT EXISTS notification_targets (
-                        id TEXT NOT NULL,
-                        name TEXT NOT NULL,
-                        type TEXT NOT NULL,
-                        url TEXT NOT NULL,
-                        token TEXT,
-                        enabled INTEGER NOT NULL DEFAULT 1,
-                        created_at TEXT NOT NULL,
-                        CONSTRAINT pk_notification_targets PRIMARY KEY (id)
-                    )
-                    """.trimIndent(),
-                ),
-            ),
-            Migration(
-                5,
-                "series_enrichment_fields",
-                listOf(
-                    "ALTER TABLE series ADD COLUMN author TEXT",
-                    "ALTER TABLE series ADD COLUMN artist TEXT",
-                    "ALTER TABLE series ADD COLUMN year INTEGER",
-                    "ALTER TABLE series ADD COLUMN upstream_status TEXT",
-                ),
-            ),
-            Migration(
-                6,
-                "series_genres",
-                listOf(
-                    """
-                    CREATE TABLE IF NOT EXISTS series_genres (
-                        series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
-                        genre TEXT NOT NULL,
-                        CONSTRAINT pk_series_genres PRIMARY KEY (series_id, genre)
-                    )
-                    """.trimIndent(),
-                    "CREATE INDEX IF NOT EXISTS idx_series_genres_series_id ON series_genres (series_id)",
-                ),
-            ),
-            Migration(
-                7,
-                "extension_configs",
-                listOf(
-                    """
-                    CREATE TABLE IF NOT EXISTS extension_configs (
-                        extension_id TEXT NOT NULL,
-                        key TEXT NOT NULL,
-                        value TEXT NOT NULL,
-                        CONSTRAINT pk_extension_configs PRIMARY KEY (extension_id, key)
-                    )
-                    """.trimIndent(),
-                ),
-            ),
-            Migration(
-                8,
-                "extension_registries",
-                listOf(
-                    """
-                    CREATE TABLE IF NOT EXISTS extension_registries (
-                        id TEXT NOT NULL,
-                        name TEXT NOT NULL,
-                        url TEXT NOT NULL,
-                        enabled INTEGER NOT NULL DEFAULT 1,
-                        created_at TEXT NOT NULL,
-                        CONSTRAINT pk_extension_registries PRIMARY KEY (id)
-                    )
-                    """.trimIndent(),
-                ),
-            ),
-            Migration(
-                9,
-                "drop_extension_config_and_registry",
-                listOf(
-                    "DROP TABLE IF EXISTS extension_configs",
-                    "DROP TABLE IF EXISTS extension_registries",
-                ),
-            ),
-            Migration(
-                10,
-                "reading_progress_rework",
-                listOf(
-                    """
-                    CREATE TABLE IF NOT EXISTS user_series_progress (
-                        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                        series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
-                        latest_chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
-                        latest_page INTEGER NOT NULL DEFAULT 0,
-                        read_at TEXT NOT NULL,
-                        CONSTRAINT pk_user_series_progress PRIMARY KEY (user_id, series_id)
-                    )
-                    """.trimIndent(),
-                    "CREATE INDEX IF NOT EXISTS idx_usp_user_id ON user_series_progress (user_id)",
-                    """
-                    INSERT OR IGNORE INTO user_series_progress (user_id, series_id, latest_chapter_id, latest_page, read_at)
-                    SELECT p.user_id, c.series_id, p.chapter_id, 0, p.read_at
-                    FROM progress p
-                    JOIN chapters c ON c.id = p.chapter_id
-                    WHERE c.chapter_index = (
-                        SELECT MAX(c2.chapter_index)
-                        FROM progress p2
-                        JOIN chapters c2 ON c2.id = p2.chapter_id
-                        WHERE p2.user_id = p.user_id AND c2.series_id = c.series_id
-                    )
-                    """.trimIndent(),
-                    "DROP TABLE IF EXISTS progress",
-                ),
-            ),
-            Migration(
-                11,
-                "series_overrides",
-                listOf(
-                    """
-                    CREATE TABLE IF NOT EXISTS series_overrides (
-                        series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
-                        field TEXT NOT NULL,
-                        value TEXT NOT NULL,
-                        CONSTRAINT pk_series_overrides PRIMARY KEY (series_id, field)
-                    )
-                    """.trimIndent(),
-                    "CREATE INDEX IF NOT EXISTS idx_series_overrides_series_id ON series_overrides (series_id)",
-                ),
-            ),
         )
 
     fun migrate(db: Database) {
@@ -189,15 +41,11 @@ object DatabaseMigrations {
             CREATE TABLE IF NOT EXISTS schema_version (
                 version INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
-                applied_at TEXT NOT NULL
+                applied_at TEXT NOT NULL,
+                checksum TEXT
             )
             """.trimIndent(),
         )
-
-        try {
-            exec("ALTER TABLE schema_version ADD COLUMN checksum TEXT")
-        } catch (_: Exception) {
-        }
 
         val applied: Map<Int, String?> =
             exec(
@@ -261,14 +109,18 @@ private fun v1Statements(): List<String> =
         CREATE TABLE IF NOT EXISTS series (
             id TEXT NOT NULL,
             title TEXT NOT NULL,
-            connector_id TEXT NOT NULL,
-            external_id TEXT NOT NULL,
+            connector_id TEXT,
+            external_id TEXT,
             status TEXT NOT NULL,
             auto_download INTEGER NOT NULL DEFAULT 0,
             default_format TEXT,
             cover_url TEXT,
             description TEXT,
-            language TEXT NOT NULL DEFAULT '',
+            language TEXT NOT NULL DEFAULT 'en',
+            author TEXT,
+            artist TEXT,
+            year INTEGER,
+            upstream_status TEXT,
             added_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             CONSTRAINT pk_series PRIMARY KEY (id)
@@ -280,7 +132,7 @@ private fun v1Statements(): List<String> =
             series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
             title TEXT NOT NULL,
             chapter_index REAL NOT NULL,
-            external_id TEXT NOT NULL,
+            external_id TEXT,
             download_status TEXT NOT NULL DEFAULT 'AVAILABLE',
             format TEXT,
             page_count INTEGER,
@@ -305,14 +157,6 @@ private fun v1Statements(): List<String> =
         )
         """.trimIndent(),
         """
-        CREATE TABLE IF NOT EXISTS progress (
-            user_id TEXT NOT NULL REFERENCES users(id),
-            chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
-            read_at TEXT NOT NULL,
-            CONSTRAINT pk_progress PRIMARY KEY (user_id, chapter_id)
-        )
-        """.trimIndent(),
-        """
         CREATE TABLE IF NOT EXISTS bookmarks (
             id TEXT NOT NULL,
             user_id TEXT NOT NULL REFERENCES users(id),
@@ -322,11 +166,61 @@ private fun v1Statements(): List<String> =
             CONSTRAINT pk_bookmarks PRIMARY KEY (id)
         )
         """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS user_series_status (
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+            status TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            CONSTRAINT pk_user_series_status PRIMARY KEY (user_id, series_id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS notification_targets (
+            id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            url TEXT NOT NULL,
+            token TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            CONSTRAINT pk_notification_targets PRIMARY KEY (id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS series_genres (
+            series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+            genre TEXT NOT NULL,
+            CONSTRAINT pk_series_genres PRIMARY KEY (series_id, genre)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS user_series_progress (
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+            latest_chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+            latest_page INTEGER NOT NULL DEFAULT 0,
+            read_at TEXT NOT NULL,
+            CONSTRAINT pk_user_series_progress PRIMARY KEY (user_id, series_id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS series_overrides (
+            series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+            field TEXT NOT NULL,
+            value TEXT NOT NULL,
+            CONSTRAINT pk_series_overrides PRIMARY KEY (series_id, field)
+        )
+        """.trimIndent(),
         "CREATE UNIQUE INDEX IF NOT EXISTS users_username_uq ON users (username)",
         "CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_uq ON sessions (token)",
-        "CREATE UNIQUE INDEX IF NOT EXISTS chapters_series_external_uq ON chapters (series_id, external_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS chapters_series_external_uq ON chapters (series_id, external_id) WHERE external_id IS NOT NULL",
         "CREATE INDEX IF NOT EXISTS idx_chapters_series_id ON chapters (series_id)",
         "CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks (user_id)",
         "CREATE INDEX IF NOT EXISTS idx_bookmarks_chapter_id ON bookmarks (chapter_id)",
         "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_uss_user_id ON user_series_status (user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_series_genres_series_id ON series_genres (series_id)",
+        "CREATE INDEX IF NOT EXISTS idx_usp_user_id ON user_series_progress (user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_series_overrides_series_id ON series_overrides (series_id)",
     )

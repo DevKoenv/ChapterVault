@@ -6,8 +6,8 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 object SeriesTable : Table("series") {
     val id = varchar("id", 36)
     val title = varchar("title", 500)
-    val connectorId = varchar("connector_id", 100)
-    val externalId = varchar("external_id", 200)
+    val connectorId = varchar("connector_id", 100).nullable()
+    val externalId = varchar("external_id", 200).nullable()
     val status = varchar("status", 50)
     val autoDownload = bool("auto_download").default(false)
     val defaultFormat = varchar("default_format", 20).nullable()

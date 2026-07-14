@@ -1,6 +1,6 @@
 services:
   chaptervault:
-    build: .
+    image: ghcr.io/devkoenv/chaptervault:latest
     ports:
       - "8080:8080"
     volumes:

@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
 data class SeriesDto(
     val id: String,
     val title: String,
-    val connectorId: String,
-    val externalId: String,
+    val connectorId: String?,
+    val externalId: String?,
     val language: String,
     val status: String,
     val autoDownload: Boolean,

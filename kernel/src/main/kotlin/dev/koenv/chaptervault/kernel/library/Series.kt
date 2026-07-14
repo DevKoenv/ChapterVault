@@ -7,8 +7,8 @@ import java.time.Instant
 data class Series(
     val id: Id,
     val title: String,
-    val connectorId: String,
-    val externalId: String,
+    val connectorId: String?,
+    val externalId: String?,
     val language: String = "en",
     val status: SeriesStatus,
     val autoDownload: Boolean = false,

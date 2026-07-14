@@ -133,9 +133,11 @@ class CustomConnector(
         format: ChapterFormat,
     ): Result<DownloadResult> {
         // TODO: adjust endpoint path, chapter.externalId comes from fetchChapters
+        val chapterExternalId = chapter.externalId
+            ?: return Result.Failure(AppError.InternalError("Cannot download chapter ${chapter.id}: no external ID"))
         val response =
             context.getJson<ApiChapterPages>(
-                url = "$baseUrl/api/chapters/${chapter.externalId}/pages",
+                url = "$baseUrl/api/chapters/$chapterExternalId/pages",
                 bucket = Bucket.CDN,
             )
         return when (response) {
@@ -143,7 +145,7 @@ class CustomConnector(
             is Result.Success -> {
                 val pageUrls = response.value.pages
                 if (pageUrls.isEmpty()) {
-                    return Result.Failure(AppError.InternalError("No pages returned for chapter ${chapter.externalId}"))
+                    return Result.Failure(AppError.InternalError("No pages returned for chapter $chapterExternalId"))
                 }
                 Result.Success(DownloadResult(pages = pageUrls.mapIndexed { i, url -> DownloadPage(url = url, index = i) }))
             }
