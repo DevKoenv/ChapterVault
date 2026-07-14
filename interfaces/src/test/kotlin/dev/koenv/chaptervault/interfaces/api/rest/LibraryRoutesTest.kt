@@ -291,6 +291,12 @@ class LibraryRoutesTest {
                         ids: Collection<Id>,
                         request: PageRequest,
                     ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
+
+                    override suspend fun listChaptersPaginated(
+                        seriesId: Id,
+                        status: DownloadStatus?,
+                        request: PageRequest,
+                    ) = Result.Success(Pagination(emptyList<Chapter>(), request.page, request.size, 0L))
                 },
             commandApi = NoOpCommandApi(),
         ) {
@@ -463,7 +469,11 @@ class LibraryRoutesTest {
         testApp(
             readApi =
                 object : NoOpReadApi() {
-                    override suspend fun listChapters(seriesId: Id) = Result.Success(listOf(fakeChapter))
+                    override suspend fun listChaptersPaginated(
+                        seriesId: Id,
+                        status: DownloadStatus?,
+                        request: PageRequest,
+                    ) = Result.Success(Pagination(listOf(fakeChapter), 0, 50, 1L))
                 },
             commandApi = NoOpCommandApi(),
         ) {
@@ -618,10 +628,11 @@ class LibraryRoutesTest {
         testApp(
             readApi =
                 object : NoOpReadApi() {
-                    override suspend fun listChaptersByStatus(
+                    override suspend fun listChaptersPaginated(
                         seriesId: Id,
-                        status: DownloadStatus,
-                    ) = Result.Success(listOf(fakeChapter))
+                        status: DownloadStatus?,
+                        request: PageRequest,
+                    ) = Result.Success(Pagination(listOf(fakeChapter), 0, 50, 1L))
                 },
             commandApi = NoOpCommandApi(),
         ) {
@@ -929,6 +940,12 @@ private open class NoOpReadApi : LibraryReadApi {
         ids: Collection<Id>,
         request: PageRequest,
     ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
+
+    override suspend fun listChaptersPaginated(
+        seriesId: Id,
+        status: DownloadStatus?,
+        request: PageRequest,
+    ) = Result.Success(Pagination(emptyList<Chapter>(), request.page, request.size, 0L))
 }
 
 private class NoOpCommandApi : LibraryCommandApi {

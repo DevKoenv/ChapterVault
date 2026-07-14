@@ -24,6 +24,7 @@ import dev.koenv.chaptervault.interfaces.api.rest.respondBadRequest
 import dev.koenv.chaptervault.interfaces.api.rest.respondError
 import dev.koenv.chaptervault.interfaces.api.rest.systemRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.userRoutes
 import dev.koenv.chaptervault.interfaces.api.sse.sseRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
@@ -189,6 +190,7 @@ fun Application.bootstrap() {
 
     routing {
         authenticate("auth-bearer") {
+            userRoutes(auth)
             libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage, connectorRegistry, readingStatusApi)
             taskRoutes(system)
             connectorRoutes(connectorRegistry, libraryRead)

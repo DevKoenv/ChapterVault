@@ -159,6 +159,8 @@ fun Route.libraryRoutes(
                 call.respondBadRequest("Invalid series ID")
                 return@get
             }
+        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
+        val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 50
         val statusParam = call.request.queryParameters["status"]
         val statusFilter =
             if (statusParam != null) {
@@ -171,14 +173,20 @@ fun Route.libraryRoutes(
             } else {
                 null
             }
-        val result =
-            if (statusFilter != null) {
-                libraryRead.listChaptersByStatus(id, statusFilter)
-            } else {
-                libraryRead.listChapters(id)
-            }
-        when (result) {
-            is Result.Success -> call.respond(HttpStatusCode.OK, result.value.map { it.toDto() })
+        when (val result = libraryRead.listChaptersPaginated(id, statusFilter, PageRequest(page, size.coerceIn(1, 200)))) {
+            is Result.Success ->
+                call.respond(
+                    HttpStatusCode.OK,
+                    PaginatedResponse(
+                        items = result.value.items.map { it.toDto() },
+                        page = result.value.page,
+                        size = result.value.size,
+                        totalItems = result.value.totalItems,
+                        totalPages = result.value.totalPages,
+                        hasNext = result.value.hasNext,
+                        hasPrevious = result.value.hasPrevious,
+                    ),
+                )
             is Result.Failure -> call.respondError(result.error)
         }
     }

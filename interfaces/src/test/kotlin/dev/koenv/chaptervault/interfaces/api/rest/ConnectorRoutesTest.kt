@@ -62,6 +62,12 @@ class ConnectorRoutesTest {
                 ids: Collection<Id>,
                 request: PageRequest,
             ): Result<Pagination<Series>> = error("not used")
+
+            override suspend fun listChaptersPaginated(
+                seriesId: Id,
+                status: DownloadStatus?,
+                request: PageRequest,
+            ): Result<Pagination<Chapter>> = error("not used")
         }
 
     private fun testApp(

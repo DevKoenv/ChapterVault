@@ -14,12 +14,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.sql.update
 import org.mindrot.jbcrypt.BCrypt
 import java.security.SecureRandom
 import java.time.Instant
@@ -117,6 +119,62 @@ class UserRepository : AuthApi {
     override suspend fun invalidateSession(token: String): Result<Unit> =
         dbQuery {
             SessionTable.deleteWhere { SessionTable.token eq token }
+            Result.Success(Unit)
+        }
+
+    override suspend fun listUsers(): Result<List<UserPrincipal>> =
+        dbQuery {
+            Result.Success(
+                UserTable
+                    .selectAll()
+                    .orderBy(UserTable.createdAt, SortOrder.ASC)
+                    .map { it.toPrincipal() },
+            )
+        }
+
+    override suspend fun deleteUser(id: Id): Result<Unit> =
+        dbQuery {
+            val deleted = UserTable.deleteWhere { UserTable.id eq id.toString() }
+            if (deleted == 0) return@dbQuery Result.Failure(AppError.NotFound("User", id.toString()))
+            SessionTable.deleteWhere { SessionTable.userId eq id.toString() }
+            Result.Success(Unit)
+        }
+
+    override suspend fun updateUserRole(
+        id: Id,
+        role: Role,
+    ): Result<UserPrincipal> =
+        dbQuery {
+            val updated =
+                UserTable.update({ UserTable.id eq id.toString() }) {
+                    it[UserTable.roles] = role.name
+                }
+            if (updated == 0) return@dbQuery Result.Failure(AppError.NotFound("User", id.toString()))
+            // invalidate existing sessions so the new role takes effect immediately
+            SessionTable.deleteWhere { SessionTable.userId eq id.toString() }
+            val row = UserTable.selectAll().where { UserTable.id eq id.toString() }.single()
+            Result.Success(row.toPrincipal())
+        }
+
+    override suspend fun changePassword(
+        userId: Id,
+        currentPassword: String,
+        newPassword: String,
+    ): Result<Unit> =
+        dbQuery {
+            val row =
+                UserTable
+                    .selectAll()
+                    .where { UserTable.id eq userId.toString() }
+                    .singleOrNull()
+                    ?: return@dbQuery Result.Failure(AppError.NotFound("User", userId.toString()))
+            if (!BCrypt.checkpw(currentPassword, row[UserTable.passwordHash])) {
+                return@dbQuery Result.Failure(AppError.Unauthorized("Current password is incorrect"))
+            }
+            val newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+            UserTable.update({ UserTable.id eq userId.toString() }) {
+                it[UserTable.passwordHash] = newHash
+            }
             Result.Success(Unit)
         }
 

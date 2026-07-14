@@ -23,6 +23,8 @@ tags:
     description: Push notification targets and dispatch (ADMIN only)
   - name: system
     description: System utilities
+  - name: users
+    description: User account management (ADMIN only)
   - name: opds
     description: OPDS v1 feed (Basic Auth) with Page Streaming Extension (PSE)
 
@@ -50,7 +52,7 @@ components:
         username: { type: string }
         roles:    { type: array, items: { type: string }, example: [ADMIN] }
 
-    UserResponse:
+    UserDto:
       type: object
       properties:
         id:       { type: string, format: uuid }
@@ -221,6 +223,17 @@ components:
         hasNext:     { type: boolean }
         hasPrevious: { type: boolean }
 
+    PaginatedChapterResponse:
+      type: object
+      properties:
+        items:       { type: array, items: { $ref: "#/components/schemas/ChapterDto" } }
+        page:        { type: integer }
+        size:        { type: integer }
+        totalItems:  { type: integer, format: int64 }
+        totalPages:  { type: integer }
+        hasNext:     { type: boolean }
+        hasPrevious: { type: boolean }
+
     PaginatedTaskResponse:
       type: object
       properties:
@@ -332,7 +345,7 @@ paths:
           description: User created
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/UserResponse" }
+              schema: { $ref: "#/components/schemas/UserDto" }
         "400": { description: Invalid request body }
         "403": { description: Registration is disabled on this server (REGISTRATION_DISABLED) }
         "409": { description: Username already taken }
@@ -370,6 +383,90 @@ paths:
       responses:
         "204": { description: Session invalidated }
         "401": { description: Missing or invalid token }
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Return the currently authenticated user
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserDto" }
+
+  /auth/change-password:
+    post:
+      tags: [auth]
+      summary: Change the authenticated user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 1, maxLength: 255 }
+      responses:
+        "204": { description: Password changed }
+        "400": { description: Invalid request body or newPassword too long }
+        "401": { description: Current password incorrect }
+
+  /users:
+    get:
+      tags: [users]
+      summary: List all user accounts (ADMIN)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserDto" }
+        "403": { description: Admin access required }
+
+  /users/{id}:
+    delete:
+      tags: [users]
+      summary: Delete a user account (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: User deleted }
+        "400": { description: Cannot delete your own account }
+        "403": { description: Admin access required }
+        "404": { description: User not found }
+
+  /users/{id}/role:
+    patch:
+      tags: [users]
+      summary: Change a user's role (ADMIN)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [ADMIN, USER, GUEST] }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserDto" }
+        "400": { description: Invalid role }
+        "403": { description: Admin access required }
+        "404": { description: User not found }
 
   /library/series/search:
     get:
@@ -508,12 +605,18 @@ paths:
   /library/series/{id}/chapters:
     get:
       tags: [library]
-      summary: List chapters for a series, optionally filtered by download status
+      summary: List chapters for a series (paginated), optionally filtered by download status
       parameters:
         - in: path
           name: id
           required: true
           schema: { type: string, format: uuid }
+        - in: query
+          name: page
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 50, minimum: 1, maximum: 200 }
         - in: query
           name: status
           required: false
@@ -525,9 +628,7 @@ paths:
         "200":
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/ChapterDto" }
+              schema: { $ref: "#/components/schemas/PaginatedChapterResponse" }
         "400": { description: Invalid status value }
         "404": { description: Series not found }
 

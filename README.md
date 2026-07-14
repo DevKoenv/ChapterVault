@@ -106,6 +106,16 @@ Authorization: Bearer <token>
 | `POST` | `/auth/register` | Create a user account (returns `403` when `registrationEnabled` is false) |
 | `POST` | `/auth/login` | Authenticate, receive session token |
 | `POST` | `/auth/logout` | Invalidate session token |
+| `GET` | `/auth/me` | Return the current user's id, username, and roles |
+| `POST` | `/auth/change-password` | Change the current user's password |
+
+### User management (ADMIN)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/users` | List all user accounts |
+| `DELETE` | `/users/{id}` | Delete a user account |
+| `PATCH` | `/users/{id}/role` | Change a user's role |
 
 ### Library
 

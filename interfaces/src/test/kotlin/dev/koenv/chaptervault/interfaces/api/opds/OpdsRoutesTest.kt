@@ -149,6 +149,12 @@ class OpdsRoutesTest {
                 ids: Collection<Id>,
                 request: PageRequest,
             ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
+
+            override suspend fun listChaptersPaginated(
+                seriesId: Id,
+                status: DownloadStatus?,
+                request: PageRequest,
+            ) = Result.Success(Pagination(emptyList<Chapter>(), request.page, request.size, 0L))
         }
 
     private val fakeOpdsRead =
@@ -327,6 +333,12 @@ class OpdsRoutesTest {
                     ids: Collection<Id>,
                     request: PageRequest,
                 ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
+
+                override suspend fun listChaptersPaginated(
+                    seriesId: Id,
+                    status: DownloadStatus?,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(emptyList<Chapter>(), request.page, request.size, 0L))
             }
         testAppWith(failingLibrary) {
             val res = client.get("/opds/v1/catalog") { basicAuth("user", "pass") }
@@ -515,6 +527,12 @@ class OpdsRoutesTest {
                     ids: Collection<Id>,
                     request: PageRequest,
                 ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
+
+                override suspend fun listChaptersPaginated(
+                    seriesId: Id,
+                    status: DownloadStatus?,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(emptyList<Chapter>(), request.page, request.size, 0L))
             }
         testAppWith(emptyLibrary) {
             val res = client.get("/opds/v1/catalog") { basicAuth("user", "pass") }
@@ -559,6 +577,12 @@ class OpdsRoutesTest {
                     ids: Collection<Id>,
                     request: PageRequest,
                 ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
+
+                override suspend fun listChaptersPaginated(
+                    seriesId: Id,
+                    status: DownloadStatus?,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(emptyList<Chapter>(), request.page, request.size, 0L))
             }
         testAppWith(paginatedLibrary) {
             val res = client.get("/opds/v1/catalog?page=0&size=20") { basicAuth("user", "pass") }

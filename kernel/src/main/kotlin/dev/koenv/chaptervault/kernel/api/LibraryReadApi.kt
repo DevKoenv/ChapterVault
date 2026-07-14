@@ -29,6 +29,12 @@ interface LibraryReadApi {
         status: DownloadStatus,
     ): Result<List<Chapter>>
 
+    suspend fun listChaptersPaginated(
+        seriesId: Id,
+        status: DownloadStatus? = null,
+        request: PageRequest,
+    ): Result<Pagination<Chapter>>
+
     suspend fun inLibraryExternalIds(
         connectorId: String,
         externalIds: List<String>,

@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
+import dev.koenv.chaptervault.interfaces.serialization.dto.v1.UserDto
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.shared.result.AppError
@@ -22,13 +23,6 @@ data class LoginRequest(
 @Serializable
 data class LoginResponse(
     val token: String,
-    val username: String,
-    val roles: List<String>,
-)
-
-@Serializable
-data class UserResponse(
-    val id: String,
     val username: String,
     val roles: List<String>,
 )
@@ -62,7 +56,7 @@ fun Application.authRoutes(
                 is Result.Success ->
                     call.respond(
                         HttpStatusCode.Created,
-                        UserResponse(
+                        UserDto(
                             id = result.value.id.toString(),
                             username = result.value.username,
                             roles = result.value.roles.map { it.name },

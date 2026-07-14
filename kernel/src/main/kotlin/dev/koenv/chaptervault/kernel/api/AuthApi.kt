@@ -31,4 +31,19 @@ interface AuthApi {
     suspend fun validateSession(token: String): Result<UserPrincipal>
 
     suspend fun invalidateSession(token: String): Result<Unit>
+
+    suspend fun listUsers(): Result<List<UserPrincipal>>
+
+    suspend fun deleteUser(id: Id): Result<Unit>
+
+    suspend fun updateUserRole(
+        id: Id,
+        role: Role,
+    ): Result<UserPrincipal>
+
+    suspend fun changePassword(
+        userId: Id,
+        currentPassword: String,
+        newPassword: String,
+    ): Result<Unit>
 }

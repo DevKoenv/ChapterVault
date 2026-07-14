@@ -57,6 +57,21 @@ class AuthRoutesTest {
             override suspend fun validateSession(token: String) = Result.Success(fakePrincipal)
 
             override suspend fun invalidateSession(token: String) = Result.Success(Unit)
+
+            override suspend fun listUsers() = Result.Success(listOf(fakePrincipal))
+
+            override suspend fun deleteUser(id: Id) = Result.Success(Unit)
+
+            override suspend fun updateUserRole(
+                id: Id,
+                role: Role,
+            ) = Result.Success(fakePrincipal)
+
+            override suspend fun changePassword(
+                userId: Id,
+                currentPassword: String,
+                newPassword: String,
+            ) = Result.Success(Unit)
         }
 
     private val failAuth =
@@ -73,6 +88,21 @@ class AuthRoutesTest {
             override suspend fun validateSession(token: String) = Result.Failure(AppError.Unauthorized())
 
             override suspend fun invalidateSession(token: String) = Result.Success(Unit)
+
+            override suspend fun listUsers() = Result.Failure(AppError.InternalError("not implemented"))
+
+            override suspend fun deleteUser(id: Id) = Result.Failure(AppError.InternalError("not implemented"))
+
+            override suspend fun updateUserRole(
+                id: Id,
+                role: Role,
+            ) = Result.Failure(AppError.InternalError("not implemented"))
+
+            override suspend fun changePassword(
+                userId: Id,
+                currentPassword: String,
+                newPassword: String,
+            ) = Result.Failure(AppError.Unauthorized("Current password is incorrect"))
         }
 
     private fun ApplicationTestBuilder.install(auth: AuthApi) {

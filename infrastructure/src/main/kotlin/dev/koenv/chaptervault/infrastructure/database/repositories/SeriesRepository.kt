@@ -141,6 +141,29 @@ class SeriesRepository(
             Result.Success(chapters)
         }
 
+    override suspend fun listChaptersPaginated(
+        seriesId: Id,
+        status: DownloadStatus?,
+        request: PageRequest,
+    ): Result<Pagination<Chapter>> =
+        dbQuery {
+            val condition =
+                if (status != null) {
+                    (ChapterTable.seriesId eq seriesId.toString()) and (ChapterTable.downloadStatus eq status.name)
+                } else {
+                    ChapterTable.seriesId eq seriesId.toString()
+                }
+            val total = ChapterTable.selectAll().where(condition).count()
+            val chapters =
+                ChapterTable
+                    .selectAll()
+                    .where(condition)
+                    .orderBy(ChapterTable.chapterIndex, SortOrder.ASC)
+                    .limit(request.size, (request.page * request.size).toLong())
+                    .map { it.toChapter() }
+            Result.Success(Pagination(chapters, request.page, request.size, total))
+        }
+
     override suspend fun addToLibrary(
         connectorId: String,
         externalId: String,
