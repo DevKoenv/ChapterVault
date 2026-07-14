@@ -144,6 +144,11 @@ class OpdsRoutesTest {
                 connectorId: String,
                 externalIds: List<String>,
             ) = Result.Success(emptySet<String>())
+
+            override suspend fun listSeriesByIds(
+                ids: Collection<Id>,
+                request: PageRequest,
+            ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
         }
 
     private val fakeOpdsRead =
@@ -317,6 +322,11 @@ class OpdsRoutesTest {
                     connectorId: String,
                     externalIds: List<String>,
                 ) = Result.Success(emptySet<String>())
+
+                override suspend fun listSeriesByIds(
+                    ids: Collection<Id>,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
             }
         testAppWith(failingLibrary) {
             val res = client.get("/opds/v1/catalog") { basicAuth("user", "pass") }
@@ -500,6 +510,11 @@ class OpdsRoutesTest {
                     connectorId: String,
                     externalIds: List<String>,
                 ) = Result.Success(emptySet<String>())
+
+                override suspend fun listSeriesByIds(
+                    ids: Collection<Id>,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
             }
         testAppWith(emptyLibrary) {
             val res = client.get("/opds/v1/catalog") { basicAuth("user", "pass") }
@@ -539,6 +554,11 @@ class OpdsRoutesTest {
                     connectorId: String,
                     externalIds: List<String>,
                 ) = Result.Success(emptySet<String>())
+
+                override suspend fun listSeriesByIds(
+                    ids: Collection<Id>,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
             }
         testAppWith(paginatedLibrary) {
             val res = client.get("/opds/v1/catalog?page=0&size=20") { basicAuth("user", "pass") }

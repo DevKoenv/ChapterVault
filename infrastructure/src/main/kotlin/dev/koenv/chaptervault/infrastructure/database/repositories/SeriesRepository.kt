@@ -68,6 +68,24 @@ class SeriesRepository(
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
+    override suspend fun listSeriesByIds(ids: Collection<Id>, request: PageRequest): Result<Pagination<Series>> =
+        dbQuery {
+            if (ids.isEmpty()) return@dbQuery Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
+            val idStrings = ids.map { it.toString() }
+            val total = SeriesTable.selectAll().where { SeriesTable.id inList idStrings }.count()
+            val rows =
+                SeriesTable
+                    .selectAll()
+                    .where { SeriesTable.id inList idStrings }
+                    .limit(request.size, (request.page * request.size).toLong())
+                    .toList()
+            val rowIds = rows.map { it[SeriesTable.id] }
+            val genreMap = genresForIds(rowIds)
+            val overrideMap = overridesForIds(rowIds)
+            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty(), overrideMap[it[SeriesTable.id]].orEmpty()) }
+            Result.Success(Pagination(items, request.page, request.size, total))
+        }
+
     override suspend fun searchLibrary(
         query: String,
         request: PageRequest,

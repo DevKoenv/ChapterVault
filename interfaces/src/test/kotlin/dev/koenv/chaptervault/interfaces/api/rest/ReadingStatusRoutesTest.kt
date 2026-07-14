@@ -127,4 +127,14 @@ private class StubReadingStatusApi : ReadingStatusApi {
         userId: Id,
         seriesId: Id,
     ): ReadingStatus? = null
+
+    override suspend fun getAllStatuses(
+        userId: Id,
+        seriesIds: Collection<Id>,
+    ): Map<Id, ReadingStatus> = emptyMap()
+
+    override suspend fun getSeriesIdsWithStatus(
+        userId: Id,
+        status: ReadingStatus,
+    ): Set<Id> = emptySet()
 }

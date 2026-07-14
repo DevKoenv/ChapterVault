@@ -57,6 +57,11 @@ class ConnectorRoutesTest {
                 connectorId: String,
                 externalIds: List<String>,
             ): Result<Set<String>> = Result.Success(inLibraryIds.intersect(externalIds.toSet()))
+
+            override suspend fun listSeriesByIds(
+                ids: Collection<Id>,
+                request: PageRequest,
+            ): Result<Pagination<Series>> = error("not used")
         }
 
     private fun testApp(

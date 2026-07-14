@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.interfaces.api.rest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.AddSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
+import dev.koenv.chaptervault.interfaces.serialization.dto.v1.SeriesDto
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.UpdateSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.mappers.v1.toDto
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
@@ -53,15 +54,15 @@ fun Route.libraryRoutes(
         val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
         val principal = call.principal<KtorPrincipal>()
         when (val result = libraryRead.searchLibrary(q, PageRequest(page, size.coerceIn(1, 100)))) {
-            is Result.Success ->
+            is Result.Success -> {
+                val statusMap =
+                    principal?.let { p ->
+                        readingStatusApi.getAllStatuses(p.user.id, result.value.items.map { it.id })
+                    } ?: emptyMap()
                 call.respond(
                     HttpStatusCode.OK,
                     PaginatedResponse(
-                        items =
-                            result.value.items.map { series ->
-                                val readingStatus = principal?.let { p -> readingStatusApi.getStatus(p.user.id, series.id) }
-                                series.toDto(readingStatus)
-                            },
+                        items = result.value.items.map { it.toDto(statusMap[it.id]) },
                         page = result.value.page,
                         size = result.value.size,
                         totalItems = result.value.totalItems,
@@ -70,6 +71,7 @@ fun Route.libraryRoutes(
                         hasPrevious = result.value.hasPrevious,
                     ),
                 )
+            }
             is Result.Failure -> call.respondError(result.error)
         }
     }
@@ -82,34 +84,52 @@ fun Route.libraryRoutes(
                 runCatching { ReadingStatus.valueOf(s.uppercase()) }.getOrNull()
             }
         val principal = call.principal<KtorPrincipal>()
-        when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
-            is Result.Success -> {
-                val items =
-                    result.value.items
-                        .map { series ->
-                            val readingStatus = principal?.let { p -> readingStatusApi.getStatus(p.user.id, series.id) }
-                            series.toDto(readingStatus)
-                        }.let { dtos ->
-                            if (statusFilter != null) {
-                                dtos.filter { it.readingStatus == statusFilter.name }
-                            } else {
-                                dtos
-                            }
-                        }
-                call.respond(
-                    HttpStatusCode.OK,
-                    PaginatedResponse(
-                        items = items,
-                        page = result.value.page,
-                        size = result.value.size,
-                        totalItems = result.value.totalItems,
-                        totalPages = result.value.totalPages,
-                        hasNext = result.value.hasNext,
-                        hasPrevious = result.value.hasPrevious,
-                    ),
-                )
+
+        if (statusFilter != null) {
+            val userId = principal?.user?.id
+            if (userId == null) {
+                call.respond(HttpStatusCode.OK, PaginatedResponse(emptyList<SeriesDto>(), page, size.coerceIn(1, 100), 0L, 0, hasNext = false, hasPrevious = false))
+                return@get
             }
-            is Result.Failure -> call.respondError(result.error)
+            val matchingIds = readingStatusApi.getSeriesIdsWithStatus(userId, statusFilter)
+            when (val result = libraryRead.listSeriesByIds(matchingIds, PageRequest(page, size.coerceIn(1, 100)))) {
+                is Result.Success ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PaginatedResponse(
+                            items = result.value.items.map { it.toDto(statusFilter) },
+                            page = result.value.page,
+                            size = result.value.size,
+                            totalItems = result.value.totalItems,
+                            totalPages = result.value.totalPages,
+                            hasNext = result.value.hasNext,
+                            hasPrevious = result.value.hasPrevious,
+                        ),
+                    )
+                is Result.Failure -> call.respondError(result.error)
+            }
+        } else {
+            when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
+                is Result.Success -> {
+                    val statusMap =
+                        principal?.let { p ->
+                            readingStatusApi.getAllStatuses(p.user.id, result.value.items.map { it.id })
+                        } ?: emptyMap()
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PaginatedResponse(
+                            items = result.value.items.map { it.toDto(statusMap[it.id]) },
+                            page = result.value.page,
+                            size = result.value.size,
+                            totalItems = result.value.totalItems,
+                            totalPages = result.value.totalPages,
+                            hasNext = result.value.hasNext,
+                            hasPrevious = result.value.hasPrevious,
+                        ),
+                    )
+                }
+                is Result.Failure -> call.respondError(result.error)
+            }
         }
     }
 

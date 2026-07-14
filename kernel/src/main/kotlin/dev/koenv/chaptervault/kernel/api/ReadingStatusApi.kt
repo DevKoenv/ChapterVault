@@ -20,4 +20,14 @@ interface ReadingStatusApi {
         userId: Id,
         seriesId: Id,
     ): ReadingStatus?
+
+    suspend fun getAllStatuses(
+        userId: Id,
+        seriesIds: Collection<Id>,
+    ): Map<Id, ReadingStatus>
+
+    suspend fun getSeriesIdsWithStatus(
+        userId: Id,
+        status: ReadingStatus,
+    ): Set<Id>
 }

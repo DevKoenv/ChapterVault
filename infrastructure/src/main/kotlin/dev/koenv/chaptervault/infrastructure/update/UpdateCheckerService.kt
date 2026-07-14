@@ -40,9 +40,7 @@ class UpdateCheckerService(
     private var latestRelease: GitHubRelease? = null
 
     fun startAsync() {
-        scope.launch {
-            checkForUpdate()
-        }
+        scope.launch { checkForUpdate() }
     }
 
     fun getUpdateInfo(): UpdateInfo {

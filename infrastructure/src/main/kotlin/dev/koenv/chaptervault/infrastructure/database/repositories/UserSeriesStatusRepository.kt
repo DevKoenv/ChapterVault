@@ -8,6 +8,7 @@ import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
@@ -60,5 +61,36 @@ class UserSeriesStatusRepository : ReadingStatusApi {
                 ?.let { row ->
                     runCatching { ReadingStatus.valueOf(row[UserSeriesStatusTable.status]) }.getOrNull()
                 }
+        }
+
+    override suspend fun getAllStatuses(
+        userId: Id,
+        seriesIds: Collection<Id>,
+    ): Map<Id, ReadingStatus> =
+        dbQuery {
+            if (seriesIds.isEmpty()) return@dbQuery emptyMap()
+            UserSeriesStatusTable
+                .selectAll()
+                .where {
+                    (UserSeriesStatusTable.userId eq userId.toString()) and
+                        (UserSeriesStatusTable.seriesId inList seriesIds.map { it.toString() })
+                }.associate { row ->
+                    Id.from(row[UserSeriesStatusTable.seriesId]) to
+                        runCatching { ReadingStatus.valueOf(row[UserSeriesStatusTable.status]) }.getOrThrow()
+                }
+        }
+
+    override suspend fun getSeriesIdsWithStatus(
+        userId: Id,
+        status: ReadingStatus,
+    ): Set<Id> =
+        dbQuery {
+            UserSeriesStatusTable
+                .selectAll()
+                .where {
+                    (UserSeriesStatusTable.userId eq userId.toString()) and
+                        (UserSeriesStatusTable.status eq status.name)
+                }.map { Id.from(it[UserSeriesStatusTable.seriesId]) }
+                .toSet()
         }
 }

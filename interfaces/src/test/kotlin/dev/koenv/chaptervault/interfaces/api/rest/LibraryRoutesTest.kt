@@ -286,6 +286,11 @@ class LibraryRoutesTest {
                         connectorId: String,
                         externalIds: List<String>,
                     ) = Result.Success(emptySet<String>())
+
+                    override suspend fun listSeriesByIds(
+                        ids: Collection<Id>,
+                        request: PageRequest,
+                    ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
                 },
             commandApi = NoOpCommandApi(),
         ) {
@@ -919,6 +924,11 @@ private open class NoOpReadApi : LibraryReadApi {
         connectorId: String,
         externalIds: List<String>,
     ): Result<Set<String>> = Result.Success(emptySet())
+
+    override suspend fun listSeriesByIds(
+        ids: Collection<Id>,
+        request: PageRequest,
+    ) = Result.Success(Pagination(emptyList<Series>(), request.page, request.size, 0L))
 }
 
 private class NoOpCommandApi : LibraryCommandApi {
@@ -1004,6 +1014,16 @@ private class NoOpReadingStatusApi : ReadingStatusApi {
         userId: Id,
         seriesId: Id,
     ): ReadingStatus? = null
+
+    override suspend fun getAllStatuses(
+        userId: Id,
+        seriesIds: Collection<Id>,
+    ): Map<Id, ReadingStatus> = emptyMap()
+
+    override suspend fun getSeriesIdsWithStatus(
+        userId: Id,
+        status: ReadingStatus,
+    ): Set<Id> = emptySet()
 }
 
 private class StubConnector(
