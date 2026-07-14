@@ -78,7 +78,7 @@ class AuthRoutesTest {
     private fun ApplicationTestBuilder.install(auth: AuthApi) {
         application {
             install(ContentNegotiation) { json() }
-            authRoutes(auth)
+            authRoutes(auth, registrationEnabled = true)
         }
     }
 

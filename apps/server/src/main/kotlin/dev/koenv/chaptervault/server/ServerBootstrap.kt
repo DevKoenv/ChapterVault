@@ -185,7 +185,7 @@ fun Application.bootstrap() {
         }
     }
 
-    authRoutes(auth)
+    authRoutes(auth, config.auth.registrationEnabled)
 
     routing {
         authenticate("auth-bearer") {

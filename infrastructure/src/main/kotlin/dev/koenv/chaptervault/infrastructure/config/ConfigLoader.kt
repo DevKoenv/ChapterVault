@@ -87,6 +87,8 @@ object ConfigLoader {
 
                 val auth =
                     (map["auth"] as? Map<*, *>)?.let { a ->
+                        val registrationEnabled =
+                            (a["registrationEnabled"] as? Boolean) ?: derived.auth.registrationEnabled
                         val rl =
                             (a["rateLimiting"] as? Map<*, *>)?.let { r ->
                                 @Suppress("UNCHECKED_CAST")
@@ -121,7 +123,7 @@ object ConfigLoader {
                                     register = register,
                                 )
                             } ?: derived.auth.rateLimiting
-                        AuthConfig(rateLimiting = rl)
+                        AuthConfig(registrationEnabled = registrationEnabled, rateLimiting = rl)
                     } ?: derived.auth
 
                 AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh, debug = debug, auth = auth)
@@ -156,6 +158,10 @@ object ConfigLoader {
           intervalHours: 24
 
         auth:
+          # Allow anyone to create a USER account via POST /auth/register.
+          # When false (default), only the bootstrap admin account is created automatically.
+          # Enable this only if you want to share the server with other users.
+          registrationEnabled: false
           rateLimiting:
             enabled: true
             # Addresses and subnets that bypass rate limiting entirely.
@@ -212,6 +218,12 @@ object ConfigLoader {
                     mockConnectorEnabled =
                         env("CHAPTERVAULT_MOCK_CONNECTOR")?.toBooleanStrictOrNull()
                             ?: base.debug.mockConnectorEnabled,
+                ),
+            auth =
+                base.auth.copy(
+                    registrationEnabled =
+                        env("CHAPTERVAULT_AUTH_REGISTRATION_ENABLED")?.toBooleanStrictOrNull()
+                            ?: base.auth.registrationEnabled,
                 ),
         )
 }

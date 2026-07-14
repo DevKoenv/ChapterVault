@@ -46,6 +46,7 @@ data class LogConfig(
 )
 
 data class AuthConfig(
+    val registrationEnabled: Boolean = false,
     val rateLimiting: RateLimitConfig = RateLimitConfig(),
 )
 

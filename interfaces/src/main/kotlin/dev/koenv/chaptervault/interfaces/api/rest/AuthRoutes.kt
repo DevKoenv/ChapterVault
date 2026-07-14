@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
+import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.shared.result.AppError
@@ -32,9 +33,16 @@ data class UserResponse(
     val roles: List<String>,
 )
 
-fun Application.authRoutes(auth: AuthApi) {
+fun Application.authRoutes(
+    auth: AuthApi,
+    registrationEnabled: Boolean,
+) {
     routing {
         post("/auth/register") {
+            if (!registrationEnabled) {
+                call.respond(HttpStatusCode.Forbidden, ErrorResponse("REGISTRATION_DISABLED", "User registration is disabled on this server"))
+                return@post
+            }
             val request =
                 try {
                     call.receive<LoginRequest>()
