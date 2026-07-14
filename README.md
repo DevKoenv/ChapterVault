@@ -62,6 +62,7 @@ curl -X POST http://localhost:8080/auth/login \
 | `CHAPTERVAULT_ADMIN_USER` | `admin` | Username for the bootstrap admin account |
 | `CHAPTERVAULT_ADMIN_PASS` | `changeme` | Password for the bootstrap admin account |
 | `CHAPTERVAULT_DATA_DIR` | `data` | Root directory for the database, library files, and config |
+| `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED` | `false` | Allow anyone to create a USER account via `POST /auth/register` |
 | `JAVA_OPTS` | _(empty)_ | Extra JVM flags, e.g. `-Xmx512m` |
 
 ### Configuration
@@ -78,6 +79,9 @@ refresh:
   intervalHours: 24    # 0 to disable automatic library refresh
 
 auth:
+  # Set to true only if you want to share the server with other users.
+  # The bootstrap admin account is always created regardless of this flag.
+  registrationEnabled: false
   rateLimiting:
     enabled: true
     # trustedProxies:
@@ -99,7 +103,7 @@ Authorization: Bearer <token>
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Server health check |
-| `POST` | `/auth/register` | Create a user account |
+| `POST` | `/auth/register` | Create a user account (returns `403` when `registrationEnabled` is false) |
 | `POST` | `/auth/login` | Authenticate, receive session token |
 | `POST` | `/auth/logout` | Invalidate session token |
 

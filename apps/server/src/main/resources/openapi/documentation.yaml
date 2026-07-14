@@ -317,6 +317,10 @@ paths:
     post:
       tags: [auth]
       summary: Register a new user
+      description: |
+        Creates a new USER account. Requires `auth.registrationEnabled: true` in `config.yaml`
+        (or env var `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED=true`); returns 403 otherwise.
+        The bootstrap admin account is created automatically regardless of this flag.
       security: []
       requestBody:
         required: true
@@ -330,6 +334,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/UserResponse" }
         "400": { description: Invalid request body }
+        "403": { description: Registration is disabled on this server (REGISTRATION_DISABLED) }
         "409": { description: Username already taken }
         "429":
           description: Too many registration attempts from this IP; rate limit exceeded
