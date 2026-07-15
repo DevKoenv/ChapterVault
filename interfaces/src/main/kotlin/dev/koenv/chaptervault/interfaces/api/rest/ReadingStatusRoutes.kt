@@ -10,7 +10,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
-import io.ktor.server.routing.put
+import io.ktor.server.routing.patch
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -19,25 +19,25 @@ private data class SetReadingStatusRequest(
 )
 
 fun Route.readingStatusRoutes(readingStatusApi: ReadingStatusApi) {
-    put("/library/series/{id}/status") {
+    patch("/library/series/{id}/status") {
         val principal =
             call.principal<KtorPrincipal>() ?: run {
                 call.respondForbidden()
-                return@put
+                return@patch
             }
         val seriesId =
             try {
                 Id.from(call.parameters["id"]!!)
             } catch (e: Exception) {
                 call.respondBadRequest("Invalid series ID")
-                return@put
+                return@patch
             }
         val request =
             try {
                 call.receive<SetReadingStatusRequest>()
             } catch (e: Exception) {
                 call.respondBadRequest("Invalid request body")
-                return@put
+                return@patch
             }
         val status =
             runCatching { ReadingStatus.valueOf(request.status) }.getOrNull()
@@ -45,7 +45,7 @@ fun Route.readingStatusRoutes(readingStatusApi: ReadingStatusApi) {
                     call.respondBadRequest(
                         "Invalid status '${request.status}'. Valid values: ${ReadingStatus.entries.joinToString { it.name }}",
                     )
-                    return@put
+                    return@patch
                 }
         when (val result = readingStatusApi.setStatus(principal.user.id, seriesId, status)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)

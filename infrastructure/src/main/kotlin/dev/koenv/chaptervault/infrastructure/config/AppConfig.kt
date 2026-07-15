@@ -48,6 +48,7 @@ data class LogConfig(
 data class AuthConfig(
     val registrationEnabled: Boolean = false,
     val rateLimiting: RateLimitConfig = RateLimitConfig(),
+    val sessionCleanupIntervalHours: Int = 24,
 )
 
 data class RateLimitConfig(

@@ -7,6 +7,7 @@ fun Chapter.toDto(): ChapterDto =
     ChapterDto(
         id = id.toString(),
         seriesId = seriesId.toString(),
+        externalId = externalId,
         title = title,
         chapterIndex = chapterIndex,
         downloadStatus = downloadStatus.name,

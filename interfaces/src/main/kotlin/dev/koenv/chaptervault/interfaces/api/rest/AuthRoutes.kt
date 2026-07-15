@@ -60,6 +60,7 @@ fun Application.authRoutes(
                             id = result.value.id.toString(),
                             username = result.value.username,
                             roles = result.value.roles.map { it.name },
+                            createdAt = result.value.createdAt.toString(),
                         ),
                     )
                 is Result.Failure -> call.respondError(result.error)

@@ -45,18 +45,19 @@ class UserRepository : AuthApi {
             }
             val id = Id.generate()
             val hash = BCrypt.hashpw(credentials.password, BCrypt.gensalt())
+            val now = Instant.now()
             try {
                 UserTable.insert {
                     it[UserTable.id] = id.toString()
                     it[UserTable.username] = credentials.username
                     it[UserTable.passwordHash] = hash
                     it[UserTable.roles] = role.name
-                    it[UserTable.createdAt] = Instant.now().toKotlinInstant()
+                    it[UserTable.createdAt] = now.toKotlinInstant()
                 }
             } catch (e: org.jetbrains.exposed.exceptions.ExposedSQLException) {
                 return@dbQuery Result.Failure(AppError.Conflict("Username '${credentials.username}' already taken"))
             }
-            Result.Success(UserPrincipal(id = id, username = credentials.username, roles = setOf(role)))
+            Result.Success(UserPrincipal(id = id, username = credentials.username, roles = setOf(role), createdAt = now))
         }
 
     override suspend fun authenticate(credentials: Credentials): Result<Pair<UserPrincipal, Session>> =
@@ -215,6 +216,7 @@ class UserRepository : AuthApi {
             id = Id.from(this[UserTable.id]),
             username = this[UserTable.username],
             roles = roles,
+            createdAt = this[UserTable.createdAt].toJavaInstant(),
         )
     }
 

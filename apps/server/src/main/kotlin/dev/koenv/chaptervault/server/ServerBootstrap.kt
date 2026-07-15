@@ -13,7 +13,6 @@ import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.backupRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
-import dev.koenv.chaptervault.interfaces.api.rest.extensionReloadRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
@@ -128,7 +127,6 @@ fun Application.bootstrap() {
         }
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
-        allowMethod(HttpMethod.Put)
         allowMethod(HttpMethod.Delete)
         allowMethod(HttpMethod.Patch)
     }
@@ -169,9 +167,13 @@ fun Application.bootstrap() {
             realm = "ChapterVault"
             validate { credential ->
                 val key = basicAuthCacheKey(credential.name, credential.password)
+                val now = System.currentTimeMillis()
                 val cached = basicAuthCache[key]
-                if (cached != null && cached.second > System.currentTimeMillis()) {
+                if (cached != null && cached.second > now) {
                     return@validate cached.first
+                }
+                if (basicAuthCache.size > 500) {
+                    basicAuthCache.entries.removeIf { (_, v) -> v.second <= now }
                 }
                 when (val result = auth.validateCredentials(Credentials(credential.name, credential.password))) {
                     is Result.Success ->
@@ -197,7 +199,6 @@ fun Application.bootstrap() {
             readingStatusRoutes(readingStatusApi)
             notificationRoutes(notificationApi, notificationDispatch)
             extensionRoutes(extensionLoaderService)
-            extensionReloadRoutes(extensionLoaderService)
             sseRoutes(projectionService)
         }
     }
@@ -273,8 +274,9 @@ fun Application.bootstrap() {
     launch { refreshScheduler.start() }
     launch {
         auth.cleanupExpiredSessions()
+        val cleanupIntervalMs = config.auth.sessionCleanupIntervalHours * 60 * 60 * 1000L
         while (true) {
-            delay(24 * 60 * 60 * 1000L)
+            delay(cleanupIntervalMs)
             auth.cleanupExpiredSessions()
         }
     }

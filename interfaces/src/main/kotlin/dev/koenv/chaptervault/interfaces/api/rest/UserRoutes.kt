@@ -43,6 +43,7 @@ fun Route.userRoutes(auth: AuthApi) {
                 id = principal.user.id.toString(),
                 username = principal.user.username,
                 roles = principal.user.roles.map { it.name },
+                createdAt = principal.user.createdAt.toString(),
             ),
         )
     }
@@ -81,7 +82,7 @@ fun Route.userRoutes(auth: AuthApi) {
             is Result.Success ->
                 call.respond(
                     HttpStatusCode.OK,
-                    result.value.map { UserDto(id = it.id.toString(), username = it.username, roles = it.roles.map { r -> r.name }) },
+                    result.value.map { UserDto(id = it.id.toString(), username = it.username, roles = it.roles.map { r -> r.name }, createdAt = it.createdAt.toString()) },
                 )
             is Result.Failure -> call.respondError(result.error)
         }
@@ -145,6 +146,7 @@ fun Route.userRoutes(auth: AuthApi) {
                         id = result.value.id.toString(),
                         username = result.value.username,
                         roles = result.value.roles.map { it.name },
+                        createdAt = result.value.createdAt.toString(),
                     ),
                 )
             is Result.Failure -> call.respondError(result.error)

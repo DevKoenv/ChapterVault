@@ -8,7 +8,7 @@ import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
-import io.ktor.client.request.put
+import io.ktor.client.request.patch
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -51,10 +51,10 @@ class ReadingStatusRoutesTest {
         }
 
     @Test
-    fun `PUT status returns 204`() =
+    fun `PATCH status returns 204`() =
         testApp {
             val res =
-                client.put("/library/series/$seriesId/status") {
+                client.patch("/library/series/$seriesId/status") {
                     bearerAuth("user-token")
                     contentType(ContentType.Application.Json)
                     setBody("""{"status":"READING"}""")
@@ -63,10 +63,10 @@ class ReadingStatusRoutesTest {
         }
 
     @Test
-    fun `PUT status returns 400 for unknown status value`() =
+    fun `PATCH status returns 400 for unknown status value`() =
         testApp {
             val res =
-                client.put("/library/series/$seriesId/status") {
+                client.patch("/library/series/$seriesId/status") {
                     bearerAuth("user-token")
                     contentType(ContentType.Application.Json)
                     setBody("""{"status":"INVALID"}""")
@@ -93,10 +93,10 @@ class ReadingStatusRoutesTest {
             }
 
         @Test
-        fun `PUT status returns 403 when principal is missing`() =
+        fun `PATCH status returns 403 when principal is missing`() =
             testAppNoAuth {
                 val res =
-                    client.put("/library/series/$seriesId/status") {
+                    client.patch("/library/series/$seriesId/status") {
                         contentType(ContentType.Application.Json)
                         setBody("""{"status":"READING"}""")
                     }

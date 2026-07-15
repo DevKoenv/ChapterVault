@@ -65,4 +65,28 @@ fun Route.extensionRoutes(loaderService: ExtensionManager) {
         loaderService.disable(id)
         call.respond(HttpStatusCode.NoContent)
     }
+
+    post("/extensions/{id}/reload") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respondForbidden()
+            return@post
+        }
+        val id = call.parameters["id"] ?: return@post call.respondBadRequest("Missing extension id")
+        loaderService.findById(id) ?: return@post call.respondError(AppError.NotFound("Extension", id))
+        loaderService.reload(id)
+        call.respond(HttpStatusCode.NoContent)
+    }
+
+    post("/extensions/{id}/unload") {
+        val principal = call.principal<KtorPrincipal>()
+        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
+            call.respondForbidden()
+            return@post
+        }
+        val id = call.parameters["id"] ?: return@post call.respondBadRequest("Missing extension id")
+        loaderService.findById(id) ?: return@post call.respondError(AppError.NotFound("Extension", id))
+        loaderService.unload(id)
+        call.respond(HttpStatusCode.NoContent)
+    }
 }

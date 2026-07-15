@@ -69,7 +69,7 @@ class ExtensionReloadRoutesTest {
             }
             routing {
                 authenticate("auth-bearer") {
-                    extensionReloadRoutes(manager)
+                    extensionRoutes(manager)
                 }
             }
         }
