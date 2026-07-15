@@ -50,6 +50,7 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
@@ -60,12 +61,14 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.plugins.swagger.swaggerUI
+import io.ktor.server.request.contentLength
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.uri
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.get
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import kotlinx.coroutines.delay
@@ -82,6 +85,17 @@ private val logger = KotlinLogging.logger("ServerBootstrap")
 
 private val basicAuthCache = ConcurrentHashMap<String, Pair<KtorPrincipal, Long>>()
 private const val BASIC_AUTH_CACHE_TTL_MS = 60_000L
+private const val MAX_REQUEST_BODY_BYTES = 10L * 1024 * 1024 // 10 MB
+
+private val RequestBodyLimit =
+    createApplicationPlugin("RequestBodyLimit") {
+        onCall { call ->
+            val length = call.request.contentLength()
+            if (length != null && length > MAX_REQUEST_BODY_BYTES) {
+                call.respond(HttpStatusCode.PayloadTooLarge, ErrorResponse("PAYLOAD_TOO_LARGE", "Request body must not exceed 10 MB"))
+            }
+        }
+    }
 
 private fun basicAuthCacheKey(
     name: String,
@@ -135,6 +149,7 @@ fun Application.bootstrap() {
     install(AuthRateLimiting) {
         this.config = appRateLimitConfig
     }
+    install(RequestBodyLimit)
 
     val libraryRead by inject<LibraryReadApi>()
     val libraryCommand by inject<LibraryCommandApi>()
@@ -186,20 +201,41 @@ fun Application.bootstrap() {
         }
     }
 
-    authRoutes(auth, config.auth.registrationEnabled)
-
     routing {
-        authenticate("auth-bearer") {
-            userRoutes(auth)
-            libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage, connectorRegistry, readingStatusApi)
-            taskRoutes(system)
-            connectorRoutes(connectorRegistry, libraryRead)
-            progressRoutes(progressApi)
-            backupRoutes(backupApi)
-            readingStatusRoutes(readingStatusApi)
-            notificationRoutes(notificationApi, notificationDispatch)
-            extensionRoutes(extensionLoaderService)
-            sseRoutes(projectionService)
+        route("/api/v1") {
+            authRoutes(auth, config.auth.registrationEnabled)
+
+            // cover images are served without auth, they're thumbnails not content
+            get("/library/series/{id}/cover") {
+                val id =
+                    try {
+                        Id.from(call.parameters["id"]!!)
+                    } catch (e: Exception) {
+                        call.respondBadRequest("Invalid series ID")
+                        return@get
+                    }
+                when (val result = fileStorage.readCover(id.toString())) {
+                    is Result.Failure -> call.respondError(result.error)
+                    is Result.Success -> {
+                        val (bytes, mimeType) = result.value
+                        call.respondBytes(bytes, ContentType.parse(mimeType))
+                    }
+                }
+            }
+
+            authenticate("auth-bearer") {
+                userRoutes(auth)
+                libraryRoutes(libraryRead, libraryCommand, taskQueue, fileStorage, connectorRegistry, readingStatusApi)
+                taskRoutes(system)
+                connectorRoutes(connectorRegistry, libraryRead)
+                progressRoutes(progressApi)
+                backupRoutes(backupApi)
+                readingStatusRoutes(readingStatusApi)
+                notificationRoutes(notificationApi, notificationDispatch)
+                extensionRoutes(extensionLoaderService)
+                sseRoutes(projectionService)
+                systemRoutes(updateCheckerService)
+            }
         }
     }
 
@@ -235,32 +271,6 @@ fun Application.bootstrap() {
                     }
                 }
             }
-        }
-    }
-
-    // cover images are served without auth, they're thumbnails not content
-    routing {
-        get("/library/series/{id}/cover") {
-            val id =
-                try {
-                    Id.from(call.parameters["id"]!!)
-                } catch (e: Exception) {
-                    call.respondBadRequest("Invalid series ID")
-                    return@get
-                }
-            when (val result = fileStorage.readCover(id.toString())) {
-                is Result.Failure -> call.respondError(result.error)
-                is Result.Success -> {
-                    val (bytes, mimeType) = result.value
-                    call.respondBytes(bytes, ContentType.parse(mimeType))
-                }
-            }
-        }
-    }
-
-    routing {
-        authenticate("auth-bearer") {
-            systemRoutes(updateCheckerService)
         }
     }
 

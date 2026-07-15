@@ -8,6 +8,7 @@ import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
+import io.ktor.client.request.delete
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -19,6 +20,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
@@ -112,7 +114,7 @@ class AuthRoutesTest {
     private fun ApplicationTestBuilder.install(auth: AuthApi) {
         application {
             install(ContentNegotiation) { json() }
-            authRoutes(auth, registrationEnabled = true)
+            routing { authRoutes(auth, registrationEnabled = true) }
         }
     }
 
@@ -145,11 +147,11 @@ class AuthRoutesTest {
     }
 
     @Test
-    fun `POST auth-logout returns 204`() {
+    fun `DELETE auth-logout returns 204`() {
         testApplication {
             install(happyAuth)
             val response =
-                client.post("/auth/logout") {
+                client.delete("/auth/logout") {
                     header(HttpHeaders.Authorization, "Bearer test-token-abc")
                 }
             assertEquals(HttpStatusCode.NoContent, response.status)
