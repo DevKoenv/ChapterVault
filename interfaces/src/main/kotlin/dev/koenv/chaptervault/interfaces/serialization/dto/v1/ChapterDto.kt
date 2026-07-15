@@ -6,7 +6,6 @@ import kotlinx.serialization.Serializable
 data class ChapterDto(
     val id: String,
     val seriesId: String,
-    val externalId: String?,
     val title: String,
     val chapterIndex: Double,
     val downloadStatus: String,
