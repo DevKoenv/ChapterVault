@@ -46,7 +46,7 @@ import io.ktor.server.sse.SSE
 import org.koin.ktor.ext.inject
 import org.slf4j.event.Level
 
-private val logger = KotlinLogging.logger("ServerBootstrap")
+private val logger = KotlinLogging.logger {}
 
 fun Application.bootstrap() {
     val config by inject<dev.koenv.chaptervault.infrastructure.config.AppConfig>()
