@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:OpdsRoutes.kt$fun Application.opdsRoutes( libraryRead: LibraryReadApi, opdsRead: OpdsReadApi, pageSource: ChapterPageSource, )</ID>
+    <ID>EmptyFunctionBlock:ConnectorExtensionAdapter.kt$ConnectorExtensionAdapter${}</ID>
+    <ID>ForbiddenComment:CustomConnector.kt$CustomConnector$// TODO: adjust endpoint path</ID>
+    <ID>ForbiddenComment:CustomConnector.kt$CustomConnector$// TODO: adjust endpoint path and params for your search API</ID>
+    <ID>ForbiddenComment:CustomConnector.kt$CustomConnector$// TODO: adjust endpoint path, chapter.externalId comes from fetchChapters</ID>
+    <ID>ForbiddenComment:CustomConnector.kt$CustomConnector$// TODO: change id and name to match your site</ID>
+    <ID>ForbiddenComment:CustomConnector.kt$CustomConnector$// TODO: replace with your site's base URL</ID>
+    <ID>LongParameterList:FeedBuilder.kt$FeedBuilder$( series: List&lt;Series>, page: Int, size: Int, totalItems: Long, now: String, genre: String? = null, language: String? = null, upstreamStatus: String? = null, )</ID>
+    <ID>LongParameterList:LibraryCommandApi.kt$LibraryCommandApi$( id: Id, autoDownload: Boolean? = null, defaultFormat: ChapterFormat? = null, title: String? = null, coverUrl: String? = null, description: String? = null, author: String? = null, artist: String? = null, year: Int? = null, upstreamStatus: UpstreamStatus? = null, genres: List&lt;String>? = null, clearFields: Set&lt;String> = emptySet(), )</ID>
+    <ID>LongParameterList:Routing.kt$( config: AppConfig, auth: AuthApi, libraryRead: LibraryReadApi, libraryCommand: LibraryCommandApi, taskQueue: TaskQueue, system: SystemApi, connectorRegistry: ConnectorRegistry, projectionService: EventProjectionService, progressApi: ProgressApi, backupApi: BackupApi, readingStatusApi: ReadingStatusApi, notificationApi: NotificationApi, notificationDispatch: NotificationDispatchApi, extensionLoaderService: ExtensionLoaderService, updateCheckerService: UpdateCheckerService, opdsRead: OpdsReadApi, fileStorage: FileStorage, )</ID>
+    <ID>MatchingDeclarationName:SystemRoutes.kt$UpdateInfoDto</ID>
+    <ID>TooManyFunctions:SeriesRepository.kt$SeriesRepository : LibraryReadApiLibraryCommandApi</ID>
+  </CurrentIssues>
+</SmellBaseline>

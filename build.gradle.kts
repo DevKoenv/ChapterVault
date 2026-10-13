@@ -2,6 +2,7 @@ group = "dev.koenv.chaptervault"
 version = "1.0.0"
 
 plugins {
+    base
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
@@ -38,6 +39,7 @@ kover {
 detekt {
     config.setFrom("$rootDir/detekt.yml")
     buildUponDefaultConfig = true
+    baseline = file("$rootDir/detekt-baseline.xml")
     source.setFrom(
         fileTree(rootDir) {
             include("**/src/main/kotlin/**/*.kt", "**/src/main/kotlin/**/*.kts")
@@ -53,8 +55,7 @@ tasks.register("coverage") {
     dependsOn("koverHtmlReport", "koverXmlReport")
 }
 
-tasks.register("check") {
-    group = "verification"
-    description = "Run all checks including detekt analysis."
+// `check` is the standard lifecycle task from the base plugin (subprojects' check runs tests and ktlint); detekt is an extra dependency
+tasks.named("check") {
     dependsOn("detekt")
 }
