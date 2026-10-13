@@ -3,6 +3,12 @@ plugins {
     id("org.jlleitschuh.gradle.ktlint")
 }
 
+ktlint {
+    filter {
+        exclude { it.file.invariantSeparatorsPath.contains("/build/generated/") }
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
