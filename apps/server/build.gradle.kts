@@ -52,4 +52,5 @@ dependencies {
     implementation(libs.logback.classic)
 
     testImplementation(libs.bundles.testing)
+    testImplementation(libs.ktor.server.test.host)
 }
