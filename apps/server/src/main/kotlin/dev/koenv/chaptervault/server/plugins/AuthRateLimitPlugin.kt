@@ -17,6 +17,10 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import java.util.concurrent.ConcurrentHashMap
 
+// matched as suffixes so the plugin doesn't depend on the prefix the auth routes are mounted under (/api/v1)
+private const val LOGIN_PATH_SUFFIX = "/auth/login"
+private const val REGISTER_PATH_SUFFIX = "/auth/register"
+
 class AuthRateLimitPluginConfig {
     var config: RateLimitConfig = RateLimitConfig()
 }
@@ -42,8 +46,10 @@ val AuthRateLimiting =
             xForwardedFor: String?,
         ): String {
             if (xForwardedFor != null && trustedProxyMatchers.any { it.matches(remoteAddress) }) {
-                val ips = xForwardedFor.split(",").map { it.trim() }
-                return ips.firstOrNull { ip -> trustedProxyMatchers.none { it.matches(ip) } } ?: remoteAddress
+                // walk from the right: every entry up to the last trusted proxy was appended by our own
+                // infrastructure, while anything further left is client-controlled and can be forged
+                val ips = xForwardedFor.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                return ips.lastOrNull { ip -> trustedProxyMatchers.none { it.matches(ip) } } ?: remoteAddress
             }
             return remoteAddress
         }
@@ -51,7 +57,8 @@ val AuthRateLimiting =
         application.intercept(ApplicationCallPipeline.Plugins) {
             val method = call.request.httpMethod
             val uri = call.request.uri.substringBefore("?")
-            val isRateLimited = method == HttpMethod.Post && (uri == "/auth/login" || uri == "/auth/register")
+            val isRateLimited =
+                method == HttpMethod.Post && (uri.endsWith(LOGIN_PATH_SUFFIX) || uri.endsWith(REGISTER_PATH_SUFFIX))
             if (!isRateLimited) return@intercept
 
             val remoteAddress = call.request.local.remoteAddress
@@ -61,9 +68,9 @@ val AuthRateLimiting =
             if (trustedNetworkMatchers.any { it.matches(clientIp) }) return@intercept
 
             val (limiters, cfg) =
-                when (uri) {
-                    "/auth/login" -> loginLimiters to rateLimitConfig.login
-                    "/auth/register" -> registerLimiters to rateLimitConfig.register
+                when {
+                    uri.endsWith(LOGIN_PATH_SUFFIX) -> loginLimiters to rateLimitConfig.login
+                    uri.endsWith(REGISTER_PATH_SUFFIX) -> registerLimiters to rateLimitConfig.register
                     else -> return@intercept
                 }
 
