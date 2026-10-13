@@ -36,7 +36,7 @@ object ConfigLoader {
                 derived
             } else {
                 @Suppress("UNCHECKED_CAST")
-                val map = Yaml().load<Map<String, Any>>(file.inputStream()) ?: return applyEnv(derived, env)
+                val map = file.inputStream().use { Yaml().load<Map<String, Any>>(it) } ?: return applyEnv(derived, env)
 
                 val server =
                     (map["server"] as? Map<*, *>)?.let { s ->
