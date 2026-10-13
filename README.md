@@ -62,7 +62,7 @@ curl -X POST http://localhost:8080/auth/login \
 | `CHAPTERVAULT_ADMIN_USER` | `admin` | Username for the bootstrap admin account |
 | `CHAPTERVAULT_ADMIN_PASS` | `changeme` | Password for the bootstrap admin account |
 | `CHAPTERVAULT_DATA_DIR` | `data` | Root directory for the database, library files, and config |
-| `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED` | `false` | Allow anyone to create a USER account via `POST /auth/register` |
+| `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED` | `false` | Allow anyone to create a USER account via `POST /api/v1/auth/register` |
 | `JAVA_OPTS` | _(empty)_ | Extra JVM flags, e.g. `-Xmx512m` |
 
 ### Configuration
@@ -88,11 +88,35 @@ auth:
     #   - "172.18.0.1"  # set this if running behind a reverse proxy
 ```
 
+#### Rate limiting behind a reverse proxy
+
+Login and register attempts are rate limited per client IP. Two settings decide which IP that is:
+
+- `trustedProxies`: addresses of your reverse proxy. Only when the direct connection comes from one of these is the
+  `X-Forwarded-For` header used, and the client is the rightmost address in it that is not itself a trusted proxy.
+  When the connection comes from anywhere else the header is ignored.
+- `trustedNetworks`: clients in these ranges are exempt from rate limiting. The defaults cover loopback and all
+  private networks.
+
+With the defaults and no `trustedProxies`, a reverse proxy on the same host or Docker network makes every request look
+like it comes from a private address, so rate limiting is effectively off. When running behind a proxy, set
+`trustedProxies` to the proxy's address and remove the private ranges from `trustedNetworks` (keep only what should
+really be exempt). The server logs a warning at startup when it detects the default combination.
+
+```yaml
+auth:
+  rateLimiting:
+    trustedProxies:
+      - "172.18.0.1"
+    trustedNetworks:
+      - "127.0.0.0/8"
+```
+
 ---
 
 ## API overview
 
-All endpoints except `/health`, `/auth/login`, and `/auth/register` require a Bearer token:
+All endpoints except `/health`, `/api/v1/auth/login`, and `/api/v1/auth/register` require a Bearer token:
 
 ```
 Authorization: Bearer <token>
@@ -103,11 +127,11 @@ Authorization: Bearer <token>
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Server health check |
-| `POST` | `/auth/register` | Create a user account (returns `403` when `registrationEnabled` is false) |
-| `POST` | `/auth/login` | Authenticate, receive session token |
-| `POST` | `/auth/logout` | Invalidate session token |
-| `GET` | `/auth/me` | Return the current user's id, username, and roles |
-| `POST` | `/auth/change-password` | Change the current user's password |
+| `POST` | `/api/v1/auth/register` | Create a user account (returns `403` when `registrationEnabled` is false) |
+| `POST` | `/api/v1/auth/login` | Authenticate, receive session token |
+| `POST` | `/api/v1/auth/logout` | Invalidate session token |
+| `GET` | `/api/v1/auth/me` | Return the current user's id, username, and roles |
+| `POST` | `/api/v1/auth/change-password` | Change the current user's password |
 
 ### User management (ADMIN)
 
