@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.server
+package dev.koenv.chaptervault.server.extensions
 
 import dev.koenv.chaptervault.kernel.extension.ManagedConfig
 import dev.koenv.chaptervault.kernel.extension.YamlConfig

@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.server
+package dev.koenv.chaptervault.server.extensions
 
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi

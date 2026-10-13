@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.server
+package dev.koenv.chaptervault.server.config
 
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import io.github.oshai.kotlinlogging.KotlinLogging

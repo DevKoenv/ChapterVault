@@ -2,6 +2,7 @@ package dev.koenv.chaptervault.server
 
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
+import dev.koenv.chaptervault.server.di.DependencyInjection
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import org.koin.java.KoinJavaComponent.getKoin

@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.server
+package dev.koenv.chaptervault.server.extensions
 
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path

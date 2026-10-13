@@ -1,4 +1,4 @@
-package dev.koenv.chaptervault.server
+package dev.koenv.chaptervault.server.di
 
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.database.DatabaseFactory
@@ -7,6 +7,7 @@ import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderSe
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.server.config.ConfigValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
