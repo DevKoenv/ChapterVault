@@ -33,7 +33,10 @@ object DependencyInjection {
         val adminUser = System.getenv("CHAPTERVAULT_ADMIN_USER") ?: "admin"
         val adminPass = System.getenv("CHAPTERVAULT_ADMIN_PASS") ?: "changeme"
         if (adminPass == "changeme") {
-            logger.warn { "CHAPTERVAULT_ADMIN_PASS is set to the default value 'changeme'. Change it before exposing this server publicly." }
+            logger.warn {
+                "CHAPTERVAULT_ADMIN_PASS is set to the default value 'changeme'. " +
+                    "Change it before exposing this server publicly."
+            }
         }
         runBlocking {
             try {

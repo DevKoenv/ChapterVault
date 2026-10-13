@@ -137,7 +137,10 @@ fun Application.bootstrap() {
     notificationService.start()
 
     launchBackgroundJobs(config, auth, projectionService, executor, refreshScheduler)
-    logger.info { "ChapterVault v${BuildConfig.VERSION} (rev ${BuildConfig.REVISION}) listening on http://${config.server.host}:${config.server.port}" }
+    logger.info {
+        "ChapterVault v${BuildConfig.VERSION} (rev ${BuildConfig.REVISION}) " +
+            "listening on http://${config.server.host}:${config.server.port}"
+    }
     updateCheckerService.startAsync()
 
     configureSwagger()
