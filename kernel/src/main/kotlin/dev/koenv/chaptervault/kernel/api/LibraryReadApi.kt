@@ -13,7 +13,10 @@ interface LibraryReadApi {
 
     suspend fun listSeries(request: PageRequest): Result<Pagination<Series>>
 
-    suspend fun listSeriesByIds(ids: Collection<Id>, request: PageRequest): Result<Pagination<Series>>
+    suspend fun listSeriesByIds(
+        ids: Collection<Id>,
+        request: PageRequest,
+    ): Result<Pagination<Series>>
 
     suspend fun searchLibrary(
         query: String,

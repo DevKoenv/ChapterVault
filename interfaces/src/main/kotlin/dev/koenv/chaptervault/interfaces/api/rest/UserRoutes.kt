@@ -82,7 +82,17 @@ fun Route.userRoutes(auth: AuthApi) {
             is Result.Success ->
                 call.respond(
                     HttpStatusCode.OK,
-                    result.value.map { UserDto(id = it.id.toString(), username = it.username, roles = it.roles.map { r -> r.name }, createdAt = it.createdAt.toString()) },
+                    result.value.map {
+                        UserDto(
+                            id = it.id.toString(),
+                            username = it.username,
+                            roles =
+                                it.roles.map { r ->
+                                    r.name
+                                },
+                            createdAt = it.createdAt.toString(),
+                        )
+                    },
                 )
             is Result.Failure -> call.respondError(result.error)
         }

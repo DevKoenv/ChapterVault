@@ -12,9 +12,9 @@ import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.kernel.library.ReadingStatus
-import dev.koenv.chaptervault.kernel.library.UpstreamStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
+import dev.koenv.chaptervault.kernel.library.UpstreamStatus
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskType

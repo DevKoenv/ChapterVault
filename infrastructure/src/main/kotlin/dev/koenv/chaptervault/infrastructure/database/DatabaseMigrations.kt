@@ -207,7 +207,7 @@ private fun v1Statements(): List<String> =
         "CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_uq ON sessions (token)",
         "CREATE UNIQUE INDEX IF NOT EXISTS chapters_series_external_uq ON chapters (series_id, external_id) WHERE external_id IS NOT NULL",
         "CREATE INDEX IF NOT EXISTS idx_chapters_series_id ON chapters (series_id)",
-"CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)",
         "CREATE INDEX IF NOT EXISTS idx_uss_user_id ON user_series_status (user_id)",
         "CREATE INDEX IF NOT EXISTS idx_series_genres_series_id ON series_genres (series_id)",
         "CREATE INDEX IF NOT EXISTS idx_usp_user_id ON user_series_progress (user_id)",

@@ -64,7 +64,10 @@ class SeriesRepository(
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
-    override suspend fun listSeriesByIds(ids: Collection<Id>, request: PageRequest): Result<Pagination<Series>> =
+    override suspend fun listSeriesByIds(
+        ids: Collection<Id>,
+        request: PageRequest,
+    ): Result<Pagination<Series>> =
         dbQuery {
             if (ids.isEmpty()) return@dbQuery Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
             val idStrings = ids.map { it.toString() }
@@ -358,12 +361,36 @@ class SeriesRepository(
                 if (autoDownload != null) it[SeriesTable.autoDownload] = autoDownload
                 if (defaultFormat != null) it[SeriesTable.defaultFormat] = defaultFormat.toString()
                 if (title != null) it[SeriesTable.title] = title
-                if (coverUrl != null) it[SeriesTable.coverUrl] = coverUrl else if ("coverUrl" in clearFields) it[SeriesTable.coverUrl] = null
-                if (description != null) it[SeriesTable.description] = description else if ("description" in clearFields) it[SeriesTable.description] = null
-                if (author != null) it[SeriesTable.author] = author else if ("author" in clearFields) it[SeriesTable.author] = null
-                if (artist != null) it[SeriesTable.artist] = artist else if ("artist" in clearFields) it[SeriesTable.artist] = null
-                if (year != null) it[SeriesTable.year] = year else if ("year" in clearFields) it[SeriesTable.year] = null
-                if (upstreamStatus != null) it[SeriesTable.upstreamStatus] = upstreamStatus.name else if ("upstreamStatus" in clearFields) it[SeriesTable.upstreamStatus] = null
+                if (coverUrl != null) {
+                    it[SeriesTable.coverUrl] = coverUrl
+                } else if ("coverUrl" in clearFields) {
+                    it[SeriesTable.coverUrl] = null
+                }
+                if (description != null) {
+                    it[SeriesTable.description] = description
+                } else if ("description" in clearFields) {
+                    it[SeriesTable.description] = null
+                }
+                if (author != null) {
+                    it[SeriesTable.author] = author
+                } else if ("author" in clearFields) {
+                    it[SeriesTable.author] = null
+                }
+                if (artist != null) {
+                    it[SeriesTable.artist] = artist
+                } else if ("artist" in clearFields) {
+                    it[SeriesTable.artist] = null
+                }
+                if (year != null) {
+                    it[SeriesTable.year] = year
+                } else if ("year" in clearFields) {
+                    it[SeriesTable.year] = null
+                }
+                if (upstreamStatus != null) {
+                    it[SeriesTable.upstreamStatus] = upstreamStatus.name
+                } else if ("upstreamStatus" in clearFields) {
+                    it[SeriesTable.upstreamStatus] = null
+                }
                 it[SeriesTable.userEditedFields] = tracked.joinToString(",")
                 it[SeriesTable.updatedAt] = Instant.now().toKotlinInstant()
             }

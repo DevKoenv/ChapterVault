@@ -133,8 +133,9 @@ class CustomConnector(
         format: ChapterFormat,
     ): Result<DownloadResult> {
         // TODO: adjust endpoint path, chapter.externalId comes from fetchChapters
-        val chapterExternalId = chapter.externalId
-            ?: return Result.Failure(AppError.InternalError("Cannot download chapter ${chapter.id}: no external ID"))
+        val chapterExternalId =
+            chapter.externalId
+                ?: return Result.Failure(AppError.InternalError("Cannot download chapter ${chapter.id}: no external ID"))
         val response =
             context.getJson<ApiChapterPages>(
                 url = "$baseUrl/api/chapters/$chapterExternalId/pages",

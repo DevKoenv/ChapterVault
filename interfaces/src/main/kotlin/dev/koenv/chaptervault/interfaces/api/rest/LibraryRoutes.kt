@@ -89,7 +89,10 @@ fun Route.libraryRoutes(
         if (statusFilter != null) {
             val userId = principal?.user?.id
             if (userId == null) {
-                call.respond(HttpStatusCode.OK, PaginatedResponse(emptyList<SeriesDto>(), page, size.coerceIn(1, 100), 0L, 0, hasNext = false, hasPrevious = false))
+                call.respond(
+                    HttpStatusCode.OK,
+                    PaginatedResponse(emptyList<SeriesDto>(), page, size.coerceIn(1, 100), 0L, 0, hasNext = false, hasPrevious = false),
+                )
                 return@get
             }
             val matchingIds = readingStatusApi.getSeriesIdsWithStatus(userId, statusFilter)

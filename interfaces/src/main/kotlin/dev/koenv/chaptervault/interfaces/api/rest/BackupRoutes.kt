@@ -5,8 +5,6 @@ import dev.koenv.chaptervault.kernel.api.BackupProgress
 import dev.koenv.chaptervault.kernel.api.BackupReadingStatus
 import dev.koenv.chaptervault.kernel.api.LibraryBackup
 import dev.koenv.chaptervault.shared.result.Result
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
@@ -15,6 +13,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class BackupProgressDto(
@@ -57,7 +56,10 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                 call.respondForbidden()
                 return@get
             }
-        val now = java.time.Instant.now().toString()
+        val now =
+            java.time.Instant
+                .now()
+                .toString()
         when (val result = backupApi.exportBackup(principal.user.id, now)) {
             is Result.Success -> {
                 val backup = result.value

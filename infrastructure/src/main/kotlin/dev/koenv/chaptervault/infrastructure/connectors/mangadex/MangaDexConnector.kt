@@ -175,8 +175,9 @@ class MangaDexConnector(
         chapter: Chapter,
         format: ChapterFormat,
     ): Result<DownloadResult> {
-        val chapterExternalId = chapter.externalId
-            ?: return Result.Failure(AppError.InternalError("Cannot download chapter ${chapter.id}: no external ID"))
+        val chapterExternalId =
+            chapter.externalId
+                ?: return Result.Failure(AppError.InternalError("Cannot download chapter ${chapter.id}: no external ID"))
         return when (val r = resolveAtHome(chapterExternalId)) {
             is Result.Failure -> r
             is Result.Success -> {
