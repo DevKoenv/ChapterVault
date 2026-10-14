@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
-import dev.koenv.chaptervault.infrastructure.update.UpdateCheckerService
+import dev.koenv.chaptervault.kernel.api.UpdateInfoApi
+import dev.koenv.chaptervault.kernel.auth.Permission
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -15,9 +16,10 @@ data class UpdateInfoDto(
     val updateAvailable: Boolean,
 )
 
-fun Route.systemRoutes(updateCheckerService: UpdateCheckerService) {
+fun Route.systemRoutes(updates: UpdateInfoApi) {
     get("/system/updates") {
-        val info = updateCheckerService.getUpdateInfo()
+        call.requirePermission(Permission.MANAGE_SERVER) ?: return@get
+        val info = updates.getUpdateInfo()
         call.respond(
             HttpStatusCode.OK,
             UpdateInfoDto(

@@ -1,14 +1,88 @@
 package dev.koenv.chaptervault.infrastructure.config
 
 import dev.koenv.chaptervault.shared.format.ChapterFormat
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.error.YAMLException
 import java.io.File
 
+private val logger = KotlinLogging.logger {}
+
+/**
+ * One level of the YAML file. Reads typed values and says so when a value has the wrong type or a key is not one the
+ * server knows, instead of quietly using the default: a misspelled `prot: 9090` should not look like it worked.
+ */
+private class Section(
+    private val path: String,
+    private val map: Map<*, *>,
+    private val warn: (String) -> Unit,
+) {
+    private val used = mutableSetOf<String>()
+
+    private fun full(key: String) = if (path.isEmpty()) key else "$path.$key"
+
+    private fun <T : Any> typed(
+        key: String,
+        expected: String,
+        default: T,
+        cast: (Any) -> T?,
+    ): T {
+        used += key
+        val value = map[key] ?: return default
+        return cast(value) ?: default.also { warn("${full(key)} must be $expected but is '$value'; using $it") }
+    }
+
+    fun int(
+        key: String,
+        default: Int,
+    ): Int = typed(key, "a number", default) { it as? Int }
+
+    fun string(
+        key: String,
+        default: String,
+    ): String = typed(key, "text", default) { it as? String }
+
+    fun bool(
+        key: String,
+        default: Boolean,
+    ): Boolean = typed(key, "true or false", default) { it as? Boolean }
+
+    fun strings(
+        key: String,
+        default: List<String>,
+    ): List<String> =
+        typed(key, "a list of text values", default) { value ->
+            (value as? List<*>)
+                ?.takeIf { l ->
+                    l.all { it is String }
+                }?.filterIsInstance<String>()
+        }
+
+    fun child(key: String): Section? {
+        used += key
+        val value = map[key] ?: return null
+        if (value !is Map<*, *>) {
+            warn("${full(key)} must be a section with settings below it but is '$value'; using defaults")
+            return null
+        }
+        return Section(full(key), value, warn)
+    }
+
+    /** Call when everything this section understands has been read; anything left over is reported. */
+    fun finish() {
+        map.keys.map { it.toString() }.filterNot { it in used }.forEach {
+            warn(
+                "Unknown setting '${full(it)}' in the config file; it is ignored",
+            )
+        }
+    }
+}
+
 object ConfigLoader {
-    @Suppress("LongMethod", "CyclomaticComplexMethod", "NestedBlockDepth")
     fun load(
         configPath: String? = null,
         env: (String) -> String? = System::getenv,
+        onWarning: (String) -> Unit = { logger.warn { it } },
     ): AppConfig {
         val dataDir = env("CHAPTERVAULT_DATA_DIR") ?: "data"
 
@@ -31,105 +105,135 @@ object ConfigLoader {
             file.writeText(defaultConfigContent())
         }
 
-        val base =
-            if (!file.exists()) {
-                derived
+        val base = if (!file.exists()) derived else fromFile(file, derived, onWarning)
+        return applyEnv(base, env, onWarning).also { it.validate() }
+    }
+
+    private fun fromFile(
+        file: File,
+        derived: AppConfig,
+        warn: (String) -> Unit,
+    ): AppConfig {
+        val root =
+            try {
+                file.inputStream().use { Yaml().load<Any?>(it) }
+            } catch (e: YAMLException) {
+                throw IllegalStateException("${file.path} is not valid YAML: ${e.message?.lineSequence()?.firstOrNull()}", e)
+            } ?: return derived
+        if (root !is Map<*, *>) {
+            warn("${file.path} must contain settings in sections (server:, storage:, ...); its content is ignored")
+            return derived
+        }
+        val top = Section("", root, warn)
+        val config =
+            AppConfig(
+                server = top.child("server")?.let { serverFrom(it, derived.server) } ?: derived.server,
+                database = top.child("database")?.let { databaseFrom(it, derived.database) } ?: derived.database,
+                storage = top.child("storage")?.let { storageFrom(it, derived.storage, warn) } ?: derived.storage,
+                log =
+                    top.child("log")?.let { l -> LogConfig(level = l.string("level", derived.log.level)).also { l.finish() } }
+                        ?: derived.log,
+                refresh = top.child("refresh")?.let { refreshFrom(it, derived.refresh) } ?: derived.refresh,
+                debug = top.child("debug")?.let { debugFrom(it, derived.debug) } ?: derived.debug,
+                auth = top.child("auth")?.let { authFrom(it, derived.auth) } ?: derived.auth,
+                notifications = top.child("notifications")?.let { notificationsFrom(it, derived.notifications) } ?: derived.notifications,
+                updates = top.child("updates")?.let { updatesFrom(it, derived.updates) } ?: derived.updates,
+            )
+        top.finish()
+        return config
+    }
+
+    private fun serverFrom(
+        s: Section,
+        d: ServerConfig,
+    ) = ServerConfig(
+        port = s.int("port", d.port),
+        host = s.string("host", d.host),
+        corsOrigins = s.strings("corsOrigins", d.corsOrigins),
+    ).also { s.finish() }
+
+    private fun databaseFrom(
+        s: Section,
+        d: DatabaseConfig,
+    ) = DatabaseConfig(
+        driver = s.string("driver", d.driver),
+        url = s.string("url", d.url),
+        maxPoolSize = s.int("maxPoolSize", d.maxPoolSize),
+    ).also { s.finish() }
+
+    private fun storageFrom(
+        s: Section,
+        d: StorageConfig,
+        warn: (String) -> Unit,
+    ): StorageConfig {
+        val format = s.string("defaultFormat", "")
+        val defaultFormat =
+            if (format.isEmpty()) {
+                d.defaultFormat
             } else {
-                @Suppress("UNCHECKED_CAST")
-                val map = file.inputStream().use { Yaml().load<Map<String, Any>>(it) } ?: return applyEnv(derived, env)
-
-                val server =
-                    (map["server"] as? Map<*, *>)?.let { s ->
-                        @Suppress("UNCHECKED_CAST")
-                        val corsOrigins = (s["corsOrigins"] as? List<String>) ?: emptyList()
-                        ServerConfig(
-                            port = (s["port"] as? Int) ?: derived.server.port,
-                            host = (s["host"] as? String) ?: derived.server.host,
-                            corsOrigins = corsOrigins,
-                        )
-                    } ?: derived.server
-
-                val database =
-                    (map["database"] as? Map<*, *>)?.let { d ->
-                        DatabaseConfig(
-                            driver = (d["driver"] as? String) ?: derived.database.driver,
-                            url = (d["url"] as? String) ?: derived.database.url,
-                            maxPoolSize = (d["maxPoolSize"] as? Int) ?: derived.database.maxPoolSize,
-                        )
-                    } ?: derived.database
-
-                val storage =
-                    (map["storage"] as? Map<*, *>)?.let { s ->
-                        StorageConfig(
-                            libraryPath = (s["libraryPath"] as? String) ?: derived.storage.libraryPath,
-                            thumbnailsPath = (s["thumbnailsPath"] as? String) ?: derived.storage.thumbnailsPath,
-                            defaultFormat =
-                                (s["defaultFormat"] as? String)
-                                    ?.let { runCatching { ChapterFormat.fromString(it) }.getOrNull() }
-                                    ?: derived.storage.defaultFormat,
-                        )
-                    } ?: derived.storage
-
-                val log =
-                    (map["log"] as? Map<*, *>)?.let { l ->
-                        LogConfig(level = (l["level"] as? String) ?: derived.log.level)
-                    } ?: derived.log
-
-                val refresh =
-                    (map["refresh"] as? Map<*, *>)?.let { r ->
-                        RefreshConfig(intervalHours = (r["intervalHours"] as? Int) ?: derived.refresh.intervalHours)
-                    } ?: derived.refresh
-
-                val debug =
-                    (map["debug"] as? Map<*, *>)?.let { d ->
-                        DebugConfig(mockConnectorEnabled = (d["mockConnectorEnabled"] as? Boolean) ?: derived.debug.mockConnectorEnabled)
-                    } ?: derived.debug
-
-                val auth =
-                    (map["auth"] as? Map<*, *>)?.let { a ->
-                        val registrationEnabled =
-                            (a["registrationEnabled"] as? Boolean) ?: derived.auth.registrationEnabled
-                        val rl =
-                            (a["rateLimiting"] as? Map<*, *>)?.let { r ->
-                                @Suppress("UNCHECKED_CAST")
-                                val trustedNetworks =
-                                    (r["trustedNetworks"] as? List<String>)
-                                        ?: derived.auth.rateLimiting.trustedNetworks
-
-                                @Suppress("UNCHECKED_CAST")
-                                val trustedProxies =
-                                    (r["trustedProxies"] as? List<String>)
-                                        ?: derived.auth.rateLimiting.trustedProxies
-                                val login =
-                                    (r["login"] as? Map<*, *>)?.let { l ->
-                                        EndpointLimitConfig(
-                                            maxAttempts = (l["maxAttempts"] as? Int) ?: derived.auth.rateLimiting.login.maxAttempts,
-                                            windowMinutes = (l["windowMinutes"] as? Int) ?: derived.auth.rateLimiting.login.windowMinutes,
-                                        )
-                                    } ?: derived.auth.rateLimiting.login
-                                val register =
-                                    (r["register"] as? Map<*, *>)?.let { reg ->
-                                        EndpointLimitConfig(
-                                            maxAttempts = (reg["maxAttempts"] as? Int) ?: derived.auth.rateLimiting.register.maxAttempts,
-                                            windowMinutes =
-                                                (reg["windowMinutes"] as? Int) ?: derived.auth.rateLimiting.register.windowMinutes,
-                                        )
-                                    } ?: derived.auth.rateLimiting.register
-                                RateLimitConfig(
-                                    enabled = (r["enabled"] as? Boolean) ?: derived.auth.rateLimiting.enabled,
-                                    trustedNetworks = trustedNetworks,
-                                    trustedProxies = trustedProxies,
-                                    login = login,
-                                    register = register,
-                                )
-                            } ?: derived.auth.rateLimiting
-                        AuthConfig(registrationEnabled = registrationEnabled, rateLimiting = rl)
-                    } ?: derived.auth
-
-                AppConfig(server = server, database = database, storage = storage, log = log, refresh = refresh, debug = debug, auth = auth)
+                runCatching { ChapterFormat.fromString(format) }.getOrElse {
+                    warn("storage.defaultFormat must be CBZ or FOLDER but is '$format'; using ${d.defaultFormat}")
+                    d.defaultFormat
+                }
             }
+        return StorageConfig(
+            libraryPath = s.string("libraryPath", d.libraryPath),
+            thumbnailsPath = s.string("thumbnailsPath", d.thumbnailsPath),
+            defaultFormat = defaultFormat,
+        ).also { s.finish() }
+    }
 
-        return applyEnv(base, env).also { it.validate() }
+    private fun refreshFrom(
+        s: Section,
+        d: RefreshConfig,
+    ) = RefreshConfig(intervalHours = s.int("intervalHours", d.intervalHours)).also { s.finish() }
+
+    private fun debugFrom(
+        s: Section,
+        d: DebugConfig,
+    ) = DebugConfig(mockConnectorEnabled = s.bool("mockConnectorEnabled", d.mockConnectorEnabled)).also { s.finish() }
+
+    private fun notificationsFrom(
+        s: Section,
+        d: NotificationConfig,
+    ) = NotificationConfig(allowLocalTargets = s.bool("allowLocalTargets", d.allowLocalTargets)).also { s.finish() }
+
+    private fun updatesFrom(
+        s: Section,
+        d: UpdateConfig,
+    ) = UpdateConfig(checkEnabled = s.bool("checkEnabled", d.checkEnabled)).also { s.finish() }
+
+    private fun authFrom(
+        a: Section,
+        defaults: AuthConfig,
+    ): AuthConfig {
+        val rateLimiting =
+            a.child("rateLimiting")?.let { r ->
+                val d = defaults.rateLimiting
+
+                fun endpoint(
+                    name: String,
+                    fallback: EndpointLimitConfig,
+                ): EndpointLimitConfig =
+                    r.child(name)?.let { e ->
+                        EndpointLimitConfig(
+                            maxAttempts = e.int("maxAttempts", fallback.maxAttempts),
+                            windowMinutes = e.int("windowMinutes", fallback.windowMinutes),
+                        ).also { e.finish() }
+                    } ?: fallback
+                RateLimitConfig(
+                    enabled = r.bool("enabled", d.enabled),
+                    trustedNetworks = r.strings("trustedNetworks", d.trustedNetworks),
+                    trustedProxies = r.strings("trustedProxies", d.trustedProxies),
+                    login = endpoint("login", d.login),
+                    register = endpoint("register", d.register),
+                ).also { r.finish() }
+            } ?: defaults.rateLimiting
+        return AuthConfig(
+            registrationEnabled = a.bool("registrationEnabled", defaults.registrationEnabled),
+            rateLimiting = rateLimiting,
+            sessionCleanupIntervalHours = a.int("sessionCleanupIntervalHours", defaults.sessionCleanupIntervalHours),
+        ).also { a.finish() }
     }
 
     fun defaultConfigContent(): String =
@@ -138,12 +242,14 @@ object ConfigLoader {
         # Edit this file and restart the server to apply changes.
         # All values shown are the defaults.
         # Environment variables (CHAPTERVAULT_*) override these settings.
+        # Misspelled or mistyped settings are reported in the log at startup.
 
         server:
           port: 8080
           # Bind address, 0.0.0.0 accepts connections on all interfaces
           host: "0.0.0.0"
-          # Allowed CORS origins. Empty = allow all origins (fine for local use).
+          # Browser origins that may call the API from another site, e.g. a separately hosted web UI.
+          # Empty = no cross-origin access (the API is still reachable from apps, OPDS readers and the same origin).
           # corsOrigins:
           #   - "http://192.168.1.10:3000"
 
@@ -157,11 +263,23 @@ object ConfigLoader {
           # Hours between automatic library refreshes. 0 to disable.
           intervalHours: 24
 
+        updates:
+          # Ask GitHub once a day whether a newer ChapterVault release exists (shown in the log and /system/updates).
+          # false = the server never contacts GitHub.
+          checkEnabled: true
+
+        notifications:
+          # Notification targets may not point at this machine (localhost, loopback, link-local such as the cloud
+          # metadata address). Addresses on your LAN are always allowed. Set true to allow localhost targets too.
+          allowLocalTargets: false
+
         auth:
           # Allow anyone to create a USER account via POST /auth/register.
           # When false (default), only the bootstrap admin account is created automatically.
           # Enable this only if you want to share the server with other users.
           registrationEnabled: false
+          # Hours between sweeps that delete expired login sessions.
+          sessionCleanupIntervalHours: 24
           rateLimiting:
             enabled: true
             # Addresses and subnets that bypass rate limiting entirely.
@@ -187,11 +305,20 @@ object ConfigLoader {
     private fun applyEnv(
         base: AppConfig,
         env: (String) -> String?,
-    ): AppConfig =
-        base.copy(
+        warn: (String) -> Unit,
+    ): AppConfig {
+        fun int(name: String): Int? =
+            env(name)?.let { value -> value.toIntOrNull().also { if (it == null) warn("$name must be a number but is '$value'; ignored") } }
+
+        fun bool(name: String): Boolean? =
+            env(name)?.let { value ->
+                value.toBooleanStrictOrNull().also { if (it == null) warn("$name must be true or false but is '$value'; ignored") }
+            }
+
+        return base.copy(
             server =
                 base.server.copy(
-                    port = env("CHAPTERVAULT_PORT")?.toIntOrNull() ?: base.server.port,
+                    port = int("CHAPTERVAULT_PORT") ?: base.server.port,
                     host = env("CHAPTERVAULT_HOST") ?: base.server.host,
                     corsOrigins =
                         env("CHAPTERVAULT_CORS_ORIGINS")
@@ -211,19 +338,24 @@ object ConfigLoader {
                 ),
             refresh =
                 base.refresh.copy(
-                    intervalHours = env("CHAPTERVAULT_REFRESH_HOURS")?.toIntOrNull() ?: base.refresh.intervalHours,
+                    intervalHours = int("CHAPTERVAULT_REFRESH_HOURS") ?: base.refresh.intervalHours,
                 ),
             debug =
                 base.debug.copy(
-                    mockConnectorEnabled =
-                        env("CHAPTERVAULT_MOCK_CONNECTOR")?.toBooleanStrictOrNull()
-                            ?: base.debug.mockConnectorEnabled,
+                    mockConnectorEnabled = bool("CHAPTERVAULT_MOCK_CONNECTOR") ?: base.debug.mockConnectorEnabled,
                 ),
             auth =
                 base.auth.copy(
-                    registrationEnabled =
-                        env("CHAPTERVAULT_AUTH_REGISTRATION_ENABLED")?.toBooleanStrictOrNull()
-                            ?: base.auth.registrationEnabled,
+                    registrationEnabled = bool("CHAPTERVAULT_AUTH_REGISTRATION_ENABLED") ?: base.auth.registrationEnabled,
+                ),
+            notifications =
+                base.notifications.copy(
+                    allowLocalTargets = bool("CHAPTERVAULT_NOTIFICATIONS_ALLOW_LOCAL") ?: base.notifications.allowLocalTargets,
+                ),
+            updates =
+                base.updates.copy(
+                    checkEnabled = bool("CHAPTERVAULT_UPDATE_CHECK") ?: base.updates.checkEnabled,
                 ),
         )
+    }
 }

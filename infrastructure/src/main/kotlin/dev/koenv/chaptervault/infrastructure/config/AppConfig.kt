@@ -10,6 +10,18 @@ data class AppConfig(
     val refresh: RefreshConfig = RefreshConfig(),
     val debug: DebugConfig = DebugConfig(),
     val auth: AuthConfig = AuthConfig(),
+    val notifications: NotificationConfig = NotificationConfig(),
+    val updates: UpdateConfig = UpdateConfig(),
+)
+
+data class NotificationConfig(
+    // true lets notification targets point at this machine (localhost, loopback, link-local); private LAN addresses always work
+    val allowLocalTargets: Boolean = false,
+)
+
+data class UpdateConfig(
+    // false stops the server from asking GitHub for the latest release
+    val checkEnabled: Boolean = true,
 )
 
 // local dev only, never enable in production
