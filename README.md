@@ -4,6 +4,10 @@
 
 Self-hosted manga library server. Tracks series, automatically downloads new chapters, and serves your collection over a JSON API and OPDS feed.
 
+ChapterVault is built for one person or one household running it on their own hardware. It is safe on a trusted
+network by default and safe on the internet **behind a TLS reverse proxy** ([how](docs/operations.md#reverse-proxy-and-tls)).
+It is not a multi-tenant or hosted service.
+
 ---
 
 ## Features
@@ -13,15 +17,15 @@ Self-hosted manga library server. Tracks series, automatically downloads new cha
 - **MangaDex connector:** search and download from MangaDex out of the box
 - **CBZ and folder output:** download chapters as `.cbz` archives or plain image folders
 - **OPDS v1.2 feed:** connect any OPDS-capable reading app (Panels, Chunky, Moon+ Reader, etc.)
-- **REST JSON API:** headless; bring your own frontend
-- **SQLite:** embedded, no external database required
-- **Metadata overrides:** override any series field (title, cover, description, status) without losing upstream data
-- **Backup / export:** export and import all reading progress, statuses, and overrides as JSON
-- **Update checker:** server logs a warning when a newer release is available on GitHub
-- **Unread count:** per-series unread chapter count available via reading progress API
+- **REST JSON API:** headless; bring your own frontend (see [`/swagger`](#swagger-ui))
+- **SQLite:** embedded, no external database required; upgrades migrate the database automatically and keep a copy first
+- **Editable metadata:** change a series' title, cover, description, author, artist, year, status or genres; your edits survive refreshes from the source until you hand a field back
+- **Reading progress backup:** export and import your reading progress and statuses as JSON
+- **Update check:** the server logs when a newer release is available (can be switched off)
 - **Reading status tracking:** per-user per-series status (`PLAN_TO_READ`, `READING`, `COMPLETED`, `DROPPED`, `ON_HOLD`)
 - **Push notifications:** ntfy, Gotify, Discord webhook, and generic webhook targets for new chapter alerts
-- **Extension system:** load third-party connectors and metadata enrichers at runtime from the extensions directory
+- **Extension system:** load third-party connectors and metadata enrichers at runtime from the extensions directory (extensions are trusted code, see [security](docs/security.md#extensions))
+- **Permission based access:** routes check permissions; roles (`ADMIN`, `USER`, `GUEST`) are bundles of them
 - **OPDS facets:** genre, language, and status navigation feeds for compatible OPDS clients
 
 ---
@@ -33,6 +37,7 @@ Self-hosted manga library server. Tracks series, automatically downloads new cha
 ```bash
 curl -o docker-compose.yml https://raw.githubusercontent.com/DevKoenv/ChapterVault/master/docker-compose.yml
 docker compose up -d
+docker compose logs chaptervault
 ```
 
 Or clone the repo and use the dev compose file to build locally:
@@ -43,33 +48,54 @@ cd ChapterVault
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-The server starts on port `8080`. On first boot a default admin account is created and a `data/config.yaml` file is auto-generated with commented defaults.
+The server listens on `127.0.0.1:8080` only (see [reverse proxy and TLS](docs/operations.md#reverse-proxy-and-tls) to
+publish it). **On the first start it creates the administrator account and prints a generated password once in the
+log**, between two lines of `=` characters:
+
+```
+ ChapterVault created the first administrator account.
+ username: admin
+ password: <generated>
+```
+
+Log in with it and change it. To choose the password yourself, set `CHAPTERVAULT_ADMIN_PASS` before the first start
+(at least 8 characters, and not `changeme`). Nothing is created again on later starts, even if you delete the account.
 
 ```bash
 curl http://localhost:8080/health
-# {"status":"ok"}
+# {"status":"ok","checks":{"database":"ok","executor":"ok"}}
 
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"changeme"}'
+  -d '{"username":"admin","password":"<the generated password>"}'
 # {"token":"...","username":"admin","roles":["ADMIN"]}
 ```
+
+Running without Docker: `./gradlew :apps:server:shadowJar`, then `java -jar apps/server/build/libs/server-all.jar`
+(JDK 21 or newer).
 
 ### Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CHAPTERVAULT_ADMIN_USER` | `admin` | Username for the bootstrap admin account |
-| `CHAPTERVAULT_ADMIN_PASS` | `changeme` | Password for the bootstrap admin account |
-| `CHAPTERVAULT_DATA_DIR` | `data` | Root directory for the database, library files, and config |
+| `CHAPTERVAULT_ADMIN_USER` | `admin` | Username of the first administrator (only used on an empty install) |
+| `CHAPTERVAULT_ADMIN_PASS` | _generated and printed once_ | Password of the first administrator; at least 8 characters, not `changeme` |
+| `CHAPTERVAULT_DATA_DIR` | `data` | Root directory for the database, library files, thumbnails, extensions and config |
+| `CHAPTERVAULT_PORT` / `CHAPTERVAULT_HOST` | `8080` / `0.0.0.0` | Where the server listens |
 | `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED` | `false` | Allow anyone to create a USER account via `POST /api/v1/auth/register` |
-| `JAVA_OPTS` | _(empty)_ | Extra JVM flags, e.g. `-Xmx512m` |
+| `CHAPTERVAULT_CORS_ORIGINS` | _(none)_ | Comma separated browser origins that may call the API from another site |
+| `CHAPTERVAULT_LIBRARY_PATH` / `CHAPTERVAULT_THUMBNAILS_PATH` / `CHAPTERVAULT_DATABASE_URL` | under the data dir | Override where individual parts live |
+| `CHAPTERVAULT_REFRESH_HOURS` | `24` | Hours between automatic library refreshes, `0` disables |
+| `CHAPTERVAULT_UPDATE_CHECK` | `true` | `false` stops the server from contacting GitHub |
+| `CHAPTERVAULT_NOTIFICATIONS_ALLOW_LOCAL` | `false` | Allow notification targets on this machine (localhost) |
+| `JAVA_OPTS` | `-XX:MaxRAMPercentage=75` (image) | Extra JVM flags, e.g. `-Xmx512m` |
 
 ### Configuration
 
-On first boot, `data/config.yaml` is auto-generated with all available options and their defaults. The docker-compose volume `./data:/app/data` persists it across container restarts. Edit the file and restart the container to apply changes.
-
-Key settings:
+On first boot, `<data dir>/config.yaml` is generated with every option and its default (inside the container:
+`/app/data/config.yaml`, persisted by the data volume). **This is the only config file the server reads.** Edit it and
+restart. Environment variables override it. A misspelled key or a value of the wrong type is reported in the log at
+startup instead of being ignored silently.
 
 ```yaml
 storage:
@@ -78,9 +104,10 @@ storage:
 refresh:
   intervalHours: 24    # 0 to disable automatic library refresh
 
+updates:
+  checkEnabled: true   # false: never contact GitHub
+
 auth:
-  # Set to true only if you want to share the server with other users.
-  # The bootstrap admin account is always created regardless of this flag.
   registrationEnabled: false
   rateLimiting:
     enabled: true
@@ -90,7 +117,7 @@ auth:
 
 #### Rate limiting behind a reverse proxy
 
-Login and register attempts are rate limited per client IP. Two settings decide which IP that is:
+Login, register and failed Basic-auth (OPDS) attempts are rate limited per client IP. Two settings decide which IP that is:
 
 - `trustedProxies`: addresses of your reverse proxy. Only when the direct connection comes from one of these is the
   `X-Forwarded-For` header used, and the client is the rightmost address in it that is not itself a trusted proxy.
@@ -112,53 +139,80 @@ auth:
       - "127.0.0.0/8"
 ```
 
+After 10 failed attempts in 15 minutes a client gets `429` with `Retry-After`; for OPDS the same applies per username
+(five times as many attempts), so one account cannot be guessed from many addresses.
+
 ---
 
 ## API overview
 
-All endpoints except `/health`, `/api/v1/auth/login`, and `/api/v1/auth/register` require a Bearer token:
+The REST API lives under **`/api/v1`**. Everything except `/health`, `POST /api/v1/auth/login`,
+`POST /api/v1/auth/register` and series covers needs a Bearer token:
 
 ```
 Authorization: Bearer <token>
 ```
 
+Errors always look like `{"error": "NOT_FOUND", "message": "..."}`. Missing or invalid token: `401`. Valid token but
+not allowed: `403`.
+
+**Permissions.** Each route needs one permission; a role grants a set of them.
+
+| Permission | ADMIN | USER | GUEST | Covers |
+|---|:-:|:-:|:-:|---|
+| `READ_LIBRARY` | yes | yes | yes | browse, read pages, own progress, own export, OPDS |
+| `WRITE_PROGRESS` | yes | yes | | own progress and reading status, backup import |
+| `WRITE_LIBRARY` | yes | | | add/edit/remove series and chapters, browse sources |
+| `TRIGGER_TASKS` | yes | | | queue downloads and refreshes, cancel tasks |
+| `VIEW_TASKS` | yes | | | task list and errors, task events |
+| `MANAGE_USERS` | yes | | | users and roles |
+| `MANAGE_EXTENSIONS` | yes | | | extensions |
+| `MANAGE_NOTIFICATIONS` | yes | | | notification targets |
+| `MANAGE_SERVER` | yes | | | update information |
+
+Paths below are relative to `/api/v1` unless they start with `/health` or `/opds`.
+
 ### Auth
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Server health check |
-| `POST` | `/api/v1/auth/register` | Create a user account (returns `403` when `registrationEnabled` is false) |
-| `POST` | `/api/v1/auth/login` | Authenticate, receive session token |
-| `POST` | `/api/v1/auth/logout` | Invalidate session token |
-| `GET` | `/api/v1/auth/me` | Return the current user's id, username, and roles |
-| `POST` | `/api/v1/auth/change-password` | Change the current user's password |
+| `GET` | `/health` | Server health check (no prefix, no auth) |
+| `POST` | `/auth/register` | Create a user account (`403` when `registrationEnabled` is false) |
+| `POST` | `/auth/login` | Authenticate, receive session token |
+| `DELETE` | `/auth/logout` | Invalidate the current session token |
+| `GET` | `/auth/me` | Return the current user's id, username, and roles |
+| `POST` | `/auth/change-password` | Change your password; all your sessions are revoked, log in again |
 
-### User management (ADMIN)
+Passwords: at least 8 characters, at most 72 bytes. Usernames are compared ignoring case.
+
+### User management (`MANAGE_USERS`)
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/users` | List all user accounts |
-| `DELETE` | `/users/{id}` | Delete a user account |
-| `PATCH` | `/users/{id}/role` | Change a user's role |
+| `DELETE` | `/users/{id}` | Delete a user account (not yourself, not the last administrator) |
+| `PATCH` | `/users/{id}/role` | Change a user's role (the last administrator cannot be demoted) |
 
 ### Library
 
-| Method | Path | Access | Description |
-|--------|------|--------|-------------|
-| `GET` | `/library/series` | Any user | List all series (paginated) |
-| `GET` | `/library/series/search` | Any user | Search series by title |
-| `GET` | `/library/series/{id}` | Any user | Get a series by ID |
-| `GET` | `/library/series/{id}/cover` | Any user | Get series cover image |
-| `GET` | `/library/series/{id}/chapters` | Any user | List chapters for a series |
-| `POST` | `/library/series` | ADMIN | Add a series to the library |
-| `PATCH` | `/library/series/{id}` | ADMIN | Update series settings |
-| `DELETE` | `/library/series/{id}` | ADMIN | Remove a series |
-| `POST` | `/library/series/{id}/download` | ADMIN | Enqueue download for all chapters |
-| `POST` | `/library/series/{id}/refresh` | ADMIN | Refresh chapter list from source |
-| `POST` | `/library/chapters/{id}/download` | ADMIN | Enqueue download for one chapter |
-| `POST` | `/library/chapters/{id}/redownload` | ADMIN | Re-download an existing chapter |
-| `DELETE` | `/library/chapters/{id}` | ADMIN | Delete a downloaded chapter |
-| `GET` | `/library/chapters/{id}/pages/{index}` | Any user | Stream a chapter page |
+| Method | Path | Permission | Description |
+|--------|------|-----------|-------------|
+| `GET` | `/library/series` | `READ_LIBRARY` | List all series (paginated) |
+| `GET` | `/library/series/search` | `READ_LIBRARY` | Search series by title |
+| `GET` | `/library/series/{id}` | `READ_LIBRARY` | Get a series by ID |
+| `GET` | `/library/series/{id}/cover` | none | Series cover image (public by design) |
+| `GET` | `/library/series/{id}/chapters` | `READ_LIBRARY` | List chapters for a series |
+| `GET` | `/library/chapters/{id}/pages/{index}` | `READ_LIBRARY` | Stream a chapter page |
+| `POST` | `/library/series` | `WRITE_LIBRARY` | Add a series to the library |
+| `PATCH` | `/library/series/{id}` | `WRITE_LIBRARY` | Update series settings and metadata |
+| `DELETE` | `/library/series/{id}` | `WRITE_LIBRARY` | Remove a series |
+| `DELETE` | `/library/chapters/{id}` | `WRITE_LIBRARY` | Delete a downloaded chapter's files |
+| `POST` | `/library/series/{id}/download` | `TRIGGER_TASKS` | Enqueue download for all chapters |
+| `POST` | `/library/series/{id}/refresh` | `TRIGGER_TASKS` | Refresh chapter list from source |
+| `POST` | `/library/chapters/{id}/download` | `TRIGGER_TASKS` | Enqueue download for one chapter |
+| `POST` | `/library/chapters/{id}/redownload` | `TRIGGER_TASKS` | Re-download an existing chapter |
+
+`page` is zero-based (a negative value is treated as 0); `size` is clamped to 1..100 (1..200 for chapters).
 
 ### Progress and reading status
 
@@ -167,10 +221,10 @@ Authorization: Bearer <token>
 | `GET` | `/library/series/{id}/progress` | Get read progress for a series |
 | `POST` | `/library/chapters/{id}/read` | Mark a chapter as read |
 | `DELETE` | `/library/chapters/{id}/read` | Mark a chapter as unread |
-| `PUT` | `/library/series/{id}/status` | Set reading status for a series |
+| `PATCH` | `/library/series/{id}/status` | Set reading status for a series |
 | `DELETE` | `/library/series/{id}/status` | Clear reading status |
 
-### Connectors
+### Connectors (`WRITE_LIBRARY`)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -181,48 +235,45 @@ Authorization: Bearer <token>
 
 ### Tasks
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/tasks` | List background tasks |
-| `GET` | `/tasks/{id}` | Get a task by ID |
-| `POST` | `/tasks/{id}/cancel` | Cancel a task |
+| Method | Path | Permission | Description |
+|--------|------|-----------|-------------|
+| `GET` | `/tasks` | `VIEW_TASKS` | List background tasks |
+| `GET` | `/tasks/{id}` | `VIEW_TASKS` | Get a task by ID |
+| `POST` | `/tasks/{id}/cancel` | `TRIGGER_TASKS` | Cancel a task (a running task is stopped) |
+
+Tasks run up to three at a time, at most two per source, with a timeout per task. A failed task is retried up to three
+times (after 30 s, 2 min, 10 min); the wait survives a restart.
 
 ### Events
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/events` | Server-sent events stream (task updates, new chapters) |
+| `GET` | `/events` | Server-sent events: download status (`READ_LIBRARY`) and task updates (`VIEW_TASKS`) |
 
-### Notifications
+### Notifications (`MANAGE_NOTIFICATIONS`)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/notifications` | List notification targets |
+| `GET` | `/notifications` | List notification targets (tokens are never returned, only `hasToken`) |
 | `POST` | `/notifications` | Add a notification target |
 | `PATCH` | `/notifications/{id}` | Update a notification target |
 | `DELETE` | `/notifications/{id}` | Remove a notification target |
 | `POST` | `/notifications/{id}/test` | Send a test notification |
 
-Supported notification types: **ntfy**, **Gotify**, **Discord** (webhook), **generic webhook**.
-
-### Metadata overrides
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/library/series/{id}/overrides` | List metadata overrides for a series |
-| `PUT` | `/library/series/{id}/overrides/{field}` | Set a metadata override |
-| `DELETE` | `/library/series/{id}/overrides/{field}` | Remove a metadata override |
-
-Overridable fields: `title`, `coverUrl`, `description`, `status`, `author`, `artist`, `upstreamStatus`.
+Supported notification types: **ntfy**, **Gotify**, **Discord** (webhook), **generic webhook**. Targets must be
+`http(s)` URLs; targets on this machine are refused unless `notifications.allowLocalTargets` is on (your LAN is fine).
 
 ### Backup
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/backup/export` | Export reading progress, statuses, and overrides as JSON |
+| `GET` | `/backup/export` | Export your reading progress and statuses as JSON |
 | `POST` | `/backup/import` | Import a previously exported backup |
 
-### Extensions
+This is a per-user export of progress, not a server backup. To back up the server itself, see
+[operations](docs/operations.md#backup-and-restore).
+
+### Extensions (`MANAGE_EXTENSIONS`)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -233,11 +284,11 @@ Overridable fields: `title`, `coverUrl`, `description`, `status`, `author`, `art
 | `POST` | `/extensions/{id}/reload` | Reload an extension from disk |
 | `POST` | `/extensions/{id}/unload` | Unload an extension |
 
-### System
+### System (`MANAGE_SERVER`)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/system/updates` | Check for a newer server version on GitHub |
+| `GET` | `/system/updates` | Version, latest release on GitHub, whether an update exists |
 
 ---
 
@@ -249,11 +300,15 @@ Interactive API documentation is available at `/swagger` without authentication.
 
 ## OPDS
 
-The OPDS v1.2 feed is available at `/opds/v1` and uses HTTP Basic Auth (same credentials as the REST API). Add it to any OPDS-compatible reading app using:
+The OPDS v1.2 feed is available at `/opds/v1` and uses HTTP Basic Auth with the same account as the REST API. Add it
+to any OPDS-compatible reading app using:
 
 ```
 http://<your-server>:8080/opds/v1
 ```
+
+**Basic auth sends the password with every request.** Use `https://` through a reverse proxy whenever the server is
+reachable by anyone but you.
 
 Tested with: Panels (iOS).
 
@@ -261,12 +316,12 @@ Tested with: Panels (iOS).
 
 ## Adding a series
 
-1. Find the series on a connector: `GET /connectors/mangadex/search?q=<title>`
+1. Find the series on a connector: `GET /api/v1/connectors/mangadex/search?q=<title>`
 2. Note the `externalId` from the results
 3. Add it to your library:
 
 ```bash
-curl -X POST http://localhost:8080/library/series \
+curl -X POST http://localhost:8080/api/v1/library/series \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"connectorId":"mangadex","externalId":"<id>","language":"en","autoDownload":true}'
@@ -274,9 +329,17 @@ curl -X POST http://localhost:8080/library/series \
 
 ---
 
+## More documentation
+
+- [Operations guide](docs/operations.md): install, reverse proxy and TLS, data layout, upgrades, backup and restore, troubleshooting, uninstall
+- [Security and trust model](docs/security.md): who can do what, what is public by design, extensions, hardening checklist
+- [Architecture notes](docs/architecture/kernel.md)
+
+---
+
 ## Architecture
 
-Six Gradle modules with a strictly enforced one-way dependency graph:
+Six Gradle modules with a one-way dependency graph that the build checks (`./gradlew verifyModuleGraph`, part of `check`):
 
 ```
 :apps:server    ->  :kernel, :infrastructure, :interfaces
@@ -295,20 +358,21 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for a full breakdown of each module's r
 
 ## Development
 
-**Requirements:** JDK 21+, Git.
+**Requirements:** JDK 21 or newer, Git. CI and the Docker image use JDK 21, and the build compiles against the JDK 21
+API even on a newer JDK, so a green local build cannot depend on a later API.
 
 ```bash
 git clone https://github.com/DevKoenv/ChapterVault.git
 cd ChapterVault
 
-# Build and run all tests
+# Build and run all tests (also ktlint, detekt, the module graph check and the coverage gate)
 ./gradlew build
 
 # Run the server
 ./gradlew :apps:server:run
 ```
 
-Tests use a temporary SQLite file — no external dependencies needed.
+Tests use temporary SQLite files — no external dependencies needed.
 
 ---
 

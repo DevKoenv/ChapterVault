@@ -2,11 +2,37 @@ openapi: "3.0.3"
 info:
   title: ChapterVault API
   version: "1.0.0"
-  description: Self-hosted manga/comic library server with connector-based download pipeline.
+  description: |
+    Self-hosted manga/comic library server with connector-based download pipeline.
+
+    **Paths.** The REST API lives under `/api/v1` (the server URL below). `/health`, the OPDS feeds
+    (`/opds/v1/...`) and `/swagger` are served from the root and say so on their path items.
+
+    **Authentication.** REST calls use `Authorization: Bearer <token>` from `POST /auth/login`. OPDS uses HTTP Basic
+    auth with the same account. Basic auth sends the password with every request, so put the server behind TLS.
+    Tokens are revoked when the password changes, the account is deleted, or its role changes.
+
+    **Permissions.** Routes check permissions, never role names. A role is a bundle of them:
+
+    | Permission | ADMIN | USER | GUEST | Covers |
+    | --- | --- | --- | --- | --- |
+    | `READ_LIBRARY` | yes | yes | yes | browse, read pages, own progress and export, OPDS |
+    | `WRITE_PROGRESS` | yes | yes | no | own reading progress, reading status, backup import |
+    | `WRITE_LIBRARY` | yes | no | no | add/edit/remove series and chapters, browse sources |
+    | `TRIGGER_TASKS` | yes | no | no | queue downloads and refreshes, cancel tasks |
+    | `VIEW_TASKS` | yes | no | no | task list, task errors, task events in `/events` |
+    | `MANAGE_USERS` | yes | no | no | users and roles |
+    | `MANAGE_EXTENSIONS` | yes | no | no | extensions |
+    | `MANAGE_NOTIFICATIONS` | yes | no | no | notification targets |
+    | `MANAGE_SERVER` | yes | no | no | `/system/updates` |
+
+    **Errors.** Every error, including 401, 404 and 405 produced by the server itself, is
+    `{"error": "<CODE>", "message": "<text>"}`. A missing or invalid token is 401; a valid token without the needed
+    permission is 403. `429` carries `Retry-After`.
 
 servers:
-  - url: http://localhost:8080
-    description: Local development
+  - url: http://localhost:8080/api/v1
+    description: Local server
 
 tags:
   - name: auth
@@ -18,13 +44,13 @@ tags:
   - name: tasks
     description: Background task queue
   - name: connectors
-    description: External source connectors (ADMIN only)
+    description: External source connectors (WRITE_LIBRARY)
   - name: notifications
-    description: Push notification targets and dispatch (ADMIN only)
+    description: Push notification targets and dispatch (MANAGE_NOTIFICATIONS)
   - name: system
     description: System utilities
   - name: users
-    description: User account management (ADMIN only)
+    description: User account management (MANAGE_USERS)
   - name: opds
     description: OPDS v1 feed (Basic Auth) with Page Streaming Extension (PSE)
 
@@ -55,9 +81,10 @@ components:
     UserDto:
       type: object
       properties:
-        id:       { type: string, format: uuid }
-        username: { type: string }
-        roles:    { type: array, items: { type: string } }
+        id:        { type: string, format: uuid }
+        username:  { type: string }
+        roles:     { type: array, items: { type: string } }
+        createdAt: { type: string, format: date-time }
 
     SeriesDto:
       type: object
@@ -71,7 +98,14 @@ components:
         autoDownload:  { type: boolean }
         coverUrl:      { type: string, nullable: true }
         description:   { type: string, nullable: true }
+        author:        { type: string, nullable: true }
+        artist:        { type: string, nullable: true }
+        year:          { type: integer, nullable: true }
+        upstreamStatus: { type: string, nullable: true, description: "Publication status at the source, e.g. ONGOING or COMPLETED" }
+        genres:        { type: array, items: { type: string } }
         readingStatus: { type: string, nullable: true, enum: [PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD], description: "Current user's reading status; null if not set" }
+        addedAt:       { type: string, format: date-time }
+        updatedAt:     { type: string, format: date-time }
 
     ChapterDto:
       type: object
@@ -83,6 +117,8 @@ components:
         downloadStatus: { type: string, enum: [AVAILABLE, PENDING, DOWNLOADING, DOWNLOADED, FAILED] }
         format:         { type: string, nullable: true, enum: [CBZ, FOLDER] }
         pageCount:      { type: integer, nullable: true }
+        addedAt:        { type: string, format: date-time }
+        updatedAt:      { type: string, format: date-time }
 
     TaskDto:
       type: object
@@ -153,9 +189,11 @@ components:
     ProgressDto:
       type: object
       properties:
-        seriesId:   { type: string, format: uuid }
-        readCount:  { type: integer, description: Number of chapters marked as read }
-        totalCount: { type: integer, description: Total number of chapters in the series }
+        seriesId:        { type: string, format: uuid }
+        latestChapterId: { type: string, format: uuid, nullable: true, description: Most recently read chapter }
+        latestPage:      { type: integer, description: Page reached in that chapter }
+        unreadCount:     { type: integer, description: Chapters not yet marked as read }
+        totalCount:      { type: integer, description: Total number of chapters in the series }
 
     DownloadQueuedResponse:
       type: object
@@ -184,7 +222,7 @@ components:
         name:      { type: string }
         type:      { type: string, enum: [NTFY, GOTIFY, DISCORD, WEBHOOK] }
         url:       { type: string }
-        token:     { type: string, nullable: true, description: "API token or auth header value; null when not required by the target type" }
+        hasToken:  { type: boolean, description: "True when a token is stored. The token itself is never returned; send a new one with PATCH to change it." }
         enabled:   { type: boolean }
         createdAt: { type: string, format: date-time }
 
@@ -194,7 +232,7 @@ components:
       properties:
         name:    { type: string, example: "My NTFY server" }
         type:    { type: string, enum: [NTFY, GOTIFY, DISCORD, WEBHOOK] }
-        url:     { type: string, example: "https://ntfy.sh/mymangaupdates" }
+        url:     { type: string, example: "https://ntfy.sh/mymangaupdates", description: "http or https. Targets on this machine (localhost, loopback, link-local) are refused unless notifications.allowLocalTargets is true; LAN addresses are allowed." }
         token:   { type: string, nullable: true, description: "Optional API token; required by Gotify; optional for NTFY/Webhook" }
         enabled: { type: boolean, default: true }
 
@@ -202,15 +240,39 @@ components:
       type: object
       properties:
         name:    { type: string, nullable: true }
-        url:     { type: string, nullable: true }
-        token:   { type: string, nullable: true }
+        url:     { type: string, nullable: true, description: "Same rules as on create" }
+        token:   { type: string, nullable: true, description: "Omit to keep the stored token; an empty string removes it" }
         enabled: { type: boolean, nullable: true }
 
     UpdateSeriesRequest:
       type: object
+      description: |
+        Every field is optional; only the fields sent are changed. Metadata fields you set become "user edited" and
+        are no longer overwritten when the series is refreshed from its source; list them in `clearFields` to hand
+        them back to the source.
       properties:
-        autoDownload:  { type: boolean, nullable: true }
-        defaultFormat: { type: string, nullable: true, enum: [CBZ, FOLDER] }
+        autoDownload:   { type: boolean, nullable: true }
+        defaultFormat:  { type: string, nullable: true, enum: [CBZ, FOLDER] }
+        title:          { type: string, nullable: true }
+        coverUrl:       { type: string, nullable: true }
+        description:    { type: string, nullable: true }
+        author:         { type: string, nullable: true }
+        artist:         { type: string, nullable: true }
+        year:           { type: integer, nullable: true }
+        upstreamStatus: { type: string, nullable: true }
+        genres:         { type: array, nullable: true, items: { type: string } }
+        clearFields:    { type: array, nullable: true, items: { type: string }, description: "Fields to release back to the source" }
+
+    ExtensionDto:
+      type: object
+      properties:
+        id:           { type: string }
+        name:         { type: string }
+        version:      { type: string }
+        status:       { type: string, enum: [DISCOVERED, LOADING, ENABLED, DISABLED, FAILED, UNLOADED] }
+        source:       { type: string, enum: [BUNDLED, LOCAL, REGISTRY], description: "LOCAL is a JAR in the data folder; REGISTRY is reserved and not used yet" }
+        capabilities: { type: array, items: { type: string, enum: [connector, metadata_enricher, notification_channel] } }
+        errorMessage: { type: string, nullable: true }
 
     PaginatedSeriesResponse:
       type: object
@@ -268,9 +330,12 @@ security:
 
 paths:
   /health:
+    servers:
+      - url: http://localhost:8080
     get:
       tags: [system]
       summary: Health check
+      description: Reports the database and the task executor. The executor stays "ok" while it is busy with long downloads.
       security: []
       responses:
         "200":
@@ -311,6 +376,9 @@ paths:
         - `task.state_changed` — a background task changed state (queued/running/completed/failed/cancelled). Data: `TaskStateChangedEvent`.
         - `chapter.download_status` — a chapter's download status changed. Data: `ChapterDownloadStatusEvent`.
 
+        Which events a client receives depends on its permissions: `task.state_changed` (which carries upstream error
+        text) needs `VIEW_TASKS`, `chapter.download_status` needs `READ_LIBRARY`.
+
         The stream stays open until the client disconnects. A buffer of 64 events is maintained per connection; oldest events are dropped if the client falls behind.
       security:
         - bearerAuth: []
@@ -333,7 +401,11 @@ paths:
       description: |
         Creates a new USER account. Requires `auth.registrationEnabled: true` in `config.yaml`
         (or env var `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED=true`); returns 403 otherwise.
-        The bootstrap admin account is created automatically regardless of this flag.
+        The first administrator is created automatically on an empty install regardless of this flag; its generated
+        password is printed once in the server log.
+
+        Usernames are trimmed, at most 100 characters, compared ignoring case, and may not contain control
+        characters. Passwords must be 8 characters or more and at most 72 bytes.
       security: []
       requestBody:
         required: true
@@ -346,7 +418,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UserDto" }
-        "400": { description: Invalid request body }
+        "400": { description: Invalid request body, username or password (the message says which rule) }
         "403": { description: Registration is disabled on this server (REGISTRATION_DISABLED) }
         "409": { description: Username already taken }
         "429":
@@ -377,7 +449,7 @@ paths:
             Retry-After: { schema: { type: integer }, description: Seconds until the rate limit window resets }
 
   /auth/logout:
-    post:
+    delete:
       tags: [auth]
       summary: Invalidate the current bearer token
       responses:
@@ -398,6 +470,9 @@ paths:
     post:
       tags: [auth]
       summary: Change the authenticated user's password
+      description: |
+        All of the user's sessions are revoked, including the one used for this call: log in again afterwards.
+        Basic-auth access (OPDS) with the old password stops at once as well.
       requestBody:
         required: true
         content:
@@ -407,10 +482,10 @@ paths:
               required: [currentPassword, newPassword]
               properties:
                 currentPassword: { type: string }
-                newPassword: { type: string, minLength: 1, maxLength: 255 }
+                newPassword: { type: string, minLength: 8, description: "At least 8 characters and at most 72 bytes" }
       responses:
-        "204": { description: Password changed }
-        "400": { description: Invalid request body or newPassword too long }
+        "204": { description: Password changed; all sessions revoked }
+        "400": { description: Invalid request body or newPassword breaks the password rules }
         "401": { description: Current password incorrect }
 
   /users:
@@ -424,7 +499,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/UserDto" }
-        "403": { description: Admin access required }
+        "403": { description: Forbidden; the user lacks the required permission }
 
   /users/{id}:
     delete:
@@ -438,8 +513,9 @@ paths:
       responses:
         "204": { description: User deleted }
         "400": { description: Cannot delete your own account }
-        "403": { description: Admin access required }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: User not found }
+        "409": { description: The user is the last administrator (CONFLICT) }
 
   /users/{id}/role:
     patch:
@@ -465,8 +541,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/UserDto" }
         "400": { description: Invalid role }
-        "403": { description: Admin access required }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: User not found }
+        "409": { description: The user is the last administrator and cannot be demoted }
 
   /library/series/search:
     get:
@@ -497,10 +574,12 @@ paths:
       parameters:
         - in: query
           name: page
-          schema: { type: integer, default: 0 }
+          schema: { type: integer, default: 0, minimum: 0 }
+          description: Zero-based; a negative value is treated as 0
         - in: query
           name: size
           schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+          description: Values outside the range are clamped
         - in: query
           name: readingStatus
           required: false
@@ -530,7 +609,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SeriesDto" }
         "400": { description: Invalid request body }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "409": { description: Series already in library }
 
   /library/series/{id}:
@@ -563,8 +642,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SeriesDto" }
-        "400": { description: Invalid defaultFormat value }
-        "403": { description: Requires ADMIN role }
+        "400": { description: Invalid defaultFormat or upstreamStatus value, or request body }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Series not found }
 
     delete:
@@ -572,7 +651,7 @@ paths:
       summary: Remove a series from the library (ADMIN)
       responses:
         "204": { description: Series removed }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Series not found }
 
   /library/series/{id}/status:
@@ -582,7 +661,7 @@ paths:
         required: true
         schema: { type: string, format: uuid }
 
-    put:
+    patch:
       tags: [reading-status]
       summary: Set reading status for a series (current user)
       requestBody:
@@ -647,7 +726,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DownloadQueuedResponse" }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Series not found }
 
   /library/series/{id}/refresh:
@@ -661,7 +740,7 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "202": { description: Metadata fetch task enqueued }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Series not found }
 
   /library/series/{id}/progress:
@@ -694,7 +773,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DownloadQueuedResponse" }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Chapter not found }
 
   /library/chapters/{id}:
@@ -708,7 +787,7 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "204": { description: Chapter deleted }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Chapter not found }
 
   /library/chapters/{id}/redownload:
@@ -726,13 +805,17 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DownloadQueuedResponse" }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Chapter not found }
 
   /library/chapters/{id}/pages/{index}:
     get:
       tags: [library]
       summary: Serve a single page image from a downloaded chapter
+      description: |
+        The content type is the real type of the stored image (JPEG, PNG or WebP). Responses carry an `ETag` and
+        `Cache-Control: private, max-age=86400, immutable` (private: pages belong to an authenticated user and must
+        not be kept by shared caches).
       parameters:
         - in: path
           name: id
@@ -741,7 +824,7 @@ paths:
         - in: path
           name: index
           required: true
-          schema: { type: integer }
+          schema: { type: integer, minimum: 0 }
           description: Zero-based page index
       responses:
         "200":
@@ -754,7 +837,7 @@ paths:
             image/webp:
               schema: { type: string, format: binary }
         "304": { description: Not modified (ETag match) }
-        "404": { description: Chapter or page not found }
+        "404": { description: Chapter or page not found (including a negative index) }
         "423": { description: Chapter not yet downloaded }
 
   /library/chapters/{id}/read:
@@ -807,7 +890,7 @@ paths:
               schema: { $ref: "#/components/schemas/NotificationTargetResponse" }
         "400": { description: Invalid request body or unsupported type }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
 
   /notifications/{id}:
     parameters:
@@ -831,7 +914,7 @@ paths:
               schema: { $ref: "#/components/schemas/NotificationTargetResponse" }
         "400": { description: Invalid request body }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Notification target not found }
 
     delete:
@@ -840,7 +923,7 @@ paths:
       responses:
         "204": { description: Target deleted }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Notification target not found }
 
   /notifications/{id}/test:
@@ -856,7 +939,7 @@ paths:
         "200": { description: Test notification dispatched successfully }
         "400": { description: Dispatch failed (bad URL, auth error, etc.) }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Notification target not found }
 
   /tasks:
@@ -903,7 +986,7 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "204": { description: Task cancelled }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Task not found }
 
   /connectors:
@@ -917,7 +1000,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ConnectorDto" }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
 
   /connectors/{id}/search:
     get:
@@ -943,7 +1026,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PaginatedSearchResponse" }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Connector not found }
 
   /connectors/{id}/series/{externalId}:
@@ -964,7 +1047,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SeriesMetadataDto" }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Connector not found }
 
   /connectors/{id}/series/{externalId}/chapters:
@@ -987,7 +1070,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ChapterMetadataDto" }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Connector not found }
 
   /library/series/{id}/cover:
@@ -1008,11 +1091,13 @@ paths:
               schema: { type: string, format: binary }
             image/png:
               schema: { type: string, format: binary }
-            image/gif:
+            image/webp:
               schema: { type: string, format: binary }
         "404": { description: Cover not found (not yet downloaded) }
 
   /opds/v1:
+    servers:
+      - url: http://localhost:8080
     get:
       tags: [opds]
       summary: OPDS v1 navigation feed
@@ -1026,6 +1111,8 @@ paths:
               schema: { type: string }
 
   /opds/v1/catalog:
+    servers:
+      - url: http://localhost:8080
     get:
       tags: [opds]
       summary: OPDS v1 acquisition catalog (paginated series list)
@@ -1034,7 +1121,38 @@ paths:
       parameters:
         - in: query
           name: page
-          schema: { type: integer, default: 0 }
+          schema: { type: integer, default: 0, minimum: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+        - in: query
+          name: genre
+          schema: { type: string }
+        - in: query
+          name: language
+          schema: { type: string }
+        - in: query
+          name: upstreamStatus
+          schema: { type: string }
+      responses:
+        "200":
+          description: Atom XML acquisition feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+
+  /opds/v1/history:
+    servers:
+      - url: http://localhost:8080
+    get:
+      tags: [opds]
+      summary: OPDS v1 reading history of the authenticated user
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 0, minimum: 0 }
         - in: query
           name: size
           schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
@@ -1045,7 +1163,76 @@ paths:
             application/atom+xml:
               schema: { type: string }
 
+  /opds/v1/library-updates:
+    servers:
+      - url: http://localhost:8080
+    get:
+      tags: [opds]
+      summary: OPDS v1 recently added chapters
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 0, minimum: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Atom XML acquisition feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+
+  /opds/v1/library/genres:
+    servers:
+      - url: http://localhost:8080
+    get:
+      tags: [opds]
+      summary: OPDS v1 navigation feed of genres
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Atom XML navigation feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+
+  /opds/v1/library/languages:
+    servers:
+      - url: http://localhost:8080
+    get:
+      tags: [opds]
+      summary: OPDS v1 navigation feed of languages
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Atom XML navigation feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+
+  /opds/v1/library/status:
+    servers:
+      - url: http://localhost:8080
+    get:
+      tags: [opds]
+      summary: OPDS v1 navigation feed of publication statuses
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Atom XML navigation feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+
   /opds/v1/series/{id}:
+    servers:
+      - url: http://localhost:8080
     get:
       tags: [opds]
       summary: OPDS v1 series feed (chapter list with download and PSE links)
@@ -1069,6 +1256,8 @@ paths:
         "404": { description: Series not found }
 
   /opds/v1/download/{chapterId}:
+    servers:
+      - url: http://localhost:8080
     get:
       tags: [opds]
       summary: Download a chapter as CBZ (Basic Auth)
@@ -1088,6 +1277,8 @@ paths:
         "404": { description: Chapter not found or not downloaded }
 
   /opds/v1/chapters/{id}/pages/{pageNumber}:
+    servers:
+      - url: http://localhost:8080
     get:
       tags: [opds]
       summary: Stream a single page from a downloaded chapter (OPDS PSE, Basic Auth)
@@ -1098,7 +1289,7 @@ paths:
 
         Responses include:
         - `ETag`: stable hash of chapter ID, page number, and chapter `updatedAt`; changes on re-download.
-        - `Cache-Control: max-age=31536000, immutable`: safe to cache aggressively since pages do not change after download.
+        - `Cache-Control: private, max-age=31536000, immutable`: pages do not change after download; `private` keeps shared caches from storing them.
         - `304 Not Modified`: returned when `If-None-Match` matches the current ETag.
       security:
         - basicAuth: []
@@ -1118,7 +1309,7 @@ paths:
           description: Page image bytes
           headers:
             ETag:          { schema: { type: string }, description: "Stable page hash, quoted (e.g. \"abc123\")" }
-            Cache-Control: { schema: { type: string }, description: "max-age=31536000, immutable" }
+            Cache-Control: { schema: { type: string }, description: "private, max-age=31536000, immutable" }
           content:
             image/jpeg:
               schema: { type: string, format: binary }
@@ -1129,15 +1320,16 @@ paths:
         "304": { description: Not modified (ETag match) }
         "400": { description: Invalid chapter ID or non-integer page number }
         "401": { description: Not authenticated }
-        "404": { description: Chapter not found, not downloaded, or page index out of range }
+        "404": { description: Chapter not found, not downloaded, or page index out of range (including a negative one) }
 
   /backup/export:
     get:
       tags: [system]
       summary: Export a backup of all user reading data
       description: |
-        Exports reading progress, reading statuses, and metadata overrides for the current user.
-        Series with no connector identity (local series) are excluded from the export.
+        Exports the current user's reading progress and reading statuses. Series are identified by connector and
+        external id, so a backup can be imported into another ChapterVault that has the same series. Library files,
+        series metadata, other users and server settings are not part of it. Series with no connector identity are excluded.
       responses:
         "200":
           description: Backup JSON
@@ -1150,14 +1342,16 @@ paths:
                   exportedAt:     { type: string, format: date-time }
                   progress:       { type: array, items: { type: object } }
                   readingStatuses: { type: array, items: { type: object } }
-                  overrides:      { type: array, items: { type: object } }
         "401": { description: Not authenticated }
 
   /backup/import:
     post:
       tags: [system]
       summary: Import a backup of user reading data
-      description: Restores reading progress, statuses, and overrides. Entries for series not present in the library are skipped.
+      description: |
+        Restores reading progress and reading statuses for the current user. Entries for series that are not in the
+        library, with a status the server does not know, or with a negative page are skipped and counted in the summary.
+        The body may be at most 10 MB.
       requestBody:
         required: true
         content:
@@ -1176,82 +1370,14 @@ paths:
                   progressSkipped:   { type: integer }
                   statusesRestored:  { type: integer }
                   statusesSkipped:   { type: integer }
-                  overridesRestored: { type: integer }
-                  overridesSkipped:  { type: integer }
         "400": { description: Invalid backup payload }
         "401": { description: Not authenticated }
-
-  /library/series/{id}/overrides:
-    get:
-      tags: [library]
-      summary: List metadata overrides for a series
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        "200":
-          description: Map of field name to override value
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: { type: string }
-        "401": { description: Not authenticated }
-        "404": { description: Series not found }
-
-  /library/series/{id}/overrides/{field}:
-    put:
-      tags: [library]
-      summary: Set a metadata override for a series field (ADMIN)
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: field
-          required: true
-          schema: { type: string, example: title }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [value]
-              properties:
-                value: { type: string }
-      responses:
-        "204": { description: Override set }
-        "400": { description: Invalid field or value }
-        "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
-        "404": { description: Series not found }
-
-    delete:
-      tags: [library]
-      summary: Remove a metadata override for a series field (ADMIN)
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: field
-          required: true
-          schema: { type: string, example: title }
-      responses:
-        "204": { description: Override removed }
-        "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
-        "404": { description: Series or override not found }
 
   /extensions:
     get:
       tags: [system]
       summary: List loaded extensions (ADMIN)
+      description: Extension JARs run inside the server with the same privileges as the server itself and are not verified. Only install extensions you trust.
       responses:
         "200":
           description: List of loaded extensions
@@ -1259,15 +1385,9 @@ paths:
             application/json:
               schema:
                 type: array
-                items:
-                  type: object
-                  properties:
-                    id:      { type: string }
-                    name:    { type: string }
-                    version: { type: string }
-                    enabled: { type: boolean }
+                items: { $ref: "#/components/schemas/ExtensionDto" }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
 
   /extensions/{id}:
     get:
@@ -1283,15 +1403,9 @@ paths:
           description: Extension details
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  id:      { type: string }
-                  name:    { type: string }
-                  version: { type: string }
-                  enabled: { type: boolean }
+              schema: { $ref: "#/components/schemas/ExtensionDto" }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Extension not found }
 
   /extensions/{id}/enable:
@@ -1306,7 +1420,7 @@ paths:
       responses:
         "204": { description: Extension enabled }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Extension not found }
 
   /extensions/{id}/disable:
@@ -1321,7 +1435,7 @@ paths:
       responses:
         "204": { description: Extension disabled }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Extension not found }
 
   /extensions/{id}/reload:
@@ -1336,7 +1450,7 @@ paths:
       responses:
         "204": { description: Extension reloaded }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Extension not found }
 
   /extensions/{id}/unload:
@@ -1351,14 +1465,17 @@ paths:
       responses:
         "204": { description: Extension unloaded }
         "401": { description: Not authenticated }
-        "403": { description: Requires ADMIN role }
+        "403": { description: Forbidden; the user lacks the required permission }
         "404": { description: Extension not found }
 
   /system/updates:
     get:
       tags: [system]
-      summary: Check for available updates
-      description: Returns the current version, latest published release, and whether an update is available.
+      summary: Check for available updates (MANAGE_SERVER)
+      description: |
+        Returns the current version, the latest published release and whether an update is available. The server asks
+        GitHub once a day; set `updates.checkEnabled: false` to stop it from contacting GitHub, in which case
+        `latestVersion` stays null.
       responses:
         "200":
           description: Update status
@@ -1372,3 +1489,4 @@ paths:
                   releaseUrl:      { type: string, nullable: true }
                   updateAvailable: { type: boolean }
         "401": { description: Not authenticated }
+        "403": { description: Forbidden; the user lacks the required permission }

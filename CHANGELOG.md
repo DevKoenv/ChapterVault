@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-07-14
 
+### Release hardening
+
+Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran a pre-release build should read
+**Breaking changes**.
+
+#### Breaking changes (compared with pre-release builds)
+
+- **The database schema was reset.** The two early migrations are now one `V1__initial_schema.sql`. A database created
+  by a pre-release build stops at startup with `Migration V1 ... checksum mismatch`. Export your reading progress
+  (`GET /api/v1/backup/export`), start with an empty data directory, re-add your series and import the progress.
+  Migrations are plain `.sql` files in `infrastructure/src/main/resources/db/migration`.
+- **All REST endpoints live under `/api/v1`** (`/health`, the OPDS feeds and `/swagger` are unprefixed). The OpenAPI
+  document's server URL reflects this.
+- `POST /auth/logout` is now `DELETE /auth/logout`; `PUT /library/series/{id}/status` is now `PATCH`.
+- The metadata override endpoints (`/library/series/{id}/overrides...`) are gone. Edit fields with
+  `PATCH /library/series/{id}`; fields you set are kept across refreshes until listed in `clearFields`. Backups no longer
+  contain overrides.
+- **No more default administrator password.** The first administrator is created only on an empty install, with a
+  generated password printed once in the log (or `CHAPTERVAULT_ADMIN_PASS`; `changeme` and passwords under 8 characters are
+  refused). A deleted `admin` account is no longer re-created at every start.
+- Passwords must be 8 to 72 bytes; usernames are compared ignoring case.
+- `GET /notifications` no longer returns the token, only `hasToken`. Notification URLs must be http(s) and not point at the
+  server itself unless `notifications.allowLocalTargets` is set.
+- **CORS is off by default.** List the origins of a separately hosted UI in `server.corsOrigins`.
+- Routes now check permissions instead of role names, and `GUEST` is read-only (it can no longer write progress or import
+  a backup). Task events in `/events` need `VIEW_TASKS`.
+- `config/application.yaml` and the compose mount `./config` were never read and are removed. The only config file is
+  `<data dir>/config.yaml`. The compose file publishes `127.0.0.1:8080`, uses a named volume and pins an image version.
+- The container runs as an unprivileged user (uid 10001). A host folder mounted at `/app/data` must be writable for it.
+
+#### Added
+
+- Failed Basic-auth (OPDS) attempts are rate limited per client address and per username; blocked clients get `429`
+  before any password is checked.
+- Pre-migration copy of the database (`chaptervault.db.pre-V<N>`), taken with `VACUUM INTO`, and a documented upgrade path.
+- Task executor: three tasks at a time, two per source, a timeout per task, running tasks can be cancelled, retries are
+  stored in the database and survive a restart, and the health check no longer reports the executor dead during a long
+  download.
+- `updates.checkEnabled` to stop the daily GitHub release check (and the check now repeats instead of running once).
+- Size limits for downloaded pages (25 MB), covers (5 MB) and chapters (512 MB), and a limit on image dimensions.
+- Config problems (unknown keys, wrong types, invalid environment values) are reported in the log;
+  `auth.sessionCleanupIntervalHours` is now read from the file.
+- A `HEALTHCHECK` in the image, a Docker build and smoke test in CI, and a module-graph check in `./gradlew check`.
+- Operations guide and security/trust model in `docs/`.
+
+#### Changed
+
+- Session tokens are stored as SHA-256 hashes, extended while in use (at most once a day), and limited to 20 per user.
+  Changing a password, deleting an account or changing a role revokes the user's sessions.
+- Pages keep their real image type (PNG and WebP are no longer written as `.jpg`), and chapters are written to a
+  temporary file first so a crash or full disk cannot leave a truncated archive.
+- Startup no longer deletes unknown folders in the library path: only folders named like a series id are considered and
+  they are moved to `library/.trash/`.
+- Page responses are `Cache-Control: private`. All responses carry `X-Content-Type-Options`, `Referrer-Policy` and
+  `X-Frame-Options`.
+- The release workflow builds and tests first, requires the tag to be on `master`, publishes `-rc`/suffixed tags as
+  pre-releases without touching `latest`, and uses actions pinned by commit SHA. Dependabot is configured.
+- The build compiles against the JDK 21 API on any newer JDK.
+
+#### Fixed
+
+- Deleting a user who had logged in returned 500.
+- A sole administrator could demote or delete themselves, leaving no administrator.
+- A password change did not revoke other sessions, and OPDS (Basic) access with a deleted, demoted or re-passworded
+  account kept working for up to a minute.
+- Importing a backup with an unknown reading status broke the user's library listing; negative pages are skipped.
+- A negative page index returned 500 (REST and OPDS); `page=-1` and `size=200` (the documented chapter maximum) returned 500.
+- Concurrent writes could fail with `SQLITE_BUSY`; transactions now start with the write lock.
+- Library search with `%`, `_` or `\` in the query matched nothing.
+- Covers with transparency were stored as empty files; covers that are not images are no longer stored.
+- ntfy notifications failed for series titles with non-ASCII characters; Discord notifications failed for many new
+  chapters at once; notification JSON with control characters was invalid; delivery errors no longer put the webhook URL
+  (which contains its secret) in logs and API answers.
+- The MangaDex chapter feed could loop forever on an inconsistent response.
+- Error responses written by Ktor itself (401, 404, 405) are JSON like every other error, and 401 no longer has an empty
+  body; route-specific messages such as `Series 'x' not found` are no longer replaced by a generic one.
+- Extension JARs load on a pre-release server version, in a deterministic order, and a huge manifest is refused.
+- `Files.list` directory handles are always closed.
+- `Main` connected and migrated the database twice.
+
+
 ### Added
 
 - **Registration gating**: `POST /auth/register` is disabled by default. Set `auth.registrationEnabled: true` in `config.yaml` or `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED=true` to allow new accounts. When disabled the endpoint returns `403 REGISTRATION_DISABLED`. The bootstrap admin account is always created regardless of this flag.
@@ -14,7 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GET /auth/me**: Returns the currently authenticated user's id, username, and roles.
 - **POST /auth/change-password**: Authenticated users can change their own password by providing their current password and a new one.
 - **Chapter list pagination**: `GET /library/series/{id}/chapters` now returns a paginated response with `page`/`size` query params (default 50, max 200) instead of an unbounded array. The shape is consistent with all other paginated endpoints.
-- **Reading status tracking**: Users can set a per-series reading status (`PLAN_TO_READ`, `READING`, `COMPLETED`, `DROPPED`, `ON_HOLD`) via `PUT /library/series/{id}/status` and clear it via `DELETE /library/series/{id}/status`. The current user's status is returned as `readingStatus` on all `SeriesDto` responses. `GET /library/series` accepts a `readingStatus` query parameter to filter the list.
+- **Reading status tracking**: Users can set a per-series reading status (`PLAN_TO_READ`, `READING`, `COMPLETED`, `DROPPED`, `ON_HOLD`) via `PATCH /library/series/{id}/status` and clear it via `DELETE /library/series/{id}/status`. The current user's status is returned as `readingStatus` on all `SeriesDto` responses. `GET /library/series` accepts a `readingStatus` query parameter to filter the list.
 - **Push notifications**: New `/notifications` endpoints (ADMIN) manage notification targets. Supported types: `NTFY`, `Gotify`, `Discord` (webhook), and generic `WEBHOOK`. When new chapters are discovered after a series refresh, a notification is dispatched to all enabled targets. Test dispatch available via `POST /notifications/{id}/test`.
 - **Auth rate limiting**: `POST /auth/login` and `POST /auth/register` are rate-limited per IP address. Defaults: 10 login attempts per 15 minutes, 5 register attempts per 60 minutes. Trusted networks (RFC 1918 + loopback) are exempt. Configurable via the `auth.rateLimiting` YAML section. Blocked requests receive `429 Too Many Requests` with a `Retry-After` header.
 - **OPDS Page Streaming Extension (PSE)**: The OPDS series feed now includes a PSE `<link>` element for each downloaded chapter, allowing OPDS clients to stream individual pages without downloading the full CBZ. New endpoint: `GET /opds/v1/chapters/{id}/pages/{pageNumber}` (Basic Auth) serves page images with `ETag` and `Cache-Control: immutable` headers and supports `304 Not Modified` conditional requests.
