@@ -11,10 +11,15 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -99,7 +104,6 @@ class MangaDexConnectorTest {
 
         assertTrue(capturedUrl.contains("offset=40"), "Expected offset=40 in URL, got: $capturedUrl")
     }
-
     @Test
     fun `search omits title param when query is blank`() {
         var capturedUrl = ""
@@ -380,5 +384,127 @@ class MangaDexConnectorTest {
 
         assertTrue(assertSuccess(result).isEmpty())
         assertTrue(requests <= 2, "asked $requests times for chapters that never come")
+    }
+
+    private class Recorded(
+        val method: HttpMethod,
+        val url: String,
+        val contentType: String?,
+        val body: String,
+    )
+
+    // answers at-home calls with `baseUrl`, images with `imageStatus`, and records every request
+    private fun recordingConnector(
+        baseUrl: String,
+        imageStatus: HttpStatusCode = HttpStatusCode.OK,
+        reportFails: Boolean = false,
+    ): Pair<MangaDexConnector, MutableList<Recorded>> {
+        val seen = mutableListOf<Recorded>()
+        val engine =
+            MockEngine { request ->
+                val text = (request.body as? TextContent)?.text.orEmpty()
+                seen += Recorded(request.method, request.url.toString(), request.body.contentType?.toString(), text)
+                val url = request.url.toString()
+                when {
+                    url.contains("/at-home/server/") ->
+                        respond(
+                            """{"result":"ok","baseUrl":"$baseUrl","chapter":{"hash":"h","data":["p1.jpg"]}}""",
+                            HttpStatusCode.OK,
+                            jsonHeaders,
+                        )
+                    url.startsWith("https://api.mangadex.network/report") -> {
+                        if (reportFails) error("report endpoint unreachable")
+                        respond("", HttpStatusCode.OK)
+                    }
+                    else -> respond(ByteArray(7), imageStatus)
+                }
+            }
+        return MangaDexConnector(HttpClient(engine)) to seen
+    }
+
+    @Test
+    fun `fetchPage reports an image served by a MangaDex at Home node`() {
+        val (connector, seen) = recordingConnector("https://abc.def.mangadex.network:443")
+        val chapter = makeChapter("chapter-report")
+
+        runBlocking {
+            val page = assertSuccess(connector.download(chapter, ChapterFormat.Cbz)).pages.single()
+            assertSuccess(connector.fetchPage(page))
+        }
+
+        val report = seen.single { it.url == "https://api.mangadex.network/report" }
+        assertEquals(HttpMethod.Post, report.method)
+        assertEquals("application/json", report.contentType)
+        val json = Json.parseToJsonElement(report.body).jsonObject
+        assertEquals("https://abc.def.mangadex.network:443/data/h/p1.jpg", json["url"]?.jsonPrimitive?.content)
+        assertEquals("true", json["success"]?.jsonPrimitive?.content)
+        assertEquals("7", json["bytes"]?.jsonPrimitive?.content)
+        assertEquals("false", json["cached"]?.jsonPrimitive?.content)
+        assertTrue((json["duration"]?.jsonPrimitive?.content?.toLongOrNull() ?: -1) >= 0)
+    }
+
+    @Test
+    fun `fetchPage reports a failed image with success false and zero bytes`() {
+        val (connector, seen) = recordingConnector("https://node.mangadex.network", HttpStatusCode.Forbidden)
+        val chapter = makeChapter("chapter-report-fail")
+
+        runBlocking {
+            val page = assertSuccess(connector.download(chapter, ChapterFormat.Cbz)).pages.single()
+            assertIs<Result.Failure>(connector.fetchPage(page))
+        }
+
+        val json = Json.parseToJsonElement(seen.single { it.url.endsWith("/report") }.body).jsonObject
+        assertEquals("false", json["success"]?.jsonPrimitive?.content)
+        assertEquals("0", json["bytes"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `fetchPage does not report images served from mangadex org itself`() {
+        val (connector, seen) = recordingConnector("https://cmdxd98sb0x3yprd.mangadex.org")
+        val chapter = makeChapter("chapter-no-report")
+
+        runBlocking {
+            val page = assertSuccess(connector.download(chapter, ChapterFormat.Cbz)).pages.single()
+            assertSuccess(connector.fetchPage(page))
+        }
+
+        assertTrue(seen.none { it.url.endsWith("/report") }, "reported a mangadex.org image: ${seen.map { it.url }}")
+    }
+
+    @Test
+    fun `fetchPage still returns the image when the report cannot be sent`() {
+        val (connector, _) = recordingConnector("https://node.mangadex.network", reportFails = true)
+        val chapter = makeChapter("chapter-report-down")
+
+        val bytes =
+            runBlocking {
+                val page = assertSuccess(connector.download(chapter, ChapterFormat.Cbz)).pages.single()
+                assertSuccess(connector.fetchPage(page))
+            }
+
+        assertEquals(7, bytes.size)
+    }
+
+    @Test
+    fun `a failed image makes the next download ask for a fresh at-home server`() {
+        val (connector, seen) = recordingConnector("https://node.mangadex.network", HttpStatusCode.Forbidden)
+        val chapter = makeChapter("chapter-expired")
+
+        runBlocking {
+            val page = assertSuccess(connector.download(chapter, ChapterFormat.Cbz)).pages.single()
+            assertIs<Result.Failure>(connector.fetchPage(page))
+            assertSuccess(connector.download(chapter, ChapterFormat.Cbz))
+        }
+
+        assertEquals(2, seen.count { it.url.contains("/at-home/server/") })
+    }
+
+    @Test
+    fun `at-home requests are limited to 40 per minute`() {
+        val connector = makeConnector { "{}" }
+
+        val limits = connector.bucketConfigs.values.map { it.requestsPerSecond to it.burst }
+
+        assertTrue(limits.any { (rate, burst) -> burst == 40 && Math.abs(rate - 40.0 / 60.0) < 1e-9 }, "limits were $limits")
     }
 }

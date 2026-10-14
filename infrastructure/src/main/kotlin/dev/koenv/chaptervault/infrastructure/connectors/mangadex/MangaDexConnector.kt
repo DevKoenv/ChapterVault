@@ -26,16 +26,25 @@ import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.client.HttpClient
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.put
+import java.net.URI
+import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 
 private val lenientJson = Json { ignoreUnknownKeys = true }
 
 class MangaDexConnector(
-    httpClient: HttpClient,
+    private val httpClient: HttpClient,
 ) : HttpConnector(httpClient) {
     override val id = "mangadex"
     override val name = "MangaDex"
@@ -44,6 +53,8 @@ class MangaDexConnector(
         mapOf(
             Bucket.API to BucketConfig(requestsPerSecond = 3.0, burst = 3),
             Bucket.CDN to BucketConfig(requestsPerSecond = 3.0, burst = 5),
+            // MangaDex allows 40 at-home lookups per minute
+            AT_HOME to BucketConfig(requestsPerSecond = 40.0 / 60.0, burst = 40),
         )
 
     override fun supportedLanguages(): List<String> =
@@ -95,6 +106,55 @@ class MangaDexConnector(
         private const val API_URL = "https://api.mangadex.org"
         private const val CDN_URL = "https://uploads.mangadex.org"
         private const val TOKEN_LIFETIME_MS = 5 * 60 * 1000L
+        private const val REPORT_URL = "https://api.mangadex.network/report"
+        private const val REPORT_TIMEOUT_MS = 5_000L
+
+        private val AT_HOME =
+            object : BucketKey {
+                override val id = "at-home"
+            }
+    }
+
+    override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> {
+        val started = System.nanoTime()
+        val result = super.fetchPage(page)
+        val bytes = (result as? Result.Success)?.value?.size ?: 0
+        if (result is Result.Failure) {
+            // the at-home base URL may have expired or the node may be bad: ask for a new one next time
+            tokenCache.entries.removeIf { (_, c) -> page.url.startsWith("${c.baseUrl}/data/${c.hash}/") }
+        }
+        report(page.url, result is Result.Success, bytes, (System.nanoTime() - started) / 1_000_000)
+        return result
+    }
+
+    // MangaDex asks clients to report every image served by a MangaDex@Home node; best effort, never fails a download
+    private suspend fun report(
+        imageUrl: String,
+        success: Boolean,
+        bytes: Int,
+        durationMs: Long,
+    ) {
+        if (runCatching { URI(imageUrl).host }.getOrNull()?.endsWith("mangadex.org") != false) return
+        val body =
+            buildJsonObject {
+                put("url", imageUrl)
+                put("success", success)
+                put("cached", false) // the page download does not expose the X-Cache header
+                put("bytes", bytes)
+                put("duration", durationMs)
+            }
+        try {
+            withTimeoutOrNull(REPORT_TIMEOUT_MS) {
+                httpClient.post(REPORT_URL) {
+                    contentType(ContentType.Application.Json)
+                    setBody(body.toString())
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // reporting is optional
+        }
     }
 
     override suspend fun search(
@@ -208,7 +268,7 @@ class MangaDexConnector(
             if (cached != null && System.currentTimeMillis() - cached.timestamp < TOKEN_LIFETIME_MS) {
                 return@withLock Result.Success(cached)
             }
-            when (val r = context.getJson<MangaDexAtHomeResponse>("$API_URL/at-home/server/$chapterId")) {
+            when (val r = context.getJson<MangaDexAtHomeResponse>("$API_URL/at-home/server/$chapterId", bucket = AT_HOME)) {
                 is Result.Failure -> r
                 is Result.Success -> {
                     val entry =
