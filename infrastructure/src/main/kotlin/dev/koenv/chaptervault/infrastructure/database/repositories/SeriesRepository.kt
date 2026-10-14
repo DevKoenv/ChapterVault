@@ -150,6 +150,9 @@ class SeriesRepository(
         request: PageRequest,
     ): Result<Pagination<Chapter>> =
         dbQuery {
+            if (SeriesTable.selectAll().where { SeriesTable.id eq seriesId.toString() }.empty()) {
+                return@dbQuery Result.Failure(AppError.NotFound("Series", seriesId.toString()))
+            }
             val condition =
                 if (status != null) {
                     (ChapterTable.seriesId eq seriesId.toString()) and (ChapterTable.downloadStatus eq status.name)

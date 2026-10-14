@@ -407,6 +407,14 @@ class SeriesRepositoryTest {
         return id
     }
 
+    @Test
+    fun `listChaptersPaginated reports an unknown series as not found`() =
+        runBlocking {
+            val result = repo.listChaptersPaginated(Id.generate(), null, PageRequest(0, 10))
+
+            assertIs<AppError.NotFound>((result as Result.Failure).error)
+        }
+
     private fun addTitled(titles: List<String>): List<Id> =
         titles.mapIndexed { i, title ->
             val series = runBlocking { (repo.addToLibrary("mangadex", "ext-order-$i", autoDownload = false) as Result.Success).value }

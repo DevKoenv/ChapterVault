@@ -77,7 +77,10 @@ fun Route.libraryRoutes(
         val pageRequest = call.pageRequest(defaultSize = 20)
         val statusFilter =
             call.request.queryParameters["readingStatus"]?.let { s ->
-                runCatching { ReadingStatus.valueOf(s.uppercase()) }.getOrNull()
+                runCatching { ReadingStatus.valueOf(s.uppercase()) }.getOrNull() ?: run {
+                    call.respondBadRequest("Invalid readingStatus value")
+                    return@get
+                }
             }
 
         if (statusFilter != null) {

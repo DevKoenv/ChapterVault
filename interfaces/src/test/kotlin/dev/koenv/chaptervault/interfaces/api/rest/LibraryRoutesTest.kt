@@ -705,6 +705,14 @@ class LibraryRoutesTest {
     }
 
     @Test
+    fun `GET library series with an invalid readingStatus returns 400`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            val response = client.get("/library/series?readingStatus=BOGUS") { bearerAuth("user-token") }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
     fun `POST chapter redownload returns 202 and enqueues DOWNLOAD_CHAPTER task`() {
         val capturingQueue = CapturingTaskQueue()
         testApp(
