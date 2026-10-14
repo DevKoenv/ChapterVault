@@ -55,6 +55,38 @@ class FeedBuilderTest {
             updatedAt = Instant.EPOCH,
         )
 
+    @Test
+    fun `entries are dated by the series and chapter they describe, not by the request time`() {
+        val series = fakeSeries().copy(updatedAt = Instant.parse("2025-01-02T03:04:05Z"))
+        val chapter = fakeChapter().copy(updatedAt = Instant.parse("2025-06-07T08:09:10Z"))
+
+        val catalog = builder.buildCatalogFeed(listOf(series), 0, 20, 1, now)
+        val seriesFeed = builder.buildSeriesFeed(series, listOf(chapter), now)
+
+        assertEquals("2025-01-02T03:04:05Z", catalog.entries.single().updated)
+        assertEquals("2025-06-07T08:09:10Z", seriesFeed.entries.single().updated)
+        assertEquals("2025-06-07T08:09:10Z", seriesFeed.updated)
+    }
+
+    @Test
+    fun `catalog feeds do not offer sort facets the server ignores`() {
+        val catalog = builder.buildCatalogFeed(listOf(fakeSeries()), 0, 20, 1, now)
+        val filtered =
+            builder.buildFilteredCatalogFeed(
+                listOf(fakeSeries()),
+                0,
+                20,
+                1,
+                now,
+                genre = "Action",
+                language = null,
+                upstreamStatus = null,
+            )
+
+        assertEquals(emptyList(), catalog.facets.filter { "sort=" in it.href })
+        assertEquals(emptyList(), filtered.facets.filter { "sort=" in it.href })
+    }
+
     // ── buildNavigationFeed ────────────────────────────────────────────────
 
     @Test

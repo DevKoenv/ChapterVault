@@ -10,12 +10,6 @@ import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
 import java.net.URLEncoder
 
-private val SORT_FACETS =
-    listOf(
-        OpdsFacet(title = "By Title (A–Z)", href = "/opds/v1/catalog?sort=title&order=asc", group = "Sort"),
-        OpdsFacet(title = "By Date Added", href = "/opds/v1/catalog?sort=date&order=desc", group = "Sort"),
-    )
-
 class FeedBuilder {
     fun buildNavigationFeed(now: String): OpdsFeed =
         OpdsFeed(
@@ -82,7 +76,7 @@ class FeedBuilder {
         return OpdsFeed(
             id = "urn:chaptervault:catalog",
             title = "ChapterVault Library",
-            updated = now,
+            updated = series.maxOfOrNull { it.updatedAt }?.toString() ?: now,
             selfHref = "/opds/v1/catalog?page=$page&size=$size",
             kind = "acquisition",
             nextHref = if (page + 1 < totalPages) "/opds/v1/catalog?page=${page + 1}&size=$size" else null,
@@ -90,7 +84,6 @@ class FeedBuilder {
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
-            facets = SORT_FACETS,
             entries = series.map { buildSeriesEntry(it, now) },
         )
     }
@@ -263,7 +256,6 @@ class FeedBuilder {
         val baseQuery = if (filterParams.isNotEmpty()) "$filterParams&" else ""
         val facets =
             buildList {
-                addAll(SORT_FACETS)
                 genre?.let {
                     add(
                         OpdsFacet(
@@ -323,7 +315,7 @@ class FeedBuilder {
         OpdsFeed(
             id = "urn:chaptervault:series:${series.id}",
             title = series.title,
-            updated = now,
+            updated = (chapters.map { it.updatedAt } + series.updatedAt).max().toString(),
             selfHref = "/opds/v1/series/${series.id}",
             kind = "acquisition",
             coverHref = series.coverUrl,
@@ -342,7 +334,7 @@ class FeedBuilder {
         return OpdsEntry(
             id = "urn:chaptervault:series:${series.id}",
             title = series.title,
-            updated = now,
+            updated = series.updatedAt.toString(),
             summary = series.description,
             links = links,
         )
@@ -362,8 +354,9 @@ class FeedBuilder {
             summary = "File Type: CBZ"
             content = TYPE_CBZ
             val thumbHref = "/opds/v1/chapters/${chapter.id}/pages/0"
-            links.add(OpdsLink(rel = REL_IMAGE, href = thumbHref, type = "image/jpeg"))
-            links.add(OpdsLink(rel = REL_IMAGE_THUMBNAIL, href = thumbHref, type = "image/jpeg"))
+            val pageType = pageInfo?.firstPageMimeType ?: "image/jpeg"
+            links.add(OpdsLink(rel = REL_IMAGE, href = thumbHref, type = pageType))
+            links.add(OpdsLink(rel = REL_IMAGE_THUMBNAIL, href = thumbHref, type = pageType))
             links.add(
                 OpdsLink(
                     rel = REL_ACQUISITION,
@@ -390,7 +383,7 @@ class FeedBuilder {
         return OpdsEntry(
             id = "urn:chaptervault:chapter:${chapter.id}",
             title = chapter.title,
-            updated = now,
+            updated = chapter.updatedAt.toString(),
             summary = summary,
             content = content,
             links = links,

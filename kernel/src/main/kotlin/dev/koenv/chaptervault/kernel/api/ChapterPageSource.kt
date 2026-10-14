@@ -11,4 +11,11 @@ interface ChapterPageSource {
     ): Result<Page>
 
     suspend fun countPages(chapter: Chapter): Result<Int>
+
+    /** The MIME type of the first page; OPDS page streaming needs it to describe the pages. */
+    suspend fun firstPageMimeType(chapter: Chapter): Result<String> =
+        when (val page = readPage(chapter, 0)) {
+            is Result.Success -> Result.Success(page.value.mimeType)
+            is Result.Failure -> page
+        }
 }

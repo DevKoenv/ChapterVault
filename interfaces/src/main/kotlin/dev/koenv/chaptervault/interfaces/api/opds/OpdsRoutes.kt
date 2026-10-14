@@ -192,7 +192,12 @@ fun Application.opdsRoutes(
                                     is Result.Success -> r.value
                                     is Result.Failure -> return@mapNotNull null
                                 }
-                            chapter.id.toString() to FeedBuilder.ChapterPageInfo(pageCount, "image/jpeg")
+                            val mimeType =
+                                when (val r = pageSource.firstPageMimeType(chapter)) {
+                                    is Result.Success -> r.value
+                                    is Result.Failure -> return@mapNotNull null
+                                }
+                            chapter.id.toString() to FeedBuilder.ChapterPageInfo(pageCount, mimeType)
                         }.toMap()
                 val now = Instant.now().toString()
                 val feed =

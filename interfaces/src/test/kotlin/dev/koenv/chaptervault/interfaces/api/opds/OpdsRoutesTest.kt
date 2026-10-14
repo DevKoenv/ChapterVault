@@ -381,7 +381,8 @@ class OpdsRoutesTest {
             assertContains(body, "rel=\"http://vaemendis.net/opds-pse/stream\"")
             assertContains(body, "pse:count=\"5\"")
             assertContains(body, "xmlns:pse=\"http://vaemendis.net/opds-pse/ns\"")
-            assertContains(body, "type=\"image/jpeg\"")
+            assertContains(body, "type=\"image/png\"")
+            assertTrue(!body.contains("image/jpeg"), "the pages are PNG, nothing in this feed may claim JPEG")
         }
 
     @Test
