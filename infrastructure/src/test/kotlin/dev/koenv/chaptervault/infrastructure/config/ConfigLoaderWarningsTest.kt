@@ -44,6 +44,16 @@ class ConfigLoaderWarningsTest {
     }
 
     @Test
+    fun `log level and pool size are no longer settings and are reported as unknown`(
+        @TempDir dir: Path,
+    ) {
+        load(dir, "log:\n  level: DEBUG\ndatabase:\n  maxPoolSize: 10\n")
+
+        assertTrue(warnings.any { "log" in it && "Unknown setting" in it }, warnings.toString())
+        assertTrue(warnings.any { "database.maxPoolSize" in it && "Unknown setting" in it }, warnings.toString())
+    }
+
+    @Test
     fun `a section that is not a section is reported`(
         @TempDir dir: Path,
     ) {

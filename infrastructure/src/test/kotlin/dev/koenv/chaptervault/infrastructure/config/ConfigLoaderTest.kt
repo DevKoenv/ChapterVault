@@ -42,13 +42,11 @@ class ConfigLoaderTest {
             """
             database:
               url: "jdbc:sqlite:custom.db"
-              maxPoolSize: 10
             """.trimIndent(),
         )
 
         val config = ConfigLoader.load(file.absolutePath)
         assertEquals("jdbc:sqlite:custom.db", config.database.url)
-        assertEquals(10, config.database.maxPoolSize)
     }
 
     @Test

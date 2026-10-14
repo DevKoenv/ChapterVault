@@ -130,9 +130,6 @@ object ConfigLoader {
                 server = top.child("server")?.let { serverFrom(it, derived.server) } ?: derived.server,
                 database = top.child("database")?.let { databaseFrom(it, derived.database) } ?: derived.database,
                 storage = top.child("storage")?.let { storageFrom(it, derived.storage, warn) } ?: derived.storage,
-                log =
-                    top.child("log")?.let { l -> LogConfig(level = l.string("level", derived.log.level)).also { l.finish() } }
-                        ?: derived.log,
                 refresh = top.child("refresh")?.let { refreshFrom(it, derived.refresh) } ?: derived.refresh,
                 debug = top.child("debug")?.let { debugFrom(it, derived.debug) } ?: derived.debug,
                 auth = top.child("auth")?.let { authFrom(it, derived.auth) } ?: derived.auth,
@@ -158,7 +155,6 @@ object ConfigLoader {
     ) = DatabaseConfig(
         driver = s.string("driver", d.driver),
         url = s.string("url", d.url),
-        maxPoolSize = s.int("maxPoolSize", d.maxPoolSize),
     ).also { s.finish() }
 
     private fun storageFrom(

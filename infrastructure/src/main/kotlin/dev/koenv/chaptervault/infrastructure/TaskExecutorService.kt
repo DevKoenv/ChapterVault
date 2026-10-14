@@ -59,7 +59,6 @@ data class ExecutorSettings(
         mapOf(
             TaskType.FETCH_SERIES_METADATA to 2 * 60_000L,
             TaskType.FETCH_CHAPTERS to 2 * 60_000L,
-            TaskType.DOWNLOAD_SERIES to 2 * 60_000L,
             TaskType.DOWNLOAD_CHAPTER to 15 * 60_000L,
         ),
     /** The wait before the first, second, third retry. A task that failed after the last entry stays failed. */
@@ -262,7 +261,6 @@ class TaskExecutorService(
             TaskType.FETCH_SERIES_METADATA -> handleFetchSeriesMetadata(task)
             TaskType.FETCH_CHAPTERS -> handleFetchChapters(task)
             TaskType.DOWNLOAD_CHAPTER -> handleDownloadChapter(task)
-            TaskType.DOWNLOAD_SERIES -> handleDownloadSeries(task)
         }
 
     internal suspend fun handleFetchSeriesMetadata(task: Task): Result<Unit> {
@@ -415,46 +413,6 @@ class TaskExecutorService(
             }
         }
 
-        return Result.Success(Unit)
-    }
-
-    private suspend fun handleDownloadSeries(task: Task): Result<Unit> {
-        val series =
-            when (val r = seriesRepository.getSeries(task.targetId)) {
-                is Result.Success -> r.value
-                is Result.Failure -> return r
-            }
-        val allChapters =
-            when (val r = chapterRepository.listChapters(task.targetId)) {
-                is Result.Success -> r.value
-                is Result.Failure -> return r
-            }
-        val toDownload =
-            allChapters.filter {
-                it.downloadStatus == DownloadStatus.AVAILABLE || it.downloadStatus == DownloadStatus.FAILED
-            }
-        val format = series.defaultFormat ?: ChapterFormat.Cbz
-        val now = Instant.now()
-        for (chapter in toDownload) {
-            setChapterStatus(chapter, DownloadStatus.PENDING)
-            taskQueue.enqueue(
-                Task(
-                    id = Id.generate(),
-                    type = TaskType.DOWNLOAD_CHAPTER,
-                    status = TaskStatus.PENDING,
-                    targetType = TargetType.CHAPTER,
-                    targetId = chapter.id,
-                    payload =
-                        mapOf(
-                            TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
-                            TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
-                            TaskPayloadKeys.FORMAT to format.toString(),
-                        ),
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
-        }
         return Result.Success(Unit)
     }
 

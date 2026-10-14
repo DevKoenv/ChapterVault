@@ -37,6 +37,11 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
   `<data dir>/config.yaml`. The compose file publishes `127.0.0.1:8080`, uses a named volume and pins an image version.
 - The container runs as an unprivileged user (uid 10001). A host folder mounted at `/app/data` must be writable for it.
 
+- Values that were declared but never produced are gone before the API freezes: the task type `DOWNLOAD_SERIES`, the
+  series status `REMOVED` and the extension source `REGISTRY` (the API never returned them), and the config keys
+  `log.level` and `database.maxPoolSize` (they were validated but had no effect; the log reports them as unknown
+  settings). `latestPage` in progress and backups is kept but reserved: it is always 0 until a client can set it.
+
 #### Added
 
 - Failed Basic-auth (OPDS) attempts are rate limited per client address and per username; blocked clients get `429`

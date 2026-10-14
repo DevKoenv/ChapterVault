@@ -6,7 +6,6 @@ data class AppConfig(
     val server: ServerConfig = ServerConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
     val storage: StorageConfig = StorageConfig(),
-    val log: LogConfig = LogConfig(),
     val refresh: RefreshConfig = RefreshConfig(),
     val debug: DebugConfig = DebugConfig(),
     val auth: AuthConfig = AuthConfig(),
@@ -44,17 +43,12 @@ data class ServerConfig(
 data class DatabaseConfig(
     val driver: String = "org.sqlite.JDBC",
     val url: String = "jdbc:sqlite:data/db/chaptervault.db",
-    val maxPoolSize: Int = 5,
 )
 
 data class StorageConfig(
     val libraryPath: String = "data/library",
     val thumbnailsPath: String = "data/thumbnails",
     val defaultFormat: ChapterFormat = ChapterFormat.Cbz,
-)
-
-data class LogConfig(
-    val level: String = "INFO",
 )
 
 data class AuthConfig(

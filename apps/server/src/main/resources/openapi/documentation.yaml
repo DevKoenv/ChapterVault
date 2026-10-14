@@ -94,7 +94,7 @@ components:
         connectorId:   { type: string, nullable: true }
         externalId:    { type: string, nullable: true }
         language:      { type: string, example: en, description: "BCP 47 language tag; defaults to 'en'" }
-        status:        { type: string, enum: [IN_LIBRARY, REMOVED] }
+        status:        { type: string, enum: [IN_LIBRARY] }
         autoDownload:  { type: boolean }
         coverUrl:      { type: string, nullable: true }
         description:   { type: string, nullable: true }
@@ -124,7 +124,7 @@ components:
       type: object
       properties:
         id:           { type: string, format: uuid }
-        type:         { type: string, enum: [FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER, DOWNLOAD_SERIES] }
+        type:         { type: string, enum: [FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER] }
         status:       { type: string, enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED] }
         targetType:   { type: string, enum: [SERIES, CHAPTER] }
         targetId:     { type: string, format: uuid }
@@ -139,7 +139,7 @@ components:
       description: Emitted when a task transitions to a new state
       properties:
         taskId:       { type: string, format: uuid }
-        taskType:     { type: string, enum: [FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER, DOWNLOAD_SERIES] }
+        taskType:     { type: string, enum: [FETCH_SERIES_METADATA, FETCH_CHAPTERS, DOWNLOAD_CHAPTER] }
         targetId:     { type: string, format: uuid }
         status:       { type: string, enum: [QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED] }
         errorMessage: { type: string, nullable: true, description: "Only present when status is FAILED" }
@@ -191,7 +191,7 @@ components:
       properties:
         seriesId:        { type: string, format: uuid }
         latestChapterId: { type: string, format: uuid, nullable: true, description: Most recently read chapter }
-        latestPage:      { type: integer, description: Page reached in that chapter }
+        latestPage:      { type: integer, description: "Reserved: always 0 for now. Backups carry it, so a later version can record the page reached in that chapter" }
         unreadCount:     { type: integer, description: Chapters not yet marked as read }
         totalCount:      { type: integer, description: Total number of chapters in the series }
 
@@ -270,7 +270,7 @@ components:
         name:         { type: string }
         version:      { type: string }
         status:       { type: string, enum: [DISCOVERED, LOADING, ENABLED, DISABLED, FAILED, UNLOADED] }
-        source:       { type: string, enum: [BUNDLED, LOCAL, REGISTRY], description: "LOCAL is a JAR in the data folder; REGISTRY is reserved and not used yet" }
+        source:       { type: string, enum: [BUNDLED, LOCAL], description: "LOCAL is a JAR in the data folder" }
         capabilities: { type: array, items: { type: string, enum: [connector, metadata_enricher, notification_channel] } }
         errorMessage: { type: string, nullable: true }
 

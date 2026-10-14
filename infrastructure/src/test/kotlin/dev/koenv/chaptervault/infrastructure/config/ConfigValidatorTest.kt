@@ -57,15 +57,6 @@ class ConfigValidatorTest {
     }
 
     @Test
-    fun `invalid log level fails`() {
-        val ex =
-            assertFailsWith<IllegalStateException> {
-                valid.copy(log = LogConfig(level = "VERBOSE")).validate()
-            }
-        assertContains(ex.message!!, "log.level")
-    }
-
-    @Test
     fun `multiple errors reported together`() {
         val ex =
             assertFailsWith<IllegalStateException> {

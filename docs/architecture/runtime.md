@@ -12,9 +12,8 @@ The runtime manages background tasks: downloads, metadata fetches, chapter list 
 ## Task types
 
 - `DOWNLOAD_CHAPTER`
-- `DOWNLOAD_SERIES`
 - `FETCH_SERIES_METADATA`
 - `FETCH_CHAPTERS`
 
 `TaskType` is a **closed set** in 1.x: extensions cannot add task types, and the values appear in REST responses and the
-event stream, so adding one is an API change. `DOWNLOAD_SERIES` has a handler but nothing enqueues it today.
+event stream, so adding one is an API change. Downloading a whole series enqueues one `DOWNLOAD_CHAPTER` task per chapter.
