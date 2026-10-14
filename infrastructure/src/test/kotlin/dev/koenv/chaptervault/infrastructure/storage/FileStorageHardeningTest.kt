@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.infrastructure.storage
 
+import com.sun.management.UnixOperatingSystemMXBean
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Page
@@ -280,11 +281,10 @@ class FileStorageHardeningTest {
 
     @Test
     fun `reading pages from a folder chapter does not leak directory handles`() {
-        val os = ManagementFactory.getOperatingSystemMXBean()
-        val counter = os.javaClass.methods.firstOrNull { it.name == "getOpenFileDescriptorCount" }
-        assumeTrue(counter != null, "open descriptor count is only available on Unix")
+        val os = ManagementFactory.getOperatingSystemMXBean() as? UnixOperatingSystemMXBean
+        assumeTrue(os != null, "open descriptor count is only available on Unix")
 
-        fun open() = (counter!!.invoke(os) as Long)
+        fun open() = os!!.openFileDescriptorCount
         write(Page(0, jpeg), Page(1, png), format = ChapterFormat.Folder)
         readPage(0) // warm up
 

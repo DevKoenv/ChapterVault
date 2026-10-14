@@ -5,15 +5,20 @@ plugins {
     alias(libs.plugins.buildconfig)
 }
 
+// The Docker build context has no .git (and the builder image no git); asking for it would fail the configuration cache.
 val gitRevision: String =
-    try {
-        providers
-            .exec {
-                commandLine("git", "rev-parse", "--short", "HEAD")
-            }.standardOutput.asText
-            .get()
-            .trim()
-    } catch (e: Exception) {
+    if (rootProject.file(".git").exists()) {
+        try {
+            providers
+                .exec {
+                    commandLine("git", "rev-parse", "--short", "HEAD")
+                }.standardOutput.asText
+                .get()
+                .trim()
+        } catch (e: Exception) {
+            "unknown"
+        }
+    } else {
         "unknown"
     }
 
