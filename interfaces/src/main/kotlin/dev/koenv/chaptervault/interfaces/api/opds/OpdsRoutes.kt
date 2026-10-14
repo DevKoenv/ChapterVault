@@ -204,7 +204,6 @@ fun Application.opdsRoutes(
                     feedBuilder.buildSeriesFeed(
                         series = (seriesResult as Result.Success).value,
                         chapters = chapters,
-                        now = now,
                         pageInfoByChapterId = pageInfoByChapterId,
                     )
                 call.respondText(opdsV1.serialize(feed), opdsContentType(call))

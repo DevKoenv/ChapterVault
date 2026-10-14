@@ -84,7 +84,7 @@ class FeedBuilder {
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
-            entries = series.map { buildSeriesEntry(it, now) },
+            entries = series.map { buildSeriesEntry(it) },
         )
     }
 
@@ -147,7 +147,7 @@ class FeedBuilder {
             startIndex = page * size + 1,
             entries =
                 chapters.map { (chapter, series) ->
-                    buildChapterEntry(chapter, now, coverUrl = series.coverUrl)
+                    buildChapterEntry(chapter, coverUrl = series.coverUrl)
                 },
         )
     }
@@ -302,14 +302,13 @@ class FeedBuilder {
             itemsPerPage = size,
             startIndex = page * size + 1,
             facets = facets,
-            entries = series.map { buildSeriesEntry(it, now) },
+            entries = series.map { buildSeriesEntry(it) },
         )
     }
 
     fun buildSeriesFeed(
         series: Series,
         chapters: List<Chapter>,
-        now: String,
         pageInfoByChapterId: Map<String, ChapterPageInfo> = emptyMap(),
     ): OpdsFeed =
         OpdsFeed(
@@ -319,13 +318,10 @@ class FeedBuilder {
             selfHref = "/opds/v1/series/${series.id}",
             kind = "acquisition",
             coverHref = series.coverUrl,
-            entries = chapters.map { buildChapterEntry(it, now, pageInfoByChapterId[it.id.toString()], series.coverUrl) },
+            entries = chapters.map { buildChapterEntry(it, pageInfoByChapterId[it.id.toString()], series.coverUrl) },
         )
 
-    private fun buildSeriesEntry(
-        series: Series,
-        now: String,
-    ): OpdsEntry {
+    private fun buildSeriesEntry(series: Series): OpdsEntry {
         val links =
             mutableListOf(
                 OpdsLink(rel = "subsection", href = "/opds/v1/series/${series.id}", type = TYPE_ACQUISITION),
@@ -342,7 +338,6 @@ class FeedBuilder {
 
     internal fun buildChapterEntry(
         chapter: Chapter,
-        now: String,
         pageInfo: ChapterPageInfo? = null,
         coverUrl: String? = null,
     ): OpdsEntry {

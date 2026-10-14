@@ -61,7 +61,7 @@ class FeedBuilderTest {
         val chapter = fakeChapter().copy(updatedAt = Instant.parse("2025-06-07T08:09:10Z"))
 
         val catalog = builder.buildCatalogFeed(listOf(series), 0, 20, 1, now)
-        val seriesFeed = builder.buildSeriesFeed(series, listOf(chapter), now)
+        val seriesFeed = builder.buildSeriesFeed(series, listOf(chapter))
 
         assertEquals("2025-01-02T03:04:05Z", catalog.entries.single().updated)
         assertEquals("2025-06-07T08:09:10Z", seriesFeed.entries.single().updated)
