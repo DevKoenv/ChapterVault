@@ -1,10 +1,15 @@
 .gradle/
+.kotlin/
 build/
 */build/
+*/*/build/
 .git/
 .idea/
 .claude/
+.github/
 docs/
-*.sqlite
 data/
 downloads/
+extensions/
+*.sqlite
+*.db

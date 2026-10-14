@@ -15,13 +15,15 @@ kotlin {
         freeCompilerArgs.addAll(
             "-opt-in=kotlin.RequiresOptIn",
             "-Xjsr305=strict",
+            // CI and the Docker image run JDK 21. Compiling against the JDK 21 API on any newer local JDK means a build
+            // that is green here cannot fail there because of a method that only exists in a later release.
+            "-Xjdk-release=21",
         )
     }
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    sourceCompatibility = "21"
-    targetCompatibility = "21"
+    options.release.set(21)
 }
 
 tasks.withType<Test>().configureEach {

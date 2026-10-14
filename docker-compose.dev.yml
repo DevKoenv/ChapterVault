@@ -1,11 +1,14 @@
+# Local development: builds the image from this checkout.
 services:
   chaptervault:
     build: .
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
-      - ./data:/app/data
-      - ./config:/app/config
+      - chaptervault-dev-data:/app/data
     environment:
       - JAVA_OPTS=-Xmx512m
     restart: unless-stopped
+
+volumes:
+  chaptervault-dev-data:

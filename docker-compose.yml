@@ -1,11 +1,29 @@
+# ChapterVault, published on this machine only. Put a reverse proxy with TLS in front of it before exposing it
+# to a network you do not control (see the README: Basic auth for OPDS sends the password with every request).
 services:
   chaptervault:
-    image: ghcr.io/devkoenv/chaptervault:latest
+    # Pin the version you run; `latest` only follows stable releases, but an upgrade should be your decision.
+    image: ghcr.io/devkoenv/chaptervault:1.0.0
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
-      - ./data:/app/data
-      - ./config:/app/config
+      # A named volume is writable for the container's user without further setup. To use a folder instead,
+      # replace it with ./data:/app/data and run `chown 10001:10001 data` on the host first.
+      - chaptervault-data:/app/data
     environment:
       - JAVA_OPTS=-Xmx512m
+      # The first start prints a generated administrator password in the log (docker compose logs chaptervault).
+      # To choose it yourself, set it before the first start; it must not be "changeme".
+      # - CHAPTERVAULT_ADMIN_PASS=
     restart: unless-stopped
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  chaptervault-data:

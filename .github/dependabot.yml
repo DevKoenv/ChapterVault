@@ -1,0 +1,25 @@
+version: 2
+
+# Dependabot only opens pull requests; nothing changes until they are reviewed and merged.
+updates:
+  # Gradle dependencies: only patch updates are proposed. Minor and major upgrades are decided by hand.
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+
+  # Pinned action versions (commit SHAs) and the base images in the Dockerfile
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
