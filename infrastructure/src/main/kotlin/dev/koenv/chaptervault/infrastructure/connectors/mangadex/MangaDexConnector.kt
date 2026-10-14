@@ -45,7 +45,10 @@ private val lenientJson = Json { ignoreUnknownKeys = true }
 
 class MangaDexConnector(
     private val httpClient: HttpClient,
+    contentRatings: List<String> = listOf("safe", "suggestive"),
 ) : HttpConnector(httpClient) {
+    private val ratingParams = contentRatings.joinToString("") { "&contentRating[]=${it.lowercase()}" }
+
     override val id = "mangadex"
     override val name = "MangaDex"
 
@@ -161,7 +164,7 @@ class MangaDexConnector(
         query: String,
         request: PageRequest,
     ): Result<Pagination<SeriesSearchResult>> {
-        val url = "$API_URL/manga?includes[]=cover_art&contentRating[]=safe&contentRating[]=suggestive"
+        val url = "$API_URL/manga?includes[]=cover_art$ratingParams"
         val params =
             buildMap<String, String> {
                 put("limit", request.size.toString())

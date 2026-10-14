@@ -13,6 +13,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
@@ -104,6 +105,38 @@ class MangaDexConnectorTest {
 
         assertTrue(capturedUrl.contains("offset=40"), "Expected offset=40 in URL, got: $capturedUrl")
     }
+
+    @Test
+    fun `search asks only for safe and suggestive content by default`() {
+        var capturedUrl = ""
+        val connector =
+            makeConnector { url ->
+                capturedUrl = url
+                """{"result":"ok","data":[],"limit":20,"offset":0,"total":0}"""
+            }
+
+        runBlocking { connector.search("", PageRequest(page = 0, size = 20)) }
+
+        assertEquals(listOf("safe", "suggestive"), ratingsIn(capturedUrl))
+    }
+
+    @Test
+    fun `search asks for the configured content ratings`() {
+        var capturedUrl = ""
+        val engine =
+            MockEngine { request ->
+                capturedUrl = request.url.toString()
+                respond("""{"result":"ok","data":[],"limit":20,"offset":0,"total":0}""", HttpStatusCode.OK, jsonHeaders)
+            }
+        val connector = MangaDexConnector(HttpClient(engine), contentRatings = listOf("Safe", "EROTICA"))
+
+        runBlocking { connector.search("", PageRequest(page = 0, size = 20)) }
+
+        assertEquals(listOf("safe", "erotica"), ratingsIn(capturedUrl))
+    }
+
+    private fun ratingsIn(url: String): List<String> = Url(url).parameters.getAll("contentRating[]").orEmpty()
+
     @Test
     fun `search omits title param when query is blank`() {
         var capturedUrl = ""

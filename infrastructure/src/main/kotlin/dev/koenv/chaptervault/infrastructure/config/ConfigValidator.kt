@@ -1,5 +1,7 @@
 package dev.koenv.chaptervault.infrastructure.config
 
+private val MANGADEX_CONTENT_RATINGS = setOf("safe", "suggestive", "erotica", "pornographic")
+
 internal fun AppConfig.validate() {
     val errors = mutableListOf<String>()
 
@@ -18,6 +20,15 @@ internal fun AppConfig.validate() {
     val register = auth.rateLimiting.register
     if (register.maxAttempts < 1) errors += "auth.rateLimiting.register.maxAttempts must be >= 1 (got ${register.maxAttempts})"
     if (register.windowMinutes < 1) errors += "auth.rateLimiting.register.windowMinutes must be >= 1 (got ${register.windowMinutes})"
+
+    val ratings = connectors.mangadex.contentRatings
+    if (ratings.isEmpty()) {
+        // MangaDex would apply its own default instead of the one documented here
+        errors += "connectors.mangadex.contentRatings must list at least one of ${MANGADEX_CONTENT_RATINGS.joinToString()}"
+    }
+    ratings.filter { it.lowercase() !in MANGADEX_CONTENT_RATINGS }.forEach {
+        errors += "connectors.mangadex.contentRatings must be one of ${MANGADEX_CONTENT_RATINGS.joinToString()} (got '$it')"
+    }
 
     if (errors.isNotEmpty()) {
         error("Invalid configuration:\n" + errors.joinToString("\n") { "  - $it" })

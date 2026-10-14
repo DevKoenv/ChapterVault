@@ -135,6 +135,7 @@ object ConfigLoader {
                 auth = top.child("auth")?.let { authFrom(it, derived.auth) } ?: derived.auth,
                 notifications = top.child("notifications")?.let { notificationsFrom(it, derived.notifications) } ?: derived.notifications,
                 updates = top.child("updates")?.let { updatesFrom(it, derived.updates) } ?: derived.updates,
+                connectors = top.child("connectors")?.let { connectorsFrom(it, derived.connectors) } ?: derived.connectors,
             )
         top.finish()
         return config
@@ -198,6 +199,16 @@ object ConfigLoader {
         s: Section,
         d: UpdateConfig,
     ) = UpdateConfig(checkEnabled = s.bool("checkEnabled", d.checkEnabled)).also { s.finish() }
+
+    private fun connectorsFrom(
+        s: Section,
+        d: ConnectorsConfig,
+    ) = ConnectorsConfig(
+        mangadex =
+            s.child("mangadex")?.let { m ->
+                MangaDexConfig(contentRatings = m.strings("contentRatings", d.mangadex.contentRatings)).also { m.finish() }
+            } ?: d.mangadex,
+    ).also { s.finish() }
 
     private fun authFrom(
         a: Section,
@@ -263,6 +274,14 @@ object ConfigLoader {
           # Ask GitHub once a day whether a newer ChapterVault release exists (shown in the log and /system/updates).
           # false = the server never contacts GitHub.
           checkEnabled: true
+
+        connectors:
+          mangadex:
+            # Which content ratings a MangaDex search returns: safe, suggestive, erotica, pornographic.
+            # You are responsible for what you enable and download (see "Content sources" in the README).
+            contentRatings:
+              - safe
+              - suggestive
 
         notifications:
           # Notification targets may not point at this machine (localhost, loopback, link-local such as the cloud
@@ -351,6 +370,18 @@ object ConfigLoader {
             updates =
                 base.updates.copy(
                     checkEnabled = bool("CHAPTERVAULT_UPDATE_CHECK") ?: base.updates.checkEnabled,
+                ),
+            connectors =
+                base.connectors.copy(
+                    mangadex =
+                        base.connectors.mangadex.copy(
+                            contentRatings =
+                                env("CHAPTERVAULT_MANGADEX_CONTENT_RATINGS")
+                                    ?.split(",")
+                                    ?.map { it.trim() }
+                                    ?.filter { it.isNotEmpty() }
+                                    ?: base.connectors.mangadex.contentRatings,
+                        ),
                 ),
         )
     }

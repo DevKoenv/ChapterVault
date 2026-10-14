@@ -11,6 +11,16 @@ data class AppConfig(
     val auth: AuthConfig = AuthConfig(),
     val notifications: NotificationConfig = NotificationConfig(),
     val updates: UpdateConfig = UpdateConfig(),
+    val connectors: ConnectorsConfig = ConnectorsConfig(),
+)
+
+data class ConnectorsConfig(
+    val mangadex: MangaDexConfig = MangaDexConfig(),
+)
+
+data class MangaDexConfig(
+    // safe, suggestive, erotica, pornographic; searches only return works with one of these ratings
+    val contentRatings: List<String> = listOf("safe", "suggestive"),
 )
 
 data class NotificationConfig(

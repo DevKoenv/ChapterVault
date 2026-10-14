@@ -88,6 +88,7 @@ Running without Docker: `./gradlew :apps:server:shadowJar`, then `java -jar apps
 | `CHAPTERVAULT_REFRESH_HOURS` | `24` | Hours between automatic library refreshes, `0` disables |
 | `CHAPTERVAULT_UPDATE_CHECK` | `true` | `false` stops the server from contacting GitHub |
 | `CHAPTERVAULT_NOTIFICATIONS_ALLOW_LOCAL` | `false` | Allow notification targets on this machine (localhost) |
+| `CHAPTERVAULT_MANGADEX_CONTENT_RATINGS` | `safe,suggestive` | Comma separated MangaDex content ratings a search returns: `safe`, `suggestive`, `erotica`, `pornographic` |
 | `JAVA_OPTS` | `-XX:MaxRAMPercentage=75` (image) | Extra JVM flags, e.g. `-Xmx512m` |
 
 ### Configuration
@@ -106,6 +107,10 @@ refresh:
 
 updates:
   checkEnabled: true   # false: never contact GitHub
+
+connectors:
+  mangadex:
+    contentRatings: [safe, suggestive]   # also: erotica, pornographic; at least one is required
 
 auth:
   registrationEnabled: false

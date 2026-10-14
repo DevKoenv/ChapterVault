@@ -43,7 +43,7 @@ val extensionModule =
                 )
             }
             // Register built-in connectors directly; they are first-party and do not need the extension adapter.
-            connectorRegistry.register(MangaDexConnector(get()))
+            connectorRegistry.register(MangaDexConnector(get(), config.connectors.mangadex.contentRatings))
             if (config.debug.mockConnectorEnabled) {
                 connectorRegistry.register(MockConnector())
                 connectorRegistry.register(CustomConnector(get()))
