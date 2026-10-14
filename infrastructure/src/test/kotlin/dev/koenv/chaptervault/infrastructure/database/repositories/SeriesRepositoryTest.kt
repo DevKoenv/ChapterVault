@@ -407,6 +407,62 @@ class SeriesRepositoryTest {
         return id
     }
 
+    private fun addTitled(titles: List<String>): List<Id> =
+        titles.mapIndexed { i, title ->
+            val series = runBlocking { (repo.addToLibrary("mangadex", "ext-order-$i", autoDownload = false) as Result.Success).value }
+            transaction { SeriesTable.update({ SeriesTable.id eq series.id.toString() }) { it[SeriesTable.title] = title } }
+            series.id
+        }
+
+    private fun <T> pages(fetch: (PageRequest) -> List<T>): List<List<T>> = (0..2).map { fetch(PageRequest(it, 2)) }
+
+    @Test
+    fun `listSeries pages are ordered by title so no row repeats or is skipped`() =
+        runBlocking {
+            addTitled(listOf("C", "A", "E", "B", "D"))
+
+            val pages = pages { runBlocking { (repo.listSeries(it) as Result.Success).value.items.map { s -> s.title } } }
+
+            assertEquals(listOf(listOf("A", "B"), listOf("C", "D"), listOf("E")), pages)
+        }
+
+    @Test
+    fun `searchLibrary pages are ordered by title`() =
+        runBlocking {
+            addTitled(listOf("x3", "x1", "x5", "x2", "x4"))
+
+            val pages = pages { runBlocking { (repo.searchLibrary("x", it) as Result.Success).value.items.map { s -> s.title } } }
+
+            assertEquals(listOf(listOf("x1", "x2"), listOf("x3", "x4"), listOf("x5")), pages)
+        }
+
+    @Test
+    fun `listSeriesByIds pages are ordered by title`() =
+        runBlocking {
+            val ids = addTitled(listOf("C", "A", "E", "B", "D"))
+
+            val pages = pages { runBlocking { (repo.listSeriesByIds(ids, it) as Result.Success).value.items.map { s -> s.title } } }
+
+            assertEquals(listOf(listOf("A", "B"), listOf("C", "D"), listOf("E")), pages)
+        }
+
+    @Test
+    fun `listChaptersPaginated breaks ties on the chapter index by id`() =
+        runBlocking {
+            val series = (repo.addToLibrary("mangadex", "ext-ties", autoDownload = false) as Result.Success).value
+            repeat(6) { insertChapter(series.id) }
+
+            val paged =
+                (0..2).flatMap {
+                    (repo.listChaptersPaginated(series.id, null, PageRequest(it, 2)) as Result.Success).value.items.map { c ->
+                        c.id.toString()
+                    }
+                }
+
+            assertEquals(paged.sorted(), paged)
+            assertEquals(6, paged.toSet().size)
+        }
+
     private fun insertChapter(
         seriesId: Id,
         id: Id = Id.generate(),

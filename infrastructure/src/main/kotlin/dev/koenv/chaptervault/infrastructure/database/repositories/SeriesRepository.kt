@@ -57,6 +57,7 @@ class SeriesRepository(
             val rows =
                 SeriesTable
                     .selectAll()
+                    .orderBy(SeriesTable.title to SortOrder.ASC, SeriesTable.id to SortOrder.ASC)
                     .limit(request.size, (request.page * request.size).toLong())
                     .toList()
             val ids = rows.map { it[SeriesTable.id] }
@@ -77,6 +78,7 @@ class SeriesRepository(
                 SeriesTable
                     .selectAll()
                     .where { SeriesTable.id inList idStrings }
+                    .orderBy(SeriesTable.title to SortOrder.ASC, SeriesTable.id to SortOrder.ASC)
                     .limit(request.size, (request.page * request.size).toLong())
                     .toList()
             val rowIds = rows.map { it[SeriesTable.id] }
@@ -97,6 +99,7 @@ class SeriesRepository(
                 SeriesTable
                     .selectAll()
                     .where { SeriesTable.title like pattern }
+                    .orderBy(SeriesTable.title to SortOrder.ASC, SeriesTable.id to SortOrder.ASC)
                     .limit(request.size, (request.page * request.size).toLong())
                     .toList()
             val ids = rows.map { it[SeriesTable.id] }
@@ -158,7 +161,7 @@ class SeriesRepository(
                 ChapterTable
                     .selectAll()
                     .where(condition)
-                    .orderBy(ChapterTable.chapterIndex, SortOrder.ASC)
+                    .orderBy(ChapterTable.chapterIndex to SortOrder.ASC, ChapterTable.id to SortOrder.ASC)
                     .limit(request.size, (request.page * request.size).toLong())
                     .map { it.toChapter() }
             Result.Success(Pagination(chapters, request.page, request.size, total))
