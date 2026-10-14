@@ -260,6 +260,46 @@ class MangaDexConnectorTest {
         assertEquals(53, ch.pageCount)
     }
 
+    private fun feedOf(vararg chapters: Triple<String, String?, String>) =
+        makeConnector {
+            val data =
+                chapters.joinToString(",") { (id, number, publishAt) ->
+                    val chapter = if (number == null) "null" else "\"$number\""
+                    """{"id":"$id","attributes":{"title":null,"chapter":$chapter,"pages":10,"publishAt":"$publishAt"}}"""
+                }
+            """{"result":"ok","data":[$data],"limit":500,"offset":0,"total":${chapters.size}}"""
+        }
+
+    @Test
+    fun `fetchChapters gives chapters without a number distinct indexes after the numbered ones`() {
+        val connector =
+            feedOf(
+                Triple("n1", "1", "2020-01-01T00:00:00+00:00"),
+                Triple("n2", "2", "2020-01-02T00:00:00+00:00"),
+                Triple("x-late", null, "2020-03-01T00:00:00+00:00"),
+                Triple("x-early", null, "2020-02-01T00:00:00+00:00"),
+            )
+
+        val byId = assertSuccess(runBlocking { connector.fetchChapters("m") }).associateBy { it.externalId }
+
+        assertEquals(3.0, byId.getValue("x-early").chapterIndex)
+        assertEquals(4.0, byId.getValue("x-late").chapterIndex)
+    }
+
+    @Test
+    fun `fetchChapters keeps only the earliest published release of a chapter number`() {
+        val connector =
+            feedOf(
+                Triple("group-b", "5", "2020-01-03T00:00:00+00:00"),
+                Triple("group-a", "5", "2020-01-02T00:00:00+00:00"),
+                Triple("other", "6", "2020-01-04T00:00:00+00:00"),
+            )
+
+        val chapters = assertSuccess(runBlocking { connector.fetchChapters("m") })
+
+        assertEquals(listOf("group-a", "other"), chapters.map { it.externalId })
+    }
+
     @Test
     fun `fetchChapters filters out chapters with external URL`() {
         val connector =

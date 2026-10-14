@@ -228,12 +228,24 @@ class MangaDexConnector(
             }
         }
 
-        return Result.Success(
-            allChapters
-                .filter { it.attributes.externalUrl == null && it.attributes.pages > 0 }
-                .map { it.toChapterMetadata() },
-        )
+        return Result.Success(allChapters.filter { it.attributes.externalUrl == null && it.attributes.pages > 0 }.toChapterMetadata())
     }
+
+    /**
+     * Several scanlation groups can release the same chapter number: only the earliest published release is kept.
+     * Chapters without a number (oneshots, extras) are indexed after the highest numbered chapter, in publication order.
+     */
+    private fun List<MangaDexChapterData>.toChapterMetadata(): List<ChapterMetadata> {
+        val (numbered, unnumbered) = sortedWith(compareBy({ it.attributes.publishAt }, { it.id })).partition { it.number() != null }
+        val firstOfEachNumber = numbered.distinctBy { it.number() }
+        val afterLast = (firstOfEachNumber.maxOfOrNull { it.number() ?: 0.0 } ?: 0.0) + 1
+        return (
+            firstOfEachNumber.map { it.toChapterMetadata(it.number() ?: 0.0) } +
+                unnumbered.mapIndexed { i, chapter -> chapter.toChapterMetadata(afterLast + i) }
+        ).sortedBy { it.chapterIndex }
+    }
+
+    private fun MangaDexChapterData.number(): Double? = attributes.chapter?.toDoubleOrNull()
 
     override suspend fun download(
         chapter: Chapter,
@@ -304,13 +316,13 @@ class MangaDexConnector(
             description = attributes.preferredDescription(),
         )
 
-    private fun MangaDexChapterData.toChapterMetadata() =
+    private fun MangaDexChapterData.toChapterMetadata(index: Double) =
         ChapterMetadata(
             externalId = id,
             title =
                 attributes.title?.takeIf { it.isNotBlank() }
                     ?: "Chapter ${attributes.chapter ?: id}",
-            chapterIndex = attributes.chapter?.toDoubleOrNull() ?: 0.0,
+            chapterIndex = index,
             pageCount = attributes.pages,
         )
 
