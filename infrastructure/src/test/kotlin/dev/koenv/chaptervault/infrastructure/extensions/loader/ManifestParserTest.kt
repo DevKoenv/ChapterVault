@@ -249,4 +249,17 @@ class ManifestParserTest {
             """.trimIndent()
         assertNull(ManifestParser.parse(yaml))
     }
+
+    @Test
+    fun `parses correctly when called from many threads at once`() {
+        val pool =
+            java.util.concurrent.Executors
+                .newFixedThreadPool(16)
+        try {
+            val results = (1..16).map { pool.submit<Int> { (1..300).count { ManifestParser.parse(validYaml)?.id == "my-source" } } }
+            assertEquals(16 * 300, results.sumOf { it.get() })
+        } finally {
+            pool.shutdownNow()
+        }
+    }
 }

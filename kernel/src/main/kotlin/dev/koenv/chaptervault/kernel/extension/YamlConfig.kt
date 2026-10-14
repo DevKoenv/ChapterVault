@@ -9,14 +9,16 @@ class YamlConfig(
     val file: File,
 ) {
     private val data: MutableMap<String, Any?> = mutableMapOf()
-    private val yaml = Yaml(DumperOptions().apply { defaultFlowStyle = DumperOptions.FlowStyle.BLOCK })
+
+    // a Yaml instance is not thread-safe, so every load and save gets its own
+    private fun newYaml() = Yaml(DumperOptions().apply { defaultFlowStyle = DumperOptions.FlowStyle.BLOCK })
 
     fun load(): YamlConfig {
         if (!file.exists()) return this
         val parsed: Any? =
             file.inputStream().use { stream ->
                 try {
-                    yaml.load<Any?>(stream)
+                    newYaml().load<Any?>(stream)
                 } catch (e: YAMLException) {
                     throw YAMLException("Failed to parse ${file.path}: ${e.message}")
                 }
@@ -35,7 +37,7 @@ class YamlConfig(
 
     fun save() {
         file.parentFile?.mkdirs()
-        file.writer().use { yaml.dump(data, it) }
+        file.writer().use { newYaml().dump(data, it) }
     }
 
     fun getString(
