@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.infrastructure
 
+import dev.koenv.chaptervault.infrastructure.network.OutboundUrlPolicy
 import dev.koenv.chaptervault.infrastructure.notifications.DefaultNotificationChannelRegistry
 import dev.koenv.chaptervault.infrastructure.notifications.DiscordNotificationChannel
 import dev.koenv.chaptervault.infrastructure.notifications.GotifyNotificationChannel
@@ -43,6 +44,7 @@ class NotificationServiceTest {
     private fun buildService(
         target: NotificationTarget?,
         recordedRequests: MutableList<String> = mutableListOf(),
+        urlPolicy: OutboundUrlPolicy = OutboundUrlPolicy(resolve = { emptyList() }),
     ): NotificationDispatchApi {
         val api =
             object : NotificationApi {
@@ -81,6 +83,7 @@ class NotificationServiceTest {
             eventBus = InMemoryEventBus(),
             notificationApi = api,
             channelRegistry = registry,
+            urlPolicy = urlPolicy,
         )
     }
 
@@ -107,5 +110,19 @@ class NotificationServiceTest {
             val service = buildService(target, requests)
             service.sendTest(target.id)
             assertTrue(requests.any { it.contains("example.com") })
+        }
+
+    @Test
+    fun `sendTest refuses a target whose url points at this machine and sends nothing`() =
+        runBlocking<Unit> {
+            val requests = mutableListOf<String>()
+            val target = mockTarget("WEBHOOK", "http://169.254.169.254/latest/meta-data")
+            val service = buildService(target, requests)
+
+            val result = service.sendTest(target.id)
+
+            assertIs<Result.Failure>(result)
+            assertIs<AppError.ValidationError>(result.error)
+            assertTrue(requests.isEmpty())
         }
 }

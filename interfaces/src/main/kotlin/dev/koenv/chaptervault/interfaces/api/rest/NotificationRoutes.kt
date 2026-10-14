@@ -5,12 +5,9 @@ import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.NotificationTarget
 import dev.koenv.chaptervault.kernel.api.NotificationTargetInput
 import dev.koenv.chaptervault.kernel.api.NotificationTargetPatch
-import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.shared.result.Result
-import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -42,7 +39,8 @@ private data class NotificationTargetResponse(
     val name: String,
     val type: String,
     val url: String,
-    val token: String?,
+    // the token itself is never returned; send a new one with PATCH to change it, or an empty string to remove it
+    val hasToken: Boolean,
     val enabled: Boolean,
     val createdAt: String,
 )
@@ -53,7 +51,7 @@ private fun NotificationTarget.toResponse() =
         name = name,
         type = type,
         url = url,
-        token = token,
+        hasToken = !token.isNullOrEmpty(),
         enabled = enabled,
         createdAt = createdAt.toString(),
     )
@@ -63,28 +61,14 @@ fun Route.notificationRoutes(
     dispatchApi: NotificationDispatchApi,
 ) {
     get("/notifications") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@get
-        }
+        call.requirePermission(Permission.MANAGE_NOTIFICATIONS) ?: return@get
         val targets = notificationApi.listTargets()
         call.respond(HttpStatusCode.OK, targets.map { it.toResponse() })
     }
 
     post("/notifications") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
-        val req =
-            try {
-                call.receive<CreateTargetRequest>()
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid request body")
-                return@post
-            }
+        call.requirePermission(Permission.MANAGE_NOTIFICATIONS) ?: return@post
+        val req = call.receiveOrBadRequest<CreateTargetRequest>() ?: return@post
         if (req.name.isBlank()) {
             call.respondBadRequest("name must not be blank")
             return@post
@@ -108,25 +92,9 @@ fun Route.notificationRoutes(
     }
 
     patch("/notifications/{id}") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@patch
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid notification target ID")
-                return@patch
-            }
-        val req =
-            try {
-                call.receive<PatchTargetRequest>()
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid request body")
-                return@patch
-            }
+        call.requirePermission(Permission.MANAGE_NOTIFICATIONS) ?: return@patch
+        val id = call.idParam("id", "notification target") ?: return@patch
+        val req = call.receiveOrBadRequest<PatchTargetRequest>() ?: return@patch
         val patch =
             NotificationTargetPatch(
                 name = req.name,
@@ -141,18 +109,8 @@ fun Route.notificationRoutes(
     }
 
     delete("/notifications/{id}") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@delete
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid notification target ID")
-                return@delete
-            }
+        call.requirePermission(Permission.MANAGE_NOTIFICATIONS) ?: return@delete
+        val id = call.idParam("id", "notification target") ?: return@delete
         when (val result = notificationApi.deleteTarget(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)
@@ -160,18 +118,8 @@ fun Route.notificationRoutes(
     }
 
     post("/notifications/{id}/test") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid notification target ID")
-                return@post
-            }
+        call.requirePermission(Permission.MANAGE_NOTIFICATIONS) ?: return@post
+        val id = call.idParam("id", "notification target") ?: return@post
         when (val result = dispatchApi.sendTest(id)) {
             is Result.Success -> call.respond(HttpStatusCode.OK)
             is Result.Failure -> call.respondError(result.error)

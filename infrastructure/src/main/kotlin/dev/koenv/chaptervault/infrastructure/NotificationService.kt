@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.infrastructure
 
+import dev.koenv.chaptervault.infrastructure.network.OutboundUrlPolicy
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.event.EventBus
@@ -18,6 +19,7 @@ class NotificationService(
     private val eventBus: EventBus,
     private val notificationApi: NotificationApi,
     private val channelRegistry: NotificationChannelRegistry,
+    private val urlPolicy: OutboundUrlPolicy = OutboundUrlPolicy(),
 ) : NotificationDispatchApi {
     fun start() {
         eventBus.on<NewChaptersDiscovered> { event -> dispatch(event) }
@@ -46,6 +48,11 @@ class NotificationService(
                     }
                     return@forEach
                 }
+                // checked again at send time: the address a name resolves to can change after the target was saved
+                urlPolicy.violation(target.url)?.let { reason ->
+                    logger.warn { "Notification target '${target.name}' skipped: $reason" }
+                    return@forEach
+                }
                 runCatching {
                     channel.send(target.url, target.token, notifEvent)
                 }.onFailure { e ->
@@ -66,6 +73,9 @@ class NotificationService(
         val channel =
             channelRegistry.find(target.type)
                 ?: return Result.Failure(AppError.InternalError("No channel registered for type '${target.type}'"))
+        urlPolicy.violation(target.url)?.let {
+            return Result.Failure(AppError.ValidationError("Target URL is not allowed: $it"))
+        }
         return runCatching {
             channel.send(
                 targetUrl = target.url,

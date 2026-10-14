@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.DatabaseMigrations
+import dev.koenv.chaptervault.infrastructure.network.OutboundUrlPolicy
 import dev.koenv.chaptervault.kernel.api.NotificationTargetInput
 import dev.koenv.chaptervault.kernel.api.NotificationTargetPatch
 import dev.koenv.chaptervault.shared.result.Result
@@ -24,7 +25,8 @@ class NotificationRepositoryTest {
     ) {
         val db = Database.connect("jdbc:sqlite:${tempDir.resolve("test.db")}", "org.sqlite.JDBC")
         DatabaseMigrations.migrate(db)
-        repo = NotificationRepository()
+        // no DNS in unit tests: hostnames are treated as unresolvable and therefore not refused
+        repo = NotificationRepository(OutboundUrlPolicy(resolve = { emptyList() }))
     }
 
     @Test
@@ -115,5 +117,40 @@ class NotificationRepositoryTest {
     fun `deleteTarget returns NotFound for unknown id`() =
         runBlocking {
             assertIs<Result.Failure>(repo.deleteTarget(Id.generate()))
+        }
+
+    @Test
+    fun `createTarget refuses urls the server must not call`() =
+        runBlocking<Unit> {
+            listOf("file:///etc/passwd", "http://127.0.0.1:8080/x", "http://169.254.169.254/latest", "not a url").forEach { url ->
+                val result = repo.createTarget(NotificationTargetInput("Bad", "WEBHOOK", url))
+                assertIs<dev.koenv.chaptervault.shared.result.AppError.ValidationError>((result as Result.Failure).error, url)
+            }
+            assertEquals(0, repo.listTargets().size)
+        }
+
+    @Test
+    fun `createTarget accepts a LAN address`() =
+        runBlocking<Unit> {
+            assertIs<Result.Success<*>>(repo.createTarget(NotificationTargetInput("Home", "GOTIFY", "http://192.168.1.20:8080")))
+        }
+
+    @Test
+    fun `updateTarget refuses a bad url and keeps the old one`() =
+        runBlocking<Unit> {
+            val created = (repo.createTarget(NotificationTargetInput("N", "NTFY", "https://ntfy.sh/a")) as Result.Success).value
+
+            val result = repo.updateTarget(created.id, NotificationTargetPatch(url = "http://127.0.0.1/x"))
+
+            assertIs<Result.Failure>(result)
+            assertEquals("https://ntfy.sh/a", (repo.findTarget(created.id) as Result.Success).value.url)
+        }
+
+    @Test
+    fun `local targets can be allowed explicitly`() =
+        runBlocking<Unit> {
+            val permissive = NotificationRepository(OutboundUrlPolicy(allowLocalTargets = true))
+
+            assertIs<Result.Success<*>>(permissive.createTarget(NotificationTargetInput("Local", "NTFY", "http://localhost:2586/topic")))
         }
 }

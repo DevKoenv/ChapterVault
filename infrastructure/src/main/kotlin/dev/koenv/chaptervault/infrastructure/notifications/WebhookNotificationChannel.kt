@@ -10,7 +10,10 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-import java.io.IOException
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 class WebhookNotificationChannel(
     private val httpClient: HttpClient,
@@ -22,22 +25,27 @@ class WebhookNotificationChannel(
         targetToken: String?,
         event: NotificationEvent,
     ) {
-        val chaptersJson =
-            event.newChapters.joinToString(",") {
-                """{"id":"${it.id}","title":"${jsonEscape(it.title)}","index":${it.index}}"""
+        val body =
+            buildJsonObject {
+                put("event", "new_chapters")
+                put("seriesId", event.seriesId)
+                put("seriesTitle", event.seriesTitle)
+                putJsonArray("newChapters") {
+                    event.newChapters.forEach { chapter ->
+                        addJsonObject {
+                            put("id", chapter.id)
+                            put("title", chapter.title)
+                            put("index", chapter.index)
+                        }
+                    }
+                }
             }
         val response: HttpResponse =
             httpClient.post(targetUrl) {
                 contentType(ContentType.Application.Json)
                 targetToken?.let { tok -> header("Authorization", "Bearer $tok") }
-                setBody(
-                    """{"event":"new_chapters","seriesId":"${event.seriesId}","seriesTitle":"${jsonEscape(
-                        event.seriesTitle,
-                    )}","newChapters":[$chaptersJson]}""",
-                )
+                setBody(body.toString())
             }
-        if (!response.status.isSuccess()) {
-            throw IOException("HTTP ${response.status.value} from $targetUrl")
-        }
+        if (!response.status.isSuccess()) throw deliveryFailure(response.status.value)
     }
 }

@@ -9,7 +9,10 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-import java.io.IOException
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 class DiscordNotificationChannel(
     private val httpClient: HttpClient,
@@ -21,18 +24,25 @@ class DiscordNotificationChannel(
         targetToken: String?,
         event: NotificationEvent,
     ) {
-        // "\\n" produces the two-char escape sequence \n in the JSON string value,
-        // which Discord renders as a newline in embed descriptions.
-        val bullets = event.newChapters.joinToString("\\n") { "- ${jsonEscape(it.title)}" }
+        val body =
+            buildJsonObject {
+                putJsonArray("embeds") {
+                    addJsonObject {
+                        put("title", discordTitle(event.seriesTitle))
+                        put("description", discordDescription(event.newChapters.map { it.title }))
+                        put("color", EMBED_COLOR)
+                    }
+                }
+            }
         val response: HttpResponse =
             httpClient.post(targetUrl) {
                 contentType(ContentType.Application.Json)
-                setBody(
-                    """{"embeds":[{"title":"New chapters: ${jsonEscape(event.seriesTitle)}","description":"$bullets","color":5814783}]}""",
-                )
+                setBody(body.toString())
             }
-        if (!response.status.isSuccess()) {
-            throw IOException("HTTP ${response.status.value} from $targetUrl")
-        }
+        if (!response.status.isSuccess()) throw deliveryFailure(response.status.value)
+    }
+
+    private companion object {
+        const val EMBED_COLOR = 5814783
     }
 }

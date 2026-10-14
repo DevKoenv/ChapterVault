@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.infrastructure.database.repositories
 
 import dev.koenv.chaptervault.infrastructure.database.entities.NotificationTargetTable
+import dev.koenv.chaptervault.infrastructure.network.OutboundUrlPolicy
 import dev.koenv.chaptervault.kernel.api.NotificationApi
 import dev.koenv.chaptervault.kernel.api.NotificationTarget
 import dev.koenv.chaptervault.kernel.api.NotificationTargetInput
@@ -21,7 +22,9 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 
-class NotificationRepository : NotificationApi {
+class NotificationRepository(
+    private val urlPolicy: OutboundUrlPolicy = OutboundUrlPolicy(),
+) : NotificationApi {
     private suspend fun <T> dbQuery(block: Transaction.() -> T): T = newSuspendedTransaction(Dispatchers.IO) { block() }
 
     override suspend fun listTargets(): List<NotificationTarget> =
@@ -43,7 +46,12 @@ class NotificationRepository : NotificationApi {
                 ?: Result.Failure(AppError.NotFound("NotificationTarget", id.toString()))
         }
 
-    override suspend fun createTarget(input: NotificationTargetInput): Result<NotificationTarget> =
+    override suspend fun createTarget(input: NotificationTargetInput): Result<NotificationTarget> {
+        urlPolicy.violation(input.url)?.let { return Result.Failure(AppError.ValidationError(it)) }
+        return createValidTarget(input)
+    }
+
+    private suspend fun createValidTarget(input: NotificationTargetInput): Result<NotificationTarget> =
         dbQuery {
             val newId = Id.generate()
             val now = Instant.now()
@@ -70,6 +78,14 @@ class NotificationRepository : NotificationApi {
         }
 
     override suspend fun updateTarget(
+        id: Id,
+        patch: NotificationTargetPatch,
+    ): Result<NotificationTarget> {
+        patch.url?.let { url -> urlPolicy.violation(url)?.let { return Result.Failure(AppError.ValidationError(it)) } }
+        return updateValidTarget(id, patch)
+    }
+
+    private suspend fun updateValidTarget(
         id: Id,
         patch: NotificationTargetPatch,
     ): Result<NotificationTarget> =

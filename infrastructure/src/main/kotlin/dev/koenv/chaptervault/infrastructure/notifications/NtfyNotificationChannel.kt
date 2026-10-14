@@ -8,7 +8,6 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.isSuccess
-import java.io.IOException
 
 class NtfyNotificationChannel(
     private val httpClient: HttpClient,
@@ -24,12 +23,10 @@ class NtfyNotificationChannel(
         val listText = event.newChapters.joinToString(", ") { it.title }
         val response: HttpResponse =
             httpClient.post(targetUrl) {
-                header("Title", "New chapters: ${event.seriesTitle.replace(Regex("[\r\n]"), " ")}")
+                header("Title", headerValue("New chapters: ${event.seriesTitle}"))
                 targetToken?.let { header("Authorization", "Bearer $it") }
                 setBody("$count new chapter(s): $listText")
             }
-        if (!response.status.isSuccess()) {
-            throw IOException("HTTP ${response.status.value} from $targetUrl")
-        }
+        if (!response.status.isSuccess()) throw deliveryFailure(response.status.value)
     }
 }

@@ -10,7 +10,8 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-import java.io.IOException
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class GotifyNotificationChannel(
     private val httpClient: HttpClient,
@@ -24,14 +25,22 @@ class GotifyNotificationChannel(
     ) {
         val listText = event.newChapters.joinToString(", ") { it.title }
         val url = "${targetUrl.trimEnd('/')}/message"
+        val body =
+            buildJsonObject {
+                put("title", "New chapters: ${event.seriesTitle}")
+                put("message", listText)
+                put("priority", GOTIFY_PRIORITY)
+            }
         val response: HttpResponse =
             httpClient.post(url) {
                 targetToken?.let { header("X-Gotify-Key", it) }
                 contentType(ContentType.Application.Json)
-                setBody("""{"title":"New chapters: ${jsonEscape(event.seriesTitle)}","message":"${jsonEscape(listText)}","priority":5}""")
+                setBody(body.toString())
             }
-        if (!response.status.isSuccess()) {
-            throw IOException("HTTP ${response.status.value} from $url")
-        }
+        if (!response.status.isSuccess()) throw deliveryFailure(response.status.value)
+    }
+
+    private companion object {
+        const val GOTIFY_PRIORITY = 5
     }
 }

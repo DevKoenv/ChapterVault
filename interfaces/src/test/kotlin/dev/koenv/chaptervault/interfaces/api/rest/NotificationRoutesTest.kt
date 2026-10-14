@@ -172,6 +172,44 @@ class NotificationRoutesTest {
             assertEquals(HttpStatusCode.NoContent, response.status)
         }
     }
+
+    @Test
+    fun `GET notifications never returns the token itself`() {
+        testApp(
+            notificationApi =
+                object : NoOpNotificationApi() {
+                    override suspend fun listTargets() = listOf(fakeTarget.copy(token = "super-secret-token"))
+                },
+        ) {
+            val body = client.get("/notifications") { bearerAuth("admin-token") }.bodyAsText()
+
+            assertEquals(false, body.contains("super-secret-token"), body)
+            assertContains(body, "\"hasToken\":true")
+        }
+    }
+
+    @Test
+    fun `POST notifications maps a refused url to 400`() {
+        testApp(
+            notificationApi =
+                object : NoOpNotificationApi() {
+                    override suspend fun createTarget(input: NotificationTargetInput) =
+                        Result.Failure(
+                            dev.koenv.chaptervault.shared.result.AppError
+                                .ValidationError("URL points at this machine"),
+                        )
+                },
+        ) {
+            val response =
+                client.post("/notifications") {
+                    bearerAuth("admin-token")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"name":"X","type":"NTFY","url":"http://127.0.0.1/x"}""")
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
 }
 
 private open class NoOpNotificationApi : NotificationApi {
