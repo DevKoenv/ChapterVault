@@ -11,4 +11,7 @@ interface TaskQueue {
     suspend fun cancel(taskId: Id): Result<Unit>
 
     suspend fun getTask(taskId: Id): Task?
+
+    /** Called once a task has reached a final state, so a queue that keeps tasks in memory can let go of it. */
+    suspend fun forget(taskId: Id) {}
 }

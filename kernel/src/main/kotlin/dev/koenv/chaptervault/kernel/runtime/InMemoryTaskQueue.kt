@@ -27,4 +27,8 @@ class InMemoryTaskQueue : TaskQueue {
     }
 
     override suspend fun getTask(taskId: Id): Task? = store[taskId]
+
+    override suspend fun forget(taskId: Id) {
+        store.remove(taskId)
+    }
 }

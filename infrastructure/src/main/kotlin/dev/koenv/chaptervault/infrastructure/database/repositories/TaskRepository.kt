@@ -47,6 +47,7 @@ class TaskRepository : TaskReadStore {
                 it[updatedAt] = task.updatedAt.toKotlinInstant()
                 it[errorMessage] = task.errorMessage
                 it[retryCount] = task.retryCount
+                it[runAfter] = task.runAfter?.toKotlinInstant()
             }
             val row =
                 TaskTable
@@ -151,5 +152,6 @@ class TaskRepository : TaskReadStore {
             updatedAt = this[TaskTable.updatedAt].toJavaInstant(),
             errorMessage = this[TaskTable.errorMessage],
             retryCount = this[TaskTable.retryCount],
+            runAfter = this[TaskTable.runAfter]?.toJavaInstant(),
         )
 }

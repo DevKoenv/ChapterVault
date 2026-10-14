@@ -8,12 +8,15 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.readRawBytes
 import io.ktor.http.isSuccess
+
+// a page is one image; 25 MB is far above any real one and far below what could hurt the heap
+const val DEFAULT_MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024
 
 class DefaultConnectorContext(
     private val httpClient: HttpClient,
     private val buckets: Map<BucketKey, RateLimiter>,
+    private val maxDownloadBytes: Int = DEFAULT_MAX_DOWNLOAD_BYTES,
 ) : ConnectorContext {
     override suspend fun get(
         url: String,
@@ -57,7 +60,9 @@ class DefaultConnectorContext(
             if (!response.status.isSuccess()) {
                 return Result.Failure(AppError.InternalError("HTTP ${response.status.value} from $url"))
             }
-            Result.Success(response.readRawBytes())
+            Result.Success(response.readBytesBounded(maxDownloadBytes))
+        } catch (_: ResponseTooLargeException) {
+            Result.Failure(AppError.InternalError("Download from $url is larger than the allowed $maxDownloadBytes bytes"))
         } catch (e: Exception) {
             Result.Failure(AppError.InternalError("HTTP download failed: ${e.message}", e))
         }

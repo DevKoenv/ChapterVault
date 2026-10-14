@@ -22,4 +22,6 @@ class EventPublishingTaskQueue(
     override suspend fun cancel(taskId: Id): Result<Unit> = delegate.cancel(taskId)
 
     override suspend fun getTask(taskId: Id): Task? = delegate.getTask(taskId)
+
+    override suspend fun forget(taskId: Id) = delegate.forget(taskId)
 }

@@ -14,4 +14,6 @@ data class Task(
     val updatedAt: Instant,
     val errorMessage: String? = null,
     val retryCount: Int = 0,
+    /** A task is not started before this moment (set on retries). Null means as soon as a worker is free. */
+    val runAfter: Instant? = null,
 )
