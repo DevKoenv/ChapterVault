@@ -28,16 +28,36 @@ class NotificationChannelDeliveryTest {
         val path: String,
         val headers: Map<String, String>,
         val body: String,
+        val clientPort: Int = 0,
+        val atMs: Long = 0,
     )
 
     private val received = CopyOnWriteArrayList<Received>()
+    private val startedAt = System.currentTimeMillis()
+
+    // says what arrived when a test expected exactly one request, so a duplicate can be told apart from a retry
+    private fun only(): Received {
+        if (received.size != 1) {
+            val seen = received.joinToString { "${it.path} from port ${it.clientPort} after ${it.atMs} ms (${it.body.length} bytes)" }
+            throw AssertionError("expected one request, got ${received.size}: $seen")
+        }
+        return received.single()
+    }
+
     private var status = 200
     private val server =
         HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0).apply {
             createContext("/") { exchange ->
                 val body = exchange.requestBody.readBytes().toString(Charsets.UTF_8)
                 val headers = exchange.requestHeaders.entries.associate { (k, v) -> k.lowercase() to v.first() }
-                received += Received(exchange.requestURI.path, headers, body)
+                received +=
+                    Received(
+                        exchange.requestURI.path,
+                        headers,
+                        body,
+                        exchange.remoteAddress.port,
+                        System.currentTimeMillis() - startedAt,
+                    )
                 exchange.sendResponseHeaders(status, -1)
                 exchange.close()
             }
@@ -81,7 +101,7 @@ class NotificationChannelDeliveryTest {
     fun `ntfy delivers a title that is not ASCII`() {
         send(NtfyNotificationChannel(client), "/topic", event("進撃の巨人", listOf("第1話", "第2話")), token = "secret")
 
-        val request = received.single()
+        val request = only()
         val title = request.headers.getValue("title")
         assertTrue(title.startsWith("=?UTF-8?B?"), "non-ASCII must be sent RFC 2047 encoded, was: $title")
         val decoded = String(Base64.getDecoder().decode(title.removePrefix("=?UTF-8?B?").removeSuffix("?=")), Charsets.UTF_8)
@@ -94,7 +114,7 @@ class NotificationChannelDeliveryTest {
     fun `ntfy sends an ASCII title unchanged`() {
         send(NtfyNotificationChannel(client), "/topic", event("One Piece"))
 
-        assertEquals("New chapters: One Piece", received.single().headers["title"])
+        assertEquals("New chapters: One Piece", only().headers["title"])
     }
 
     @Test
@@ -109,7 +129,7 @@ class NotificationChannelDeliveryTest {
     fun `gotify sends valid JSON whatever the title contains`() {
         send(GotifyNotificationChannel(client), "", event(awkward, listOf(awkward)), token = "key")
 
-        val request = received.single()
+        val request = only()
         assertEquals("/message", request.path)
         assertEquals("key", request.headers["x-gotify-key"])
         val body = json(request.body)
@@ -121,7 +141,7 @@ class NotificationChannelDeliveryTest {
     fun `webhook sends valid JSON whatever the title contains`() {
         send(WebhookNotificationChannel(client), "/hook", event(awkward, listOf(awkward, "plain")), token = "tok")
 
-        val request = received.single()
+        val request = only()
         assertEquals("Bearer tok", request.headers["authorization"])
         val body = json(request.body)
         assertEquals("new_chapters", body.getValue("event").jsonPrimitive.content)
@@ -150,7 +170,7 @@ class NotificationChannelDeliveryTest {
         send(DiscordNotificationChannel(client), "/hook", event(awkward, listOf(awkward, "plain")))
 
         val embed =
-            json(received.single().body)
+            json(only().body)
                 .getValue("embeds")
                 .jsonArray
                 .single()
@@ -166,7 +186,7 @@ class NotificationChannelDeliveryTest {
         send(DiscordNotificationChannel(client), "/hook", event("S".repeat(500), chapters))
 
         val embed =
-            json(received.single().body)
+            json(only().body)
                 .getValue("embeds")
                 .jsonArray
                 .single()
