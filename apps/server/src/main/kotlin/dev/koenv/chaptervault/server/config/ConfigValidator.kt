@@ -4,10 +4,26 @@ import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.UUID
 
 private val logger = KotlinLogging.logger {}
 
 object ConfigValidator {
+    private const val MAX_LISTED = 5
+
+    /** Names in the library path that are neither a series directory (named by its id) nor `.trash`, sorted. */
+    internal fun foreignLibraryEntries(libraryPath: String): List<String> {
+        val dir = Paths.get(libraryPath)
+        if (!Files.isDirectory(dir)) return emptyList()
+        return Files.list(dir).use { stream ->
+            stream
+                .map { it.fileName.toString() }
+                .filter { name -> name != ".trash" && !(runCatching { UUID.fromString(name).toString() == name }.getOrDefault(false)) }
+                .sorted()
+                .toList()
+        }
+    }
+
     fun validate(config: AppConfig) {
         val errors = mutableListOf<String>()
 
@@ -45,6 +61,17 @@ object ConfigValidator {
                 }
             } catch (e: Exception) {
                 errors += "$name '$path' cannot be created: ${e.message}"
+            }
+        }
+
+        if (errors.isEmpty()) {
+            val foreign = foreignLibraryEntries(config.storage.libraryPath)
+            if (foreign.isNotEmpty()) {
+                logger.warn {
+                    "storage.libraryPath '${config.storage.libraryPath}' contains ${foreign.size} entries that are not " +
+                        "ChapterVault's (${foreign.take(MAX_LISTED).joinToString()}${if (foreign.size > MAX_LISTED) ", ..." else ""}). " +
+                        "They are left alone, but the path should hold ChapterVault's library and nothing else"
+                }
             }
         }
 
