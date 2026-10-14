@@ -14,6 +14,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -364,5 +365,20 @@ class MangaDexConnectorTest {
         val result = runBlocking { connector.download(makeChapter("chapter-uuid-empty"), ChapterFormat.Cbz) }
 
         assertIs<Result.Failure>(result)
+    }
+
+    @Test
+    fun `fetchChapters stops when the feed returns an empty page although the total says more exist`() {
+        var requests = 0
+        val connector =
+            makeConnector {
+                requests++
+                """{"result":"ok","data":[],"limit":500,"offset":0,"total":600}"""
+            }
+
+        val result = runBlocking { withTimeout(5_000) { connector.fetchChapters("manga-1", "en") } }
+
+        assertTrue(assertSuccess(result).isEmpty())
+        assertTrue(requests <= 2, "asked $requests times for chapters that never come")
     }
 }

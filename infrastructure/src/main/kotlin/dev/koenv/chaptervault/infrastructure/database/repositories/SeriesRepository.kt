@@ -20,6 +20,7 @@ import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
+import org.jetbrains.exposed.sql.LikePattern
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -89,12 +90,13 @@ class SeriesRepository(
         request: PageRequest,
     ): Result<Pagination<Series>> =
         dbQuery {
-            val escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            val total = SeriesTable.selectAll().where { SeriesTable.title like "%$escaped%" }.count()
+            // SQLite has no default LIKE escape character, so the escape has to be declared (ESCAPE '\')
+            val pattern = LikePattern("%" + LikePattern.ofLiteral(query).pattern + "%", '\\')
+            val total = SeriesTable.selectAll().where { SeriesTable.title like pattern }.count()
             val rows =
                 SeriesTable
                     .selectAll()
-                    .where { SeriesTable.title like "%$escaped%" }
+                    .where { SeriesTable.title like pattern }
                     .limit(request.size, (request.page * request.size).toLong())
                     .toList()
             val ids = rows.map { it[SeriesTable.id] }
@@ -453,7 +455,7 @@ class SeriesRepository(
             updatedAt = this[SeriesTable.updatedAt].toJavaInstant(),
         )
 
-    // removes storage dirs with no matching DB entry
+    // moves storage dirs with no matching DB entry to .trash, removes unfinished downloads and orphaned covers
     // called on startup to cover crash window between DB delete and file delete
     suspend fun cleanupOrphanedFiles() {
         val knownIds =
@@ -461,6 +463,8 @@ class SeriesRepository(
                 SeriesTable.selectAll().map { it[SeriesTable.id] }.toSet()
             }
         fileStorage.cleanupOrphanedDirs(knownIds)
+        fileStorage.sweepPartialWrites()
+        fileStorage.cleanupOrphanedThumbnails(knownIds)
     }
 
     private fun ResultRow.toChapter() =

@@ -10,6 +10,8 @@ import kotlin.io.path.extension
 
 private val logger = KotlinLogging.logger {}
 
+private const val MAX_MANIFEST_BYTES = 64 * 1024
+
 class ExternalExtensionLoader(
     val extensionsDir: Path,
     private val serverVersion: String,
@@ -18,10 +20,9 @@ class ExternalExtensionLoader(
     fun loadAll(): List<LoadedExtension> {
         Files.createDirectories(extensionsDir)
         val seen = mutableMapOf<String, String>() // id -> first jar filename
-        return Files
-            .list(extensionsDir)
-            .filter { it.extension == "jar" }
-            .toList()
+        // sorted, so which JAR wins a duplicate id does not depend on the file system's listing order
+        val jars = Files.list(extensionsDir).use { stream -> stream.filter { it.extension == "jar" }.sorted().toList() }
+        return jars
             .mapNotNull { jar ->
                 val loaded = loadSingle(jar) ?: return@mapNotNull null
                 val id = loaded.manifest.id
@@ -71,7 +72,13 @@ class ExternalExtensionLoader(
         try {
             JarFile(jar.toFile()).use { jf ->
                 val entry = jf.getJarEntry("extension.yaml") ?: return null
-                val content = jf.getInputStream(entry).bufferedReader().readText()
+                if (entry.size > MAX_MANIFEST_BYTES) {
+                    logger.warn { "Skipping ${jar.fileName}: extension.yaml is larger than $MAX_MANIFEST_BYTES bytes" }
+                    return null
+                }
+                // entry.size can be -1 or forged, so the read is bounded as well
+                val content = jf.getInputStream(entry).use { String(it.readNBytes(MAX_MANIFEST_BYTES + 1), Charsets.UTF_8) }
+                if (content.length > MAX_MANIFEST_BYTES) return null
                 ManifestParser.parse(content)
             }
         } catch (e: Exception) {
@@ -88,6 +95,7 @@ class ExternalExtensionLoader(
     private fun parseVersion(version: String): IntArray? =
         try {
             version
+                .substringBefore('-') // 1.0.0-rc1 is 1.0.0 for compatibility purposes
                 .split(".")
                 .take(3)
                 .map { it.toInt() }

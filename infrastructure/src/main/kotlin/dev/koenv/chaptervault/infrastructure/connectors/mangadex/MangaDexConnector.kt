@@ -158,7 +158,8 @@ class MangaDexConnector(
                 is Result.Success -> {
                     val page = r.value
                     allChapters.addAll(page.data)
-                    if (offset + page.data.size >= page.total) break
+                    // an empty page ends the loop even if the total claims more: the offset would never move
+                    if (page.data.isEmpty() || offset + page.data.size >= page.total) break
                     offset += page.data.size
                 }
             }

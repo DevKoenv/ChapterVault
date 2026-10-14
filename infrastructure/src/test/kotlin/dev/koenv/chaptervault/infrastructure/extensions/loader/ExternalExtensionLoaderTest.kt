@@ -19,8 +19,9 @@ class ExternalExtensionLoaderTest {
     private fun buildJar(
         manifestYaml: String,
         vararg classes: Class<*>,
+        fileName: String? = null,
     ): Path {
-        val jar = Files.createTempFile(tempDir, "test-ext", ".jar")
+        val jar = if (fileName != null) tempDir.resolve(fileName) else Files.createTempFile(tempDir, "test-ext", ".jar")
         JarOutputStream(Files.newOutputStream(jar)).use { jos ->
             jos.putNextEntry(JarEntry("extension.yaml"))
             jos.write(manifestYaml.toByteArray())
@@ -194,6 +195,44 @@ class ExternalExtensionLoaderTest {
         buildJar(manifest, TestExtension::class.java) // second JAR, same id
         val results = makeLoader().loadAll()
         assertEquals(1, results.size) // second must be skipped
+    }
+
+    private fun manifestFor(
+        name: String,
+        minServerVersion: String = "1.0.0",
+        description: String = "Test",
+    ) = """
+        id: test-extension
+        name: $name
+        version: 1.0.0
+        minServerVersion: $minServerVersion
+        description: "$description"
+        author: Test
+        capabilities:
+          - connector
+        entryPoint: "dev.koenv.chaptervault.infrastructure.extensions.loader.TestExtension"
+        """.trimIndent()
+
+    @Test
+    fun `skips a JAR whose manifest is implausibly large`() {
+        buildJar(manifestFor("Huge", description = "x".repeat(200_000)), TestExtension::class.java)
+
+        assertTrue(makeLoader().loadAll().isEmpty())
+    }
+
+    @Test
+    fun `loads extensions on a server with a pre-release version`() {
+        buildJar(manifestFor("Test"), TestExtension::class.java)
+
+        assertEquals(1, makeLoader(serverVersion = "1.0.0-rc1").loadAll().size)
+    }
+
+    @Test
+    fun `with a duplicate id the first JAR by file name wins`() {
+        buildJar(manifestFor("Second"), TestExtension::class.java, fileName = "b-ext.jar")
+        buildJar(manifestFor("First"), TestExtension::class.java, fileName = "a-ext.jar")
+
+        assertEquals(listOf("First"), makeLoader().loadAll().map { it.manifest.name })
     }
 }
 

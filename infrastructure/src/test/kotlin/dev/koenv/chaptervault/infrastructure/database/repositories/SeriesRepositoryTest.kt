@@ -262,6 +262,33 @@ class SeriesRepositoryTest {
         }
 
     @Test
+    fun `searchLibrary treats percent and underscore in the query as plain text`() =
+        runBlocking<Unit> {
+            // a new series is titled with its external id until its metadata has been fetched
+            repo.addToLibrary("mangadex", "50% Off", autoDownload = false)
+            repo.addToLibrary("mangadex", "50 Off", autoDownload = false)
+            repo.addToLibrary("mangadex", "a_b", autoDownload = false)
+            repo.addToLibrary("mangadex", "axb", autoDownload = false)
+
+            val percent = (repo.searchLibrary("50%", PageRequest()) as Result.Success).value
+            val underscore = (repo.searchLibrary("a_b", PageRequest()) as Result.Success).value
+
+            assertEquals(listOf("50% Off"), percent.items.map { it.externalId })
+            assertEquals(listOf("a_b"), underscore.items.map { it.externalId })
+        }
+
+    @Test
+    fun `searchLibrary treats a backslash in the query as plain text`() =
+        runBlocking<Unit> {
+            repo.addToLibrary("mangadex", "back\\slash", autoDownload = false)
+            repo.addToLibrary("mangadex", "backslash", autoDownload = false)
+
+            val result = (repo.searchLibrary("back\\s", PageRequest()) as Result.Success).value
+
+            assertEquals(listOf("back\\slash"), result.items.map { it.externalId })
+        }
+
+    @Test
     fun `listChapters returns empty list when no chapters for series`() =
         runBlocking {
             val series = (repo.addToLibrary("mangadex", "ext-ch", autoDownload = false) as Result.Success).value
