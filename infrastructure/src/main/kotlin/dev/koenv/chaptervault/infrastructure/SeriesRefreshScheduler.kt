@@ -20,7 +20,11 @@ class SeriesRefreshScheduler(
     private val libraryRead: LibraryReadApi,
     private val taskQueue: TaskQueue,
     private val intervalHours: Int,
+    private val startupDelayMs: Long = STARTUP_DELAY_MS,
 ) {
+    // series id -> the refresh task queued for it; the queue is in memory, so a restart starts with none
+    private val queued = mutableMapOf<Id, Id>()
+
     suspend fun start() {
         if (intervalHours <= 0) {
             logger.info { "Series auto-refresh disabled (intervalHours=$intervalHours)" }
@@ -28,9 +32,11 @@ class SeriesRefreshScheduler(
         }
         val intervalMs = intervalHours * 3_600_000L
         logger.info { "Series auto-refresh enabled, interval=${intervalHours}h" }
+        // the first run does not wait a whole interval: after a restart the queue is empty and the library may be stale
+        delay(startupDelayMs)
         while (true) {
-            delay(intervalMs)
             enqueueRefreshTasks()
+            delay(intervalMs)
         }
     }
 
@@ -48,8 +54,9 @@ class SeriesRefreshScheduler(
             for (series in pagination.items) {
                 val connectorId = series.connectorId ?: continue
                 val externalId = series.externalId ?: continue
+                if (isStillQueued(series.id)) continue
                 val now = Instant.now()
-                taskQueue.enqueue(
+                val task =
                     Task(
                         id = Id.generate(),
                         type = TaskType.FETCH_SERIES_METADATA,
@@ -64,13 +71,26 @@ class SeriesRefreshScheduler(
                             ),
                         createdAt = now,
                         updatedAt = now,
-                    ),
-                )
+                    )
+                taskQueue.enqueue(task)
+                queued[series.id] = task.id
                 enqueued++
             }
             if (!pagination.hasNext) break
             page++
         }
         logger.info { "Auto-refresh: enqueued $enqueued FETCH_SERIES_METADATA tasks" }
+    }
+
+    private suspend fun isStillQueued(seriesId: Id): Boolean {
+        val taskId = queued[seriesId] ?: return false
+        val status = taskQueue.getTask(taskId)?.status
+        if (status == TaskStatus.PENDING || status == TaskStatus.RUNNING) return true
+        queued.remove(seriesId)
+        return false
+    }
+
+    private companion object {
+        const val STARTUP_DELAY_MS = 60_000L
     }
 }
