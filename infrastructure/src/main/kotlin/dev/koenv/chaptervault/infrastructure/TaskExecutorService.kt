@@ -227,7 +227,8 @@ class TaskExecutorService(
                 taskRepository.updateStatus(task.id, TaskStatus.FAILED, result.error.message)
                 eventBus.publish(TaskEvents.TaskFailed(task.id, task.type, task.targetId, result.error.message, Instant.now()))
                 logger.error { "Task ${task.id} [${task.type}] failed: ${result.error.message}" }
-                scheduleRetry(task)
+                // a missing or invalid target does not get better by waiting
+                if (result.error !is AppError.NotFound && result.error !is AppError.ValidationError) scheduleRetry(task)
             }
         }
         taskQueue.forget(task.id)

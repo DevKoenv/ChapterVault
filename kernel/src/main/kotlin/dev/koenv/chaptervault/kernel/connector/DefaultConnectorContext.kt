@@ -8,6 +8,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 
 // a page is one image; 25 MB is far above any real one and far below what could hurt the heap
@@ -35,7 +36,7 @@ class DefaultConnectorContext(
                     headers.forEach { (k, v) -> header(k, v) }
                 }
             if (!response.status.isSuccess()) {
-                return Result.Failure(AppError.InternalError("HTTP ${response.status.value} from $url"))
+                return Result.Failure(httpFailure(response.status, url))
             }
             Result.Success(response)
         } catch (e: Exception) {
@@ -58,7 +59,7 @@ class DefaultConnectorContext(
                     headers.forEach { (k, v) -> header(k, v) }
                 }
             if (!response.status.isSuccess()) {
-                return Result.Failure(AppError.InternalError("HTTP ${response.status.value} from $url"))
+                return Result.Failure(httpFailure(response.status, url))
             }
             Result.Success(response.readBytesBounded(maxDownloadBytes))
         } catch (_: ResponseTooLargeException) {
@@ -67,4 +68,15 @@ class DefaultConnectorContext(
             Result.Failure(AppError.InternalError("HTTP download failed: ${e.message}", e))
         }
     }
+
+    /** 404 and 410 will not change on a retry, so they are not reported like a failing server. */
+    private fun httpFailure(
+        status: HttpStatusCode,
+        url: String,
+    ): AppError =
+        if (status == HttpStatusCode.NotFound || status == HttpStatusCode.Gone) {
+            AppError.NotFound("Upstream resource", url)
+        } else {
+            AppError.InternalError("HTTP ${status.value} from $url")
+        }
 }

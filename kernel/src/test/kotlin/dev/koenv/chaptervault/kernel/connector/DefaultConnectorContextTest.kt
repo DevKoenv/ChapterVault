@@ -1,9 +1,12 @@
 package dev.koenv.chaptervault.kernel.connector
 
 import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
+import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import kotlin.test.assertIs
@@ -28,6 +31,25 @@ class DefaultConnectorContextTest {
                 context.get("https://example.com", bucket = Bucket.CDN)
             }
         assertIs<Result.Failure>(result)
+    }
+
+    private fun contextAnswering(status: HttpStatusCode) =
+        DefaultConnectorContext(
+            HttpClient(MockEngine { respond("", status) }),
+            mapOf(Bucket.API to RateLimiter(requestsPerSecond = 100.0), Bucket.CDN to RateLimiter(requestsPerSecond = 100.0)),
+        )
+
+    @Test
+    fun `a missing upstream resource is reported as not found, a server error is not`() {
+        runBlocking {
+            for (gone in listOf(HttpStatusCode.NotFound, HttpStatusCode.Gone)) {
+                val ctx = contextAnswering(gone)
+                assertIs<AppError.NotFound>((ctx.get("https://example.com/a") as Result.Failure).error)
+                assertIs<AppError.NotFound>((ctx.download("https://example.com/a", bucket = Bucket.CDN) as Result.Failure).error)
+            }
+            val broken = contextAnswering(HttpStatusCode.InternalServerError)
+            assertIs<AppError.InternalError>((broken.get("https://example.com/a") as Result.Failure).error)
+        }
     }
 
     @Test

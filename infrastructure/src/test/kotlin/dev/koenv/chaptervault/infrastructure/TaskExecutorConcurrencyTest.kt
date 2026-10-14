@@ -263,6 +263,21 @@ class TaskExecutorConcurrencyTest {
         }
 
     @Test
+    fun `a task that failed because its target does not exist is not retried`() =
+        runBlocking<Unit> {
+            registry.register(ScriptedConnector("gone") { Result.Failure(AppError.NotFound("page", "https://example.com/x")) })
+            val task = downloadTask(newChapter("a"), "gone")
+            val queue = newQueue()
+            run(executor(queue, fast))
+
+            queue.enqueue(task)
+            awaitStatus(task.id, TaskStatus.FAILED)
+            delay(500)
+
+            assertEquals(emptyList(), taskRepository.listAllByStatus(TaskStatus.PENDING), "a permanent failure must not be retried")
+        }
+
+    @Test
     fun `a failed task is retried later and the wait is stored so a restart keeps it`() =
         runBlocking<Unit> {
             val succeed = AtomicBoolean(false)
