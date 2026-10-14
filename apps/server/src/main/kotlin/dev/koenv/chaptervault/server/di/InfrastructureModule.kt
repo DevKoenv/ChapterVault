@@ -13,6 +13,7 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesReposit
 import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.UserSeriesStatusRepository
+import dev.koenv.chaptervault.infrastructure.network.OutboundUrlPolicy
 import dev.koenv.chaptervault.infrastructure.network.createHttpClient
 import dev.koenv.chaptervault.infrastructure.notifications.DefaultNotificationChannelRegistry
 import dev.koenv.chaptervault.infrastructure.notifications.DiscordNotificationChannel
@@ -34,8 +35,10 @@ import dev.koenv.chaptervault.kernel.api.NotificationDispatchApi
 import dev.koenv.chaptervault.kernel.api.OpdsReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
+import dev.koenv.chaptervault.kernel.api.UpdateInfoApi
 import dev.koenv.chaptervault.kernel.extension.NotificationChannelRegistry
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
+import dev.koenv.chaptervault.server.auth.CachingAuthApi
 import dev.koenv.chaptervault.server.generated.BuildConfig
 import org.koin.dsl.module
 import java.nio.file.Paths
@@ -46,7 +49,7 @@ val infrastructureModule =
         single<LibraryReadApi> { get<SeriesRepository>() }
         single<LibraryCommandApi> { get<SeriesRepository>() }
         single { UserRepository() }
-        single<AuthApi> { get<UserRepository>() }
+        single<AuthApi> { CachingAuthApi(get<UserRepository>()) }
         single { TaskRepository() }
         single<TaskReadStore> { get<TaskRepository>() }
         single { ChapterRepository() }
@@ -58,7 +61,8 @@ val infrastructureModule =
         single<ReadingStatusApi> { get<UserSeriesStatusRepository>() }
         single { OpdsReadRepository() }
         single<OpdsReadApi> { get<OpdsReadRepository>() }
-        single { NotificationRepository() }
+        single { OutboundUrlPolicy(get<AppConfig>().notifications.allowLocalTargets) }
+        single { NotificationRepository(get()) }
         single<NotificationApi> { get<NotificationRepository>() }
         single { NtfyNotificationChannel(get()) }
         single { GotifyNotificationChannel(get()) }
@@ -72,7 +76,7 @@ val infrastructureModule =
                 registry.register(get<WebhookNotificationChannel>())
             }
         }
-        single { NotificationService(get(), get(), get()) }
+        single { NotificationService(get(), get(), get(), get()) }
         single<NotificationDispatchApi> { get<NotificationService>() }
         single { createHttpClient() }
         single { CbzWriter() }
@@ -87,6 +91,7 @@ val infrastructureModule =
             )
         }
         single { UpdateCheckerService(get(), BuildConfig.VERSION) }
+        single<UpdateInfoApi> { get<UpdateCheckerService>() }
         single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
         single {
             TaskExecutorService(

@@ -4,10 +4,10 @@ import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.UserDto
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
+import dev.koenv.chaptervault.kernel.auth.PasswordPolicy
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -36,19 +36,13 @@ fun Route.authRoutes(
             call.respond(HttpStatusCode.Forbidden, ErrorResponse("REGISTRATION_DISABLED", "User registration is disabled on this server"))
             return@post
         }
-        val request =
-            try {
-                call.receive<LoginRequest>()
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid request body")
-                return@post
-            }
+        val request = call.receiveOrBadRequest<LoginRequest>() ?: return@post
         if (request.username.isBlank() || request.username.length > 100) {
             call.respondBadRequest("username must be 1–100 non-whitespace characters")
             return@post
         }
-        if (request.password.isEmpty() || request.password.length > 255) {
-            call.respondBadRequest("password must be 1–255 characters")
+        PasswordPolicy.violation(request.password)?.let {
+            call.respondBadRequest(it)
             return@post
         }
         when (val result = auth.register(Credentials(request.username, request.password))) {
@@ -67,13 +61,7 @@ fun Route.authRoutes(
     }
 
     post("/auth/login") {
-        val request =
-            try {
-                call.receive<LoginRequest>()
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid request body")
-                return@post
-            }
+        val request = call.receiveOrBadRequest<LoginRequest>() ?: return@post
         if (request.username.isBlank() || request.username.length > 100) {
             call.respondBadRequest("username must be 1–100 non-whitespace characters")
             return@post

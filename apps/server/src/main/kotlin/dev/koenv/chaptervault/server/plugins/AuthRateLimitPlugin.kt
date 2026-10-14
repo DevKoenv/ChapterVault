@@ -9,13 +9,16 @@ import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.auth.basicAuthenticationCredentials
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.uri
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.util.AttributeKey
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -141,6 +144,86 @@ private fun isPrivateOrLoopbackRange(cidr: String): Boolean {
         isUniqueLocalIpv6
 }
 
+/** Resolves the address a request really came from, honouring X-Forwarded-For only behind a trusted proxy. */
+internal class ClientAddressResolver(
+    config: RateLimitConfig,
+) {
+    private val trustedNetworks = config.trustedNetworks.map { CidrMatcher(it) }
+    private val trustedProxies = config.trustedProxies.map { CidrMatcher(it) }
+
+    fun isTrusted(clientIp: String): Boolean = trustedNetworks.any { it.matches(clientIp) }
+
+    fun resolve(call: ApplicationCall): String = resolve(call.request.local.remoteAddress, call.request.headers["X-Forwarded-For"])
+
+    fun resolve(
+        remoteAddress: String,
+        xForwardedFor: String?,
+    ): String {
+        if (xForwardedFor != null && trustedProxies.any { it.matches(remoteAddress) }) {
+            // walk from the right: every entry up to the last trusted proxy was appended by our own
+            // infrastructure, while anything further left is client-controlled and can be forged
+            val ips = xForwardedFor.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            return ips.lastOrNull { ip -> trustedProxies.none { it.matches(ip) } } ?: remoteAddress
+        }
+        return remoteAddress
+    }
+}
+
+/**
+ * Throttles Basic authentication (OPDS), which the login limiter never sees. Failed attempts are counted per client
+ * address and per username, using the login budget; once either is spent the request is refused with 429 before the
+ * password is checked, so guessing is both limited and cheap for the server. Successful logins are not counted.
+ *
+ * The username budget is [USERNAME_BUDGET_FACTOR] times the client budget. That stops one account being guessed from
+ * many addresses, at the price that such an attack also locks the real user out of Basic auth until the window passes.
+ */
+internal class BasicAuthThrottle(
+    private val resolver: ClientAddressResolver,
+    private val limit: EndpointLimitConfig,
+    clock: () -> Long,
+    sweepThreshold: Int,
+    maxEntries: Int,
+) {
+    private val idleTimeoutMs = limit.windowMinutes * 60_000L
+    private val clientLimiters = ClientLimiters(idleTimeoutMs, clock, sweepThreshold, maxEntries = maxEntries)
+    private val userLimiters = ClientLimiters(idleTimeoutMs, clock, sweepThreshold, maxEntries = maxEntries)
+
+    private fun limiter(attempts: Int): RateLimiter =
+        RateLimiter(requestsPerSecond = attempts.toDouble() / (limit.windowMinutes * 60.0), burst = attempts)
+
+    private fun userKey(username: String) = "user/${username.lowercase()}"
+
+    /** Milliseconds the caller must wait, or 0 when the request may proceed to the password check. */
+    suspend fun retryAfterMs(call: ApplicationCall): Long {
+        val credentials = call.request.basicAuthenticationCredentials() ?: return 0L
+        val clientIp = resolver.resolve(call)
+        if (resolver.isTrusted(clientIp)) return 0L
+        val clientWait = clientLimiters.get(clientIp) { limiter(limit.maxAttempts) }.retryAfterMs()
+        val userWait =
+            userLimiters
+                .get(userKey(credentials.name)) { limiter(limit.maxAttempts * USERNAME_BUDGET_FACTOR) }
+                .retryAfterMs()
+        return maxOf(clientWait, userWait)
+    }
+
+    suspend fun recordFailure(
+        call: ApplicationCall,
+        username: String,
+    ) {
+        val clientIp = resolver.resolve(call)
+        if (resolver.isTrusted(clientIp)) return
+        clientLimiters.get(clientIp) { limiter(limit.maxAttempts) }.tryAcquire()
+        userLimiters.get(userKey(username)) { limiter(limit.maxAttempts * USERNAME_BUDGET_FACTOR) }.tryAcquire()
+    }
+
+    companion object {
+        const val USERNAME_BUDGET_FACTOR = 5
+    }
+}
+
+/** Set by [AuthRateLimiting] when enabled; the Basic auth provider reports failed attempts to it. */
+internal val BasicAuthThrottleKey = AttributeKey<BasicAuthThrottle>("BasicAuthThrottle")
+
 val AuthRateLimiting =
     createApplicationPlugin("AuthRateLimiting", ::AuthRateLimitPluginConfig) {
         val rateLimitConfig = pluginConfig.config
@@ -154,8 +237,7 @@ val AuthRateLimiting =
             }
         }
 
-        val trustedNetworkMatchers = rateLimitConfig.trustedNetworks.map { CidrMatcher(it) }
-        val trustedProxyMatchers = rateLimitConfig.trustedProxies.map { CidrMatcher(it) }
+        val resolver = ClientAddressResolver(rateLimitConfig)
 
         fun clientLimiters(cfg: EndpointLimitConfig) =
             ClientLimiters(
@@ -166,37 +248,38 @@ val AuthRateLimiting =
             )
         val loginLimiters = clientLimiters(rateLimitConfig.login)
         val registerLimiters = clientLimiters(rateLimitConfig.register)
+        val basicThrottle =
+            BasicAuthThrottle(
+                resolver,
+                rateLimitConfig.login,
+                pluginConfig.clock,
+                pluginConfig.sweepThreshold,
+                pluginConfig.maxEntries,
+            )
+        application.attributes.put(BasicAuthThrottleKey, basicThrottle)
 
         fun makeLimiter(cfg: EndpointLimitConfig): RateLimiter {
             val rps = cfg.maxAttempts.toDouble() / (cfg.windowMinutes * 60.0)
             return RateLimiter(requestsPerSecond = rps, burst = cfg.maxAttempts)
         }
 
-        fun resolveClientIp(
-            remoteAddress: String,
-            xForwardedFor: String?,
-        ): String {
-            if (xForwardedFor != null && trustedProxyMatchers.any { it.matches(remoteAddress) }) {
-                // walk from the right: every entry up to the last trusted proxy was appended by our own
-                // infrastructure, while anything further left is client-controlled and can be forged
-                val ips = xForwardedFor.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                return ips.lastOrNull { ip -> trustedProxyMatchers.none { it.matches(ip) } } ?: remoteAddress
-            }
-            return remoteAddress
-        }
-
         application.intercept(ApplicationCallPipeline.Plugins) {
+            val basicWaitMs = basicThrottle.retryAfterMs(call)
+            if (basicWaitMs > 0) {
+                call.response.header("Retry-After", ((basicWaitMs / 1000) + 1).toString())
+                call.respond(HttpStatusCode.TooManyRequests)
+                finish()
+                return@intercept
+            }
             val method = call.request.httpMethod
             val uri = call.request.uri.substringBefore("?")
             val isRateLimited =
                 method == HttpMethod.Post && (uri.endsWith(LOGIN_PATH_SUFFIX) || uri.endsWith(REGISTER_PATH_SUFFIX))
             if (!isRateLimited) return@intercept
 
-            val remoteAddress = call.request.local.remoteAddress
-            val xff = call.request.headers["X-Forwarded-For"]
-            val clientIp = resolveClientIp(remoteAddress, xff)
+            val clientIp = resolver.resolve(call)
 
-            if (trustedNetworkMatchers.any { it.matches(clientIp) }) return@intercept
+            if (resolver.isTrusted(clientIp)) return@intercept
 
             val (limiters, cfg) =
                 when {

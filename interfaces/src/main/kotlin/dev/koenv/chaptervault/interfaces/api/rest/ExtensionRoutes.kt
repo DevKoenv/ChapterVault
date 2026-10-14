@@ -1,11 +1,10 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.toDto
-import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.kernel.extension.ExtensionManager
 import dev.koenv.chaptervault.shared.result.AppError
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.auth.principal
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -13,20 +12,12 @@ import io.ktor.server.routing.post
 
 fun Route.extensionRoutes(loaderService: ExtensionManager) {
     get("/extensions") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@get
-        }
+        call.requirePermission(Permission.MANAGE_EXTENSIONS) ?: return@get
         call.respond(HttpStatusCode.OK, loaderService.listAll().map { it.toDto() })
     }
 
     get("/extensions/{id}") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@get
-        }
+        call.requirePermission(Permission.MANAGE_EXTENSIONS) ?: return@get
         val id = call.parameters["id"]!!
         val entry = loaderService.findById(id)
         if (entry == null) {
@@ -37,11 +28,7 @@ fun Route.extensionRoutes(loaderService: ExtensionManager) {
     }
 
     post("/extensions/{id}/enable") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
+        call.requirePermission(Permission.MANAGE_EXTENSIONS) ?: return@post
         val id = call.parameters["id"]!!
         if (loaderService.findById(id) == null) {
             call.respondError(AppError.NotFound("Extension", id))
@@ -52,11 +39,7 @@ fun Route.extensionRoutes(loaderService: ExtensionManager) {
     }
 
     post("/extensions/{id}/disable") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
+        call.requirePermission(Permission.MANAGE_EXTENSIONS) ?: return@post
         val id = call.parameters["id"]!!
         if (loaderService.findById(id) == null) {
             call.respondError(AppError.NotFound("Extension", id))
@@ -67,11 +50,7 @@ fun Route.extensionRoutes(loaderService: ExtensionManager) {
     }
 
     post("/extensions/{id}/reload") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
+        call.requirePermission(Permission.MANAGE_EXTENSIONS) ?: return@post
         val id = call.parameters["id"] ?: return@post call.respondBadRequest("Missing extension id")
         loaderService.findById(id) ?: return@post call.respondError(AppError.NotFound("Extension", id))
         loaderService.reload(id)
@@ -79,11 +58,7 @@ fun Route.extensionRoutes(loaderService: ExtensionManager) {
     }
 
     post("/extensions/{id}/unload") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
+        call.requirePermission(Permission.MANAGE_EXTENSIONS) ?: return@post
         val id = call.parameters["id"] ?: return@post call.respondBadRequest("Missing extension id")
         loaderService.findById(id) ?: return@post call.respondError(AppError.NotFound("Extension", id))
         loaderService.unload(id)

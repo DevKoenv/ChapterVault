@@ -3,24 +3,25 @@ package dev.koenv.chaptervault.server.routing
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
-import dev.koenv.chaptervault.infrastructure.update.UpdateCheckerService
 import dev.koenv.chaptervault.interfaces.api.opds.opdsPageRoutes
 import dev.koenv.chaptervault.interfaces.api.opds.opdsRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.authRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.backupRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.connectorRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.extensionRoutes
+import dev.koenv.chaptervault.interfaces.api.rest.idParam
 import dev.koenv.chaptervault.interfaces.api.rest.libraryRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.notificationRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.progressRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.readingStatusRoutes
-import dev.koenv.chaptervault.interfaces.api.rest.respondBadRequest
+import dev.koenv.chaptervault.interfaces.api.rest.requirePermissionForAll
 import dev.koenv.chaptervault.interfaces.api.rest.respondError
 import dev.koenv.chaptervault.interfaces.api.rest.systemRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.taskRoutes
 import dev.koenv.chaptervault.interfaces.api.rest.userRoutes
 import dev.koenv.chaptervault.interfaces.api.sse.sseRoutes
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
+import dev.koenv.chaptervault.kernel.api.ApiPaths
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.BackupApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
@@ -31,11 +32,12 @@ import dev.koenv.chaptervault.kernel.api.OpdsReadApi
 import dev.koenv.chaptervault.kernel.api.ProgressApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
 import dev.koenv.chaptervault.kernel.api.SystemApi
+import dev.koenv.chaptervault.kernel.api.UpdateInfoApi
+import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
-import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticate
@@ -46,6 +48,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 
+// takes every API the routes need; grouping them is tracked in the fix list (section G)
+@Suppress("LongParameterList")
 internal fun Application.configureRouting(
     config: AppConfig,
     auth: AuthApi,
@@ -61,23 +65,17 @@ internal fun Application.configureRouting(
     notificationApi: NotificationApi,
     notificationDispatch: NotificationDispatchApi,
     extensionLoaderService: ExtensionLoaderService,
-    updateCheckerService: UpdateCheckerService,
+    updates: UpdateInfoApi,
     opdsRead: OpdsReadApi,
     fileStorage: FileStorage,
 ) {
     routing {
-        route("/api/v1") {
+        route(ApiPaths.V1) {
             authRoutes(auth, config.auth.registrationEnabled)
 
             // cover images are served without auth, they're thumbnails not content
             get("/library/series/{id}/cover") {
-                val id =
-                    try {
-                        Id.from(call.parameters["id"]!!)
-                    } catch (e: Exception) {
-                        call.respondBadRequest("Invalid series ID")
-                        return@get
-                    }
+                val id = call.idParam("id", "series") ?: return@get
                 when (val result = fileStorage.readCover(id.toString())) {
                     is Result.Failure -> call.respondError(result.error)
                     is Result.Success -> {
@@ -98,7 +96,7 @@ internal fun Application.configureRouting(
                 notificationRoutes(notificationApi, notificationDispatch)
                 extensionRoutes(extensionLoaderService)
                 sseRoutes(projectionService)
-                systemRoutes(updateCheckerService)
+                systemRoutes(updates)
             }
         }
     }
@@ -109,14 +107,9 @@ internal fun Application.configureRouting(
     // here rather than :interfaces because it needs FileStorage directly
     routing {
         authenticate("auth-basic") {
+            requirePermissionForAll(Permission.READ_LIBRARY)
             get("/opds/v1/download/{chapterId}") {
-                val chapterId =
-                    try {
-                        Id.from(call.parameters["chapterId"]!!)
-                    } catch (e: Exception) {
-                        call.respondBadRequest("Invalid chapter ID")
-                        return@get
-                    }
+                val chapterId = call.idParam("chapterId", "chapter") ?: return@get
                 when (val chapterResult = libraryRead.getChapter(chapterId)) {
                     is Result.Failure -> {
                         call.respondError(chapterResult.error)

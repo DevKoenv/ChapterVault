@@ -165,7 +165,7 @@ class AuthRoutesTest {
             val response =
                 client.post("/auth/register") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"username":"alice","password":"pass"}""")
+                    setBody("""{"username":"alice","password":"password1"}""")
                 }
             assertEquals(HttpStatusCode.Created, response.status)
             val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
@@ -180,7 +180,7 @@ class AuthRoutesTest {
             val response =
                 client.post("/auth/register") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"username":"alice","password":"pass"}""")
+                    setBody("""{"username":"alice","password":"password1"}""")
                 }
             assertEquals(HttpStatusCode.Conflict, response.status)
         }
@@ -193,7 +193,20 @@ class AuthRoutesTest {
             val response =
                 client.post("/auth/register") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"username":"   ","password":"pass"}""")
+                    setBody("""{"username":"   ","password":"password1"}""")
+                }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
+    fun `POST auth-register rejects a password shorter than 8 characters`() {
+        testApplication {
+            install(happyAuth)
+            val response =
+                client.post("/auth/register") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"username":"alice","password":"1234567"}""")
                 }
             assertEquals(HttpStatusCode.BadRequest, response.status)
         }
@@ -219,7 +232,7 @@ class AuthRoutesTest {
             val response =
                 client.post("/auth/register") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"username":"${"a".repeat(101)}","password":"pass"}""")
+                    setBody("""{"username":"${"a".repeat(101)}","password":"password1"}""")
                 }
             assertEquals(HttpStatusCode.BadRequest, response.status)
         }
@@ -232,7 +245,7 @@ class AuthRoutesTest {
             val response =
                 client.post("/auth/login") {
                     contentType(ContentType.Application.Json)
-                    setBody("""{"username":"","password":"pass"}""")
+                    setBody("""{"username":"","password":"password1"}""")
                 }
             assertEquals(HttpStatusCode.BadRequest, response.status)
         }

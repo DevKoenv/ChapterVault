@@ -174,21 +174,21 @@ class ProgressRoutesTest {
             }
 
         @Test
-        fun `GET progress returns 403 when principal is missing`() =
+        fun `GET progress returns 401 when principal is missing`() =
             testAppNoAuth {
-                assertEquals(HttpStatusCode.Forbidden, client.get("/library/series/$seriesId/progress").status)
+                assertEquals(HttpStatusCode.Unauthorized, client.get("/library/series/$seriesId/progress").status)
             }
 
         @Test
-        fun `POST read returns 403 when principal is missing`() =
+        fun `POST read returns 401 when principal is missing`() =
             testAppNoAuth {
-                assertEquals(HttpStatusCode.Forbidden, client.post("/library/chapters/$chapterId/read").status)
+                assertEquals(HttpStatusCode.Unauthorized, client.post("/library/chapters/$chapterId/read").status)
             }
 
         @Test
-        fun `DELETE read returns 403 when principal is missing`() =
+        fun `DELETE read returns 401 when principal is missing`() =
             testAppNoAuth {
-                assertEquals(HttpStatusCode.Forbidden, client.delete("/library/chapters/$chapterId/read").status)
+                assertEquals(HttpStatusCode.Unauthorized, client.delete("/library/chapters/$chapterId/read").status)
             }
     }
 }

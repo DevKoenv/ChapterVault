@@ -1,17 +1,19 @@
 package dev.koenv.chaptervault.interfaces.api.opds
 
-import dev.koenv.chaptervault.interfaces.api.rest.KtorPrincipal
+import dev.koenv.chaptervault.interfaces.api.rest.idParam
+import dev.koenv.chaptervault.interfaces.api.rest.pageRequest
+import dev.koenv.chaptervault.interfaces.api.rest.requirePermissionForAll
+import dev.koenv.chaptervault.interfaces.api.rest.requirePrincipal
 import dev.koenv.chaptervault.interfaces.api.rest.respondBadRequest
 import dev.koenv.chaptervault.interfaces.api.rest.respondError
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.OpdsReadApi
 import dev.koenv.chaptervault.kernel.api.OpdsSeriesFilter
+import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
-import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
-import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -46,18 +48,18 @@ fun Application.opdsRoutes(
 ) {
     routing {
         authenticate("auth-basic") {
+            requirePermissionForAll(Permission.READ_LIBRARY)
             get("/opds/v1") {
                 val feed = feedBuilder.buildNavigationFeed(Instant.now().toString())
                 call.respondText(opdsV1.serialize(feed), opdsContentType(call))
             }
 
             get("/opds/v1/catalog") {
-                val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
-                val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+                val pageRequest = call.pageRequest(defaultSize = 20)
+                val page = pageRequest.page
                 val genre = call.request.queryParameters["genre"]
                 val language = call.request.queryParameters["language"]
                 val upstreamStatus = call.request.queryParameters["upstreamStatus"]
-                val pageRequest = PageRequest(page, size.coerceIn(1, 100))
                 val now = Instant.now().toString()
 
                 if (genre != null || language != null || upstreamStatus != null) {
@@ -100,20 +102,15 @@ fun Application.opdsRoutes(
             }
 
             get("/opds/v1/history") {
-                val principal =
-                    call.principal<KtorPrincipal>() ?: run {
-                        call.respond(HttpStatusCode.Unauthorized)
-                        return@get
-                    }
-                val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
-                val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
-                when (val result = opdsRead.listReadHistory(principal.user.id, PageRequest(page, size.coerceIn(1, 100)))) {
+                val principal = call.requirePrincipal() ?: return@get
+                val pageRequest = call.pageRequest(defaultSize = 20)
+                when (val result = opdsRead.listReadHistory(principal.user.id, pageRequest)) {
                     is Result.Success -> {
                         val p = result.value
                         val feed =
                             feedBuilder.buildHistoryFeed(
                                 entries = p.items,
-                                page = page,
+                                page = pageRequest.page,
                                 size = p.size,
                                 totalItems = p.totalItems,
                                 now = Instant.now().toString(),
@@ -125,15 +122,14 @@ fun Application.opdsRoutes(
             }
 
             get("/opds/v1/library-updates") {
-                val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
-                val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
-                when (val result = opdsRead.listRecentlyAddedChapters(PageRequest(page, size.coerceIn(1, 100)))) {
+                val pageRequest = call.pageRequest(defaultSize = 20)
+                when (val result = opdsRead.listRecentlyAddedChapters(pageRequest)) {
                     is Result.Success -> {
                         val p = result.value
                         val feed =
                             feedBuilder.buildLibraryUpdatesFeed(
                                 chapters = p.items,
-                                page = page,
+                                page = pageRequest.page,
                                 size = p.size,
                                 totalItems = p.totalItems,
                                 now = Instant.now().toString(),
@@ -175,13 +171,7 @@ fun Application.opdsRoutes(
             }
 
             get("/opds/v1/series/{id}") {
-                val id =
-                    try {
-                        Id.from(call.parameters["id"]!!)
-                    } catch (e: Exception) {
-                        call.respondBadRequest("Invalid series ID")
-                        return@get
-                    }
+                val id = call.idParam("id", "series") ?: return@get
                 val seriesResult = libraryRead.getSeries(id)
                 if (seriesResult is Result.Failure) {
                     call.respondError(seriesResult.error)
@@ -224,20 +214,19 @@ fun Application.opdsPageRoutes(
 ) {
     routing {
         authenticate("auth-basic") {
+            requirePermissionForAll(Permission.READ_LIBRARY)
             get("/opds/v1/chapters/{id}/pages/{pageNumber}") {
-                val id =
-                    try {
-                        Id.from(call.parameters["id"]!!)
-                    } catch (e: Exception) {
-                        call.respondBadRequest("Invalid chapter ID")
-                        return@get
-                    }
+                val id = call.idParam("id", "chapter") ?: return@get
                 val pageNumber =
                     call.parameters["pageNumber"]?.toIntOrNull()
                         ?: run {
                             call.respondBadRequest("Invalid page number")
                             return@get
                         }
+                if (pageNumber < 0) {
+                    call.respondError(AppError.NotFound("Page", pageNumber.toString()))
+                    return@get
+                }
 
                 val chapterResult = libraryRead.getChapter(id)
                 if (chapterResult is Result.Failure) {
@@ -256,7 +245,7 @@ fun Application.opdsPageRoutes(
                         val page = pageResult.value
                         val etag = "\"${sha256("$id:${chapter.updatedAt.epochSecond}:$pageNumber")}\""
                         call.response.headers.append(HttpHeaders.ETag, etag)
-                        call.response.headers.append(HttpHeaders.CacheControl, "max-age=31536000, immutable")
+                        call.response.headers.append(HttpHeaders.CacheControl, "private, max-age=31536000, immutable")
                         val ifNoneMatch = call.request.header(HttpHeaders.IfNoneMatch)
                         if (ifNoneMatch == etag) {
                             call.respond(HttpStatusCode.NotModified)

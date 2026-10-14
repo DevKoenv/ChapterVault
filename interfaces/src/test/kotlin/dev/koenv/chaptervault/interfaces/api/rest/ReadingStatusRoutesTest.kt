@@ -93,20 +93,20 @@ class ReadingStatusRoutesTest {
             }
 
         @Test
-        fun `PATCH status returns 403 when principal is missing`() =
+        fun `PATCH status returns 401 when principal is missing`() =
             testAppNoAuth {
                 val res =
                     client.patch("/library/series/$seriesId/status") {
                         contentType(ContentType.Application.Json)
                         setBody("""{"status":"READING"}""")
                     }
-                assertEquals(HttpStatusCode.Forbidden, res.status)
+                assertEquals(HttpStatusCode.Unauthorized, res.status)
             }
 
         @Test
-        fun `DELETE status returns 403 when principal is missing`() =
+        fun `DELETE status returns 401 when principal is missing`() =
             testAppNoAuth {
-                assertEquals(HttpStatusCode.Forbidden, client.delete("/library/series/$seriesId/status").status)
+                assertEquals(HttpStatusCode.Unauthorized, client.delete("/library/series/$seriesId/status").status)
             }
     }
 }

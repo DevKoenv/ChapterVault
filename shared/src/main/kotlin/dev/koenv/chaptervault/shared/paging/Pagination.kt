@@ -6,7 +6,11 @@ data class PageRequest(
 ) {
     init {
         require(page >= 0) { "Page must be >= 0" }
-        require(size in 1..100) { "Size must be between 1 and 100" }
+        require(size in 1..MAX_SIZE) { "Size must be between 1 and $MAX_SIZE" }
+    }
+
+    companion object {
+        const val MAX_SIZE = 200
     }
 }
 

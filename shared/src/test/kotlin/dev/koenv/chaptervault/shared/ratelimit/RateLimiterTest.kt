@@ -34,4 +34,16 @@ class RateLimiterTest {
             val secondReject = limiter.tryAcquire()
             assertTrue(secondReject > 0)
         }
+
+    @Test
+    fun `retryAfterMs reports exhaustion without consuming a slot`() =
+        runBlocking {
+            val limiter = RateLimiter(requestsPerSecond = 1.0, burst = 2)
+            assertEquals(0L, limiter.retryAfterMs())
+            assertEquals(0L, limiter.retryAfterMs())
+            assertEquals(0L, limiter.retryAfterMs(), "peeking must not use up the budget")
+            assertEquals(0L, limiter.tryAcquire())
+            assertEquals(0L, limiter.tryAcquire())
+            assertTrue(limiter.retryAfterMs() > 0)
+        }
 }

@@ -25,6 +25,14 @@ class RateLimiter(
         }
     }
 
+    /** Milliseconds until a slot frees up, or 0 when one is free now. Unlike [tryAcquire] this never takes a slot. */
+    suspend fun retryAfterMs(): Long =
+        mutex.withLock {
+            val now = System.currentTimeMillis()
+            timestamps.removeAll { it < now - windowMs }
+            if (timestamps.size >= burst) windowMs - (now - timestamps.first()) + 1L else 0L
+        }
+
     suspend fun tryAcquire(): Long =
         mutex.withLock {
             val now = System.currentTimeMillis()

@@ -74,10 +74,12 @@ class UserSeriesStatusRepository : ReadingStatusApi {
                 .where {
                     (UserSeriesStatusTable.userId eq userId.toString()) and
                         (UserSeriesStatusTable.seriesId inList seriesIds.map { it.toString() })
-                }.associate { row ->
-                    Id.from(row[UserSeriesStatusTable.seriesId]) to
-                        runCatching { ReadingStatus.valueOf(row[UserSeriesStatusTable.status]) }.getOrThrow()
-                }
+                }.mapNotNull { row ->
+                    // a row with a status this version does not know is ignored rather than failing the whole listing
+                    val status =
+                        runCatching { ReadingStatus.valueOf(row[UserSeriesStatusTable.status]) }.getOrNull() ?: return@mapNotNull null
+                    Id.from(row[UserSeriesStatusTable.seriesId]) to status
+                }.toMap()
         }
 
     override suspend fun getSeriesIdsWithStatus(

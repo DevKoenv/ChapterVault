@@ -3,14 +3,13 @@ package dev.koenv.chaptervault.interfaces.api.rest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.AddSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.PaginatedResponse
-import dev.koenv.chaptervault.interfaces.serialization.dto.v1.SeriesDto
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.UpdateSeriesRequest
 import dev.koenv.chaptervault.interfaces.serialization.mappers.v1.toDto
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
-import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.ReadingStatus
@@ -23,6 +22,7 @@ import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
+import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
@@ -30,7 +30,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.principal
 import io.ktor.server.request.header
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
@@ -50,16 +49,11 @@ fun Route.libraryRoutes(
     readingStatusApi: ReadingStatusApi,
 ) {
     get("/library/series/search") {
+        val principal = call.requirePermission(Permission.READ_LIBRARY) ?: return@get
         val q = call.request.queryParameters["q"] ?: ""
-        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
-        val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
-        val principal = call.principal<KtorPrincipal>()
-        when (val result = libraryRead.searchLibrary(q, PageRequest(page, size.coerceIn(1, 100)))) {
+        when (val result = libraryRead.searchLibrary(q, call.pageRequest(defaultSize = 20))) {
             is Result.Success -> {
-                val statusMap =
-                    principal?.let { p ->
-                        readingStatusApi.getAllStatuses(p.user.id, result.value.items.map { it.id })
-                    } ?: emptyMap()
+                val statusMap = readingStatusApi.getAllStatuses(principal.user.id, result.value.items.map { it.id })
                 call.respond(
                     HttpStatusCode.OK,
                     PaginatedResponse(
@@ -78,25 +72,16 @@ fun Route.libraryRoutes(
     }
 
     get("/library/series") {
-        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
-        val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+        val principal = call.requirePermission(Permission.READ_LIBRARY) ?: return@get
+        val pageRequest = call.pageRequest(defaultSize = 20)
         val statusFilter =
             call.request.queryParameters["readingStatus"]?.let { s ->
                 runCatching { ReadingStatus.valueOf(s.uppercase()) }.getOrNull()
             }
-        val principal = call.principal<KtorPrincipal>()
 
         if (statusFilter != null) {
-            val userId = principal?.user?.id
-            if (userId == null) {
-                call.respond(
-                    HttpStatusCode.OK,
-                    PaginatedResponse(emptyList<SeriesDto>(), page, size.coerceIn(1, 100), 0L, 0, hasNext = false, hasPrevious = false),
-                )
-                return@get
-            }
-            val matchingIds = readingStatusApi.getSeriesIdsWithStatus(userId, statusFilter)
-            when (val result = libraryRead.listSeriesByIds(matchingIds, PageRequest(page, size.coerceIn(1, 100)))) {
+            val matchingIds = readingStatusApi.getSeriesIdsWithStatus(principal.user.id, statusFilter)
+            when (val result = libraryRead.listSeriesByIds(matchingIds, pageRequest)) {
                 is Result.Success ->
                     call.respond(
                         HttpStatusCode.OK,
@@ -113,12 +98,9 @@ fun Route.libraryRoutes(
                 is Result.Failure -> call.respondError(result.error)
             }
         } else {
-            when (val result = libraryRead.listSeries(PageRequest(page, size.coerceIn(1, 100)))) {
+            when (val result = libraryRead.listSeries(pageRequest)) {
                 is Result.Success -> {
-                    val statusMap =
-                        principal?.let { p ->
-                            readingStatusApi.getAllStatuses(p.user.id, result.value.items.map { it.id })
-                        } ?: emptyMap()
+                    val statusMap = readingStatusApi.getAllStatuses(principal.user.id, result.value.items.map { it.id })
                     call.respond(
                         HttpStatusCode.OK,
                         PaginatedResponse(
@@ -138,17 +120,11 @@ fun Route.libraryRoutes(
     }
 
     get("/library/series/{id}") {
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid series ID")
-                return@get
-            }
-        val principal = call.principal<KtorPrincipal>()
+        val principal = call.requirePermission(Permission.READ_LIBRARY) ?: return@get
+        val id = call.idParam("id", "series") ?: return@get
         when (val result = libraryRead.getSeries(id)) {
             is Result.Success -> {
-                val readingStatus = principal?.let { p -> readingStatusApi.getStatus(p.user.id, id) }
+                val readingStatus = readingStatusApi.getStatus(principal.user.id, id)
                 call.respond(HttpStatusCode.OK, result.value.toDto(readingStatus))
             }
             is Result.Failure -> call.respondError(result.error)
@@ -156,28 +132,28 @@ fun Route.libraryRoutes(
     }
 
     get("/library/series/{id}/chapters") {
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid series ID")
-                return@get
-            }
-        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 0
-        val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 50
+        call.requirePermission(Permission.READ_LIBRARY) ?: return@get
+        val id = call.idParam("id", "series") ?: return@get
         val statusParam = call.request.queryParameters["status"]
         val statusFilter =
             if (statusParam != null) {
                 try {
                     DownloadStatus.valueOf(statusParam.uppercase())
-                } catch (e: Exception) {
+                } catch (_: IllegalArgumentException) {
                     call.respondBadRequest("Invalid status value")
                     return@get
                 }
             } else {
                 null
             }
-        when (val result = libraryRead.listChaptersPaginated(id, statusFilter, PageRequest(page, size.coerceIn(1, 200)))) {
+        when (
+            val result =
+                libraryRead.listChaptersPaginated(
+                    id,
+                    statusFilter,
+                    call.pageRequest(defaultSize = 50, maxSize = PageRequest.MAX_SIZE),
+                )
+        ) {
             is Result.Success ->
                 call.respond(
                     HttpStatusCode.OK,
@@ -196,19 +172,19 @@ fun Route.libraryRoutes(
     }
 
     get("/library/chapters/{id}/pages/{index}") {
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid chapter ID")
-                return@get
-            }
+        call.requirePermission(Permission.READ_LIBRARY) ?: return@get
+        val id = call.idParam("id", "chapter") ?: return@get
         val index =
             call.parameters["index"]?.toIntOrNull()
                 ?: run {
                     call.respondBadRequest("Invalid page index")
                     return@get
                 }
+
+        if (index < 0) {
+            call.respondError(AppError.NotFound("Page", index.toString()))
+            return@get
+        }
 
         val chapter =
             when (val r = libraryRead.getChapter(id)) {
@@ -242,23 +218,13 @@ fun Route.libraryRoutes(
         }
 
         call.response.headers.append(HttpHeaders.ETag, etag)
-        call.response.headers.append(HttpHeaders.CacheControl, "max-age=86400, immutable")
+        call.response.headers.append(HttpHeaders.CacheControl, "private, max-age=86400, immutable")
         call.respondBytes(page.data, ContentType.parse(page.mimeType))
     }
 
     post("/library/series") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
-        val request =
-            try {
-                call.receive<AddSeriesRequest>()
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid request body")
-                return@post
-            }
+        call.requirePermission(Permission.WRITE_LIBRARY) ?: return@post
+        val request = call.receiveOrBadRequest<AddSeriesRequest>() ?: return@post
         val connector =
             connectorRegistry.findById(request.connectorId)
                 ?: run {
@@ -300,18 +266,8 @@ fun Route.libraryRoutes(
     }
 
     delete("/library/series/{id}") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@delete
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid series ID")
-                return@delete
-            }
+        call.requirePermission(Permission.WRITE_LIBRARY) ?: return@delete
+        val id = call.idParam("id", "series") ?: return@delete
         when (val result = libraryCommand.removeSeries(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)
@@ -319,18 +275,8 @@ fun Route.libraryRoutes(
     }
 
     post("/library/series/{id}/download") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid series ID")
-                return@post
-            }
+        call.requirePermission(Permission.TRIGGER_TASKS) ?: return@post
+        val id = call.idParam("id", "series") ?: return@post
         val series =
             when (val r = libraryRead.getSeries(id)) {
                 is Result.Success -> r.value
@@ -377,18 +323,8 @@ fun Route.libraryRoutes(
     }
 
     post("/library/chapters/{id}/download") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid chapter ID")
-                return@post
-            }
+        call.requirePermission(Permission.TRIGGER_TASKS) ?: return@post
+        val id = call.idParam("id", "chapter") ?: return@post
         val chapter =
             when (val r = libraryRead.getChapter(id)) {
                 is Result.Success -> r.value
@@ -429,18 +365,8 @@ fun Route.libraryRoutes(
     }
 
     post("/library/chapters/{id}/redownload") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid chapter ID")
-                return@post
-            }
+        call.requirePermission(Permission.TRIGGER_TASKS) ?: return@post
+        val id = call.idParam("id", "chapter") ?: return@post
         val chapter =
             when (val r = libraryRead.getChapter(id)) {
                 is Result.Success -> r.value
@@ -481,18 +407,8 @@ fun Route.libraryRoutes(
     }
 
     delete("/library/chapters/{id}") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@delete
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid chapter ID")
-                return@delete
-            }
+        call.requirePermission(Permission.WRITE_LIBRARY) ?: return@delete
+        val id = call.idParam("id", "chapter") ?: return@delete
         when (val result = libraryCommand.evictChapter(id)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)
@@ -500,18 +416,8 @@ fun Route.libraryRoutes(
     }
 
     post("/library/series/{id}/refresh") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@post
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid series ID")
-                return@post
-            }
+        call.requirePermission(Permission.TRIGGER_TASKS) ?: return@post
+        val id = call.idParam("id", "series") ?: return@post
         val series =
             when (val r = libraryRead.getSeries(id)) {
                 is Result.Success -> r.value
@@ -542,25 +448,9 @@ fun Route.libraryRoutes(
     }
 
     patch("/library/series/{id}") {
-        val principal = call.principal<KtorPrincipal>()
-        if (principal == null || !principal.user.hasRole(Role.ADMIN)) {
-            call.respondForbidden()
-            return@patch
-        }
-        val id =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid series ID")
-                return@patch
-            }
-        val request =
-            try {
-                call.receive<UpdateSeriesRequest>()
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid request body")
-                return@patch
-            }
+        call.requirePermission(Permission.WRITE_LIBRARY) ?: return@patch
+        val id = call.idParam("id", "series") ?: return@patch
+        val request = call.receiveOrBadRequest<UpdateSeriesRequest>() ?: return@patch
         val defaultFormat =
             try {
                 request.defaultFormat?.let { ChapterFormat.fromString(it) }

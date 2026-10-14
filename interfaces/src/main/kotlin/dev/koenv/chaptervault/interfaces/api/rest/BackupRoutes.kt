@@ -4,10 +4,9 @@ import dev.koenv.chaptervault.kernel.api.BackupApi
 import dev.koenv.chaptervault.kernel.api.BackupProgress
 import dev.koenv.chaptervault.kernel.api.BackupReadingStatus
 import dev.koenv.chaptervault.kernel.api.LibraryBackup
+import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -51,11 +50,7 @@ data class BackupImportSummaryDto(
 
 fun Route.backupRoutes(backupApi: BackupApi) {
     get("/backup/export") {
-        val principal =
-            call.principal<KtorPrincipal>() ?: run {
-                call.respondForbidden()
-                return@get
-            }
+        val principal = call.requirePermission(Permission.READ_LIBRARY) ?: return@get
         val now =
             java.time.Instant
                 .now()
@@ -80,18 +75,8 @@ fun Route.backupRoutes(backupApi: BackupApi) {
     }
 
     post("/backup/import") {
-        val principal =
-            call.principal<KtorPrincipal>() ?: run {
-                call.respondForbidden()
-                return@post
-            }
-        val dto =
-            try {
-                call.receive<LibraryBackupDto>()
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid request body")
-                return@post
-            }
+        val principal = call.requirePermission(Permission.WRITE_PROGRESS) ?: return@post
+        val dto = call.receiveOrBadRequest<LibraryBackupDto>() ?: return@post
         val backup =
             LibraryBackup(
                 exportedAt = dto.exportedAt,

@@ -65,7 +65,7 @@ class UserRepositoryTest {
     @Test
     fun `register with ADMIN role creates admin user`() {
         runBlocking {
-            val result = repo.register(Credentials("admin", "secret"), Role.ADMIN)
+            val result = repo.register(Credentials("admin", "secret123"), Role.ADMIN)
             assertIs<Result.Success<*>>(result)
             val principal = (result as Result.Success).value
             assertEquals(setOf(Role.ADMIN), principal.roles)
@@ -75,8 +75,8 @@ class UserRepositoryTest {
     @Test
     fun `register returns Conflict when username taken`() {
         runBlocking {
-            repo.register(Credentials("bob", "pass"))
-            val result = repo.register(Credentials("bob", "other"))
+            repo.register(Credentials("bob", "password1"))
+            val result = repo.register(Credentials("bob", "other-pass"))
             assertIs<Result.Failure>(result)
             assertIs<AppError.Conflict>((result as Result.Failure).error)
         }
@@ -97,7 +97,7 @@ class UserRepositoryTest {
     @Test
     fun `authenticate returns Unauthorized for wrong password`() {
         runBlocking {
-            repo.register(Credentials("dave", "correct"))
+            repo.register(Credentials("dave", "correct-pw"))
             val result = repo.authenticate(Credentials("dave", "wrong"))
             assertIs<Result.Failure>(result)
             assertIs<AppError.Unauthorized>((result as Result.Failure).error)
@@ -107,7 +107,7 @@ class UserRepositoryTest {
     @Test
     fun `authenticate returns Unauthorized for unknown user`() {
         runBlocking {
-            val result = repo.authenticate(Credentials("nobody", "pass"))
+            val result = repo.authenticate(Credentials("nobody", "password1"))
             assertIs<Result.Failure>(result)
             assertIs<AppError.Unauthorized>((result as Result.Failure).error)
         }
@@ -116,8 +116,8 @@ class UserRepositoryTest {
     @Test
     fun `validateSession returns principal for valid token`() {
         runBlocking {
-            repo.register(Credentials("eve", "pass"))
-            val authResult = repo.authenticate(Credentials("eve", "pass"))
+            repo.register(Credentials("eve", "password1"))
+            val authResult = repo.authenticate(Credentials("eve", "password1"))
             val token = ((authResult as Result.Success).value).second.token
             val result = repo.validateSession(token)
             assertIs<Result.Success<*>>(result)
@@ -137,8 +137,8 @@ class UserRepositoryTest {
     @Test
     fun `invalidateSession removes the session`() {
         runBlocking {
-            repo.register(Credentials("frank", "pass"))
-            val token = ((repo.authenticate(Credentials("frank", "pass")) as Result.Success).value).second.token
+            repo.register(Credentials("frank", "password1"))
+            val token = ((repo.authenticate(Credentials("frank", "password1")) as Result.Success).value).second.token
             repo.invalidateSession(token)
             val result = repo.validateSession(token)
             assertIs<Result.Failure>(result)
@@ -148,7 +148,7 @@ class UserRepositoryTest {
     @Test
     fun `validateSession returns Unauthorized for expired token`() {
         runBlocking {
-            repo.register(Credentials("grace", "pass"))
+            repo.register(Credentials("grace", "password1"))
             val userId =
                 transaction {
                     dev.koenv.chaptervault.infrastructure.database.entities.UserTable
@@ -168,7 +168,8 @@ class UserRepositoryTest {
                             .generate()
                             .toString()
                     it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.userId] = userId
-                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.token] = "expired-token-xyz"
+                    it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.tokenHash] =
+                        sessionTokenHash("expired-token-xyz")
                     it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.expiresAt] = pastExpiry
                     it[dev.koenv.chaptervault.infrastructure.database.entities.SessionTable.createdAt] = pastExpiry
                 }

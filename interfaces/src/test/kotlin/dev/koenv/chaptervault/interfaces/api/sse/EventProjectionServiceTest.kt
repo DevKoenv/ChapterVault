@@ -1,6 +1,8 @@
 package dev.koenv.chaptervault.interfaces.api.sse
 
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
+import dev.koenv.chaptervault.kernel.auth.Role
+import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
 import dev.koenv.chaptervault.kernel.library.ChapterEvents
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
@@ -9,6 +11,7 @@ import dev.koenv.chaptervault.kernel.runtime.TaskType
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.sse.ServerSentEvent
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -136,5 +139,52 @@ class EventProjectionServiceTest {
             assertContains(event.data!!, chapterId.toString())
             assertContains(event.data!!, seriesId.toString())
             assertContains(event.data!!, "DOWNLOADED")
+        }
+
+    private val admin = UserPrincipal(Id.generate(), "root", setOf(Role.ADMIN))
+    private val guest = UserPrincipal(Id.generate(), "guest", setOf(Role.GUEST))
+
+    private suspend fun CoroutineScope.collectFor(
+        service: EventProjectionService,
+        user: UserPrincipal,
+        publish: suspend () -> Unit,
+    ): List<String?> {
+        val collected = mutableListOf<ServerSentEvent>()
+        val job = launch { service.eventsFor(user).toList(collected) }
+        yield()
+        publish()
+        yield()
+        job.cancelAndJoin()
+        return collected.map { it.event }
+    }
+
+    @Test
+    fun `task events and their error text only reach users who may view tasks`() =
+        runBlocking {
+            val eventBus = InMemoryEventBus()
+            val service = EventProjectionService(eventBus)
+            service.start()
+
+            val publish: suspend () -> Unit = {
+                eventBus.publish(TaskEvents.TaskFailed(taskId, TaskType.DOWNLOAD_CHAPTER, seriesId, "boom at https://upstream/secret", now))
+            }
+
+            assertEquals(listOf("task.state_changed"), collectFor(service, admin, publish))
+            assertEquals(emptyList(), collectFor(service, guest, publish))
+        }
+
+    @Test
+    fun `chapter download status reaches every user who may read the library`() =
+        runBlocking {
+            val eventBus = InMemoryEventBus()
+            val service = EventProjectionService(eventBus)
+            service.start()
+
+            val publish: suspend () -> Unit = {
+                eventBus.publish(ChapterEvents.DownloadStatusChanged(chapterId, seriesId, DownloadStatus.DOWNLOADED, now))
+            }
+
+            assertEquals(listOf("chapter.download_status"), collectFor(service, guest, publish))
+            assertEquals(listOf("chapter.download_status"), collectFor(service, admin, publish))
         }
 }

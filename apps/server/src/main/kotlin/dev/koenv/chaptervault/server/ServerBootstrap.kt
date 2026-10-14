@@ -7,7 +7,6 @@ import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderSe
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.infrastructure.update.UpdateCheckerService
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
-import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.BackupApi
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
@@ -24,24 +23,21 @@ import dev.koenv.chaptervault.server.auth.configureAuthentication
 import dev.koenv.chaptervault.server.background.launchBackgroundJobs
 import dev.koenv.chaptervault.server.generated.BuildConfig
 import dev.koenv.chaptervault.server.plugins.AuthRateLimiting
+import dev.koenv.chaptervault.server.plugins.DefaultSecurityHeaders
 import dev.koenv.chaptervault.server.plugins.RequestBodyLimit
+import dev.koenv.chaptervault.server.plugins.configureCors
+import dev.koenv.chaptervault.server.plugins.configureStatusPages
 import dev.koenv.chaptervault.server.routing.configureHealthRoutes
 import dev.koenv.chaptervault.server.routing.configureRouting
 import dev.koenv.chaptervault.server.routing.configureSwagger
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.cors.routing.CORS
-import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.uri
-import io.ktor.server.response.respond
 import io.ktor.server.sse.SSE
 import org.koin.ktor.ext.inject
 import org.slf4j.event.Level
@@ -62,30 +58,10 @@ fun Application.bootstrap() {
             "$method $uri -> $status"
         }
     }
+    configureStatusPages() // before ContentNegotiation, see EmptyErrorBodies
     install(ContentNegotiation) { json() }
-    install(StatusPages) {
-        exception<Throwable> { call, cause ->
-            logger.error(cause) { "Unhandled exception on ${call.request.httpMethod.value} ${call.request.uri}" }
-            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("INTERNAL_ERROR", "An unexpected error occurred"))
-        }
-        status(HttpStatusCode.NotFound) { call, status ->
-            call.respond(status, ErrorResponse("NOT_FOUND", "The requested resource was not found"))
-        }
-        status(HttpStatusCode.MethodNotAllowed) { call, status ->
-            call.respond(status, ErrorResponse("METHOD_NOT_ALLOWED", "HTTP method not allowed for this endpoint"))
-        }
-    }
-    install(CORS) {
-        if (config.server.corsOrigins.isEmpty()) {
-            anyHost()
-        } else {
-            config.server.corsOrigins.forEach { allowHost(it, schemes = listOf("http", "https")) }
-        }
-        allowHeader(HttpHeaders.Authorization)
-        allowHeader(HttpHeaders.ContentType)
-        allowMethod(HttpMethod.Delete)
-        allowMethod(HttpMethod.Patch)
-    }
+    configureCors(config.server.corsOrigins)
+    install(DefaultSecurityHeaders)
     install(SSE)
     val appRateLimitConfig = config.auth.rateLimiting
     install(AuthRateLimiting) {
@@ -129,7 +105,7 @@ fun Application.bootstrap() {
         notificationApi = notificationApi,
         notificationDispatch = notificationDispatch,
         extensionLoaderService = extensionLoaderService,
-        updateCheckerService = updateCheckerService,
+        updates = updateCheckerService,
         opdsRead = opdsRead,
         fileStorage = fileStorage,
     )
@@ -141,7 +117,11 @@ fun Application.bootstrap() {
         "ChapterVault v${BuildConfig.VERSION} (rev ${BuildConfig.REVISION}) " +
             "listening on http://${config.server.host}:${config.server.port}"
     }
-    updateCheckerService.startAsync()
+    if (config.updates.checkEnabled) {
+        updateCheckerService.startAsync()
+    } else {
+        logger.info { "Update check disabled (updates.checkEnabled=false); the server will not contact GitHub" }
+    }
 
     configureSwagger()
 

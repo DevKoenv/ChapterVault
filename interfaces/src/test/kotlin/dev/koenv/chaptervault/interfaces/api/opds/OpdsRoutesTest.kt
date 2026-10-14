@@ -214,6 +214,8 @@ class OpdsRoutesTest {
                     validate { cred ->
                         if (cred.name == "user" && cred.password == "pass") {
                             KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                        } else if (cred.name == "nobody" && cred.password == "pass") {
+                            KtorPrincipal(UserPrincipal(Id.generate(), "nobody", emptySet()))
                         } else {
                             null
                         }
@@ -238,6 +240,8 @@ class OpdsRoutesTest {
                     validate { cred ->
                         if (cred.name == "user" && cred.password == "pass") {
                             KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                        } else if (cred.name == "nobody" && cred.password == "pass") {
+                            KtorPrincipal(UserPrincipal(Id.generate(), "nobody", emptySet()))
                         } else {
                             null
                         }
@@ -260,6 +264,8 @@ class OpdsRoutesTest {
                         validate { cred ->
                             if (cred.name == "user" && cred.password == "pass") {
                                 KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                            } else if (cred.name == "nobody" && cred.password == "pass") {
+                                KtorPrincipal(UserPrincipal(Id.generate(), "nobody", emptySet()))
                             } else {
                                 null
                             }
@@ -451,6 +457,38 @@ class OpdsRoutesTest {
             assertNotNull(cacheControl, "Expected Cache-Control header")
             assertContains(cacheControl!!, "max-age=31536000")
             assertContains(cacheControl, "immutable")
+            assertContains(cacheControl, "private")
+        }
+
+    @Test
+    fun `PSE page endpoint returns 404 for a negative page index`() =
+        testApp {
+            val res = client.get("/opds/v1/chapters/$downloadedChapterId/pages/-1") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.NotFound, res.status)
+        }
+
+    @Test
+    fun `catalog treats a negative page as the first page`() =
+        testApp {
+            val res = client.get("/opds/v1/catalog?page=-3") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+        }
+
+    @Test
+    fun `a user without read permission gets 403 from every OPDS feed and page`() =
+        testApp {
+            val paths =
+                listOf(
+                    "/opds/v1",
+                    "/opds/v1/catalog",
+                    "/opds/v1/history",
+                    "/opds/v1/library-updates",
+                    "/opds/v1/series/$seriesId",
+                    "/opds/v1/chapters/$downloadedChapterId/pages/0",
+                )
+            paths.forEach { path ->
+                assertEquals(HttpStatusCode.Forbidden, client.get(path) { basicAuth("nobody", "pass") }.status, path)
+            }
         }
 
     @Test

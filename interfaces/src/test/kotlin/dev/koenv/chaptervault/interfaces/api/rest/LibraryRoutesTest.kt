@@ -94,6 +94,7 @@ class LibraryRoutesTest {
                         when (cred.token) {
                             "admin-token" -> KtorPrincipal(UserPrincipal(Id.generate(), "admin", setOf(Role.ADMIN)))
                             "user-token" -> KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                            "guest-token" -> KtorPrincipal(UserPrincipal(Id.generate(), "guest", setOf(Role.GUEST)))
                             else -> null
                         }
                     }
@@ -134,6 +135,7 @@ class LibraryRoutesTest {
             assertEquals("image/jpeg", response.headers[HttpHeaders.ContentType])
             assertContains(response.headers[HttpHeaders.CacheControl]!!, "max-age=86400")
             assertContains(response.headers[HttpHeaders.CacheControl]!!, "immutable")
+            assertContains(response.headers[HttpHeaders.CacheControl]!!, "private")
             val etag = response.headers[HttpHeaders.ETag]
             assertContains(etag!!, "00000000-0000-0000-0000-000000000002")
         }
@@ -990,6 +992,97 @@ class LibraryRoutesTest {
                     setBody("""{"autoDownload":true}""")
                 }
             assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    @Test
+    fun `GET library series with a negative page is served as the first page`() {
+        var seen: PageRequest? = null
+        testApp(
+            readApi =
+                object : NoOpReadApi() {
+                    override suspend fun listSeries(request: PageRequest): Result.Success<Pagination<Series>> {
+                        seen = request
+                        return Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
+                    }
+                },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/series?page=-1&size=0") { bearerAuth("user-token") }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(PageRequest(0, 1), seen)
+        }
+    }
+
+    @Test
+    fun `GET library series chapters accepts the documented maximum page size of 200`() {
+        var seen: PageRequest? = null
+        testApp(
+            readApi =
+                object : NoOpReadApi() {
+                    override suspend fun listChaptersPaginated(
+                        seriesId: Id,
+                        status: DownloadStatus?,
+                        request: PageRequest,
+                    ): Result.Success<Pagination<Chapter>> {
+                        seen = request
+                        return Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
+                    }
+                },
+            commandApi = NoOpCommandApi(),
+        ) {
+            val response = client.get("/library/series/${fakeSeries.id}/chapters?size=200") { bearerAuth("user-token") }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(200, seen?.size)
+        }
+    }
+
+    @Test
+    fun `GET chapter page with a negative index returns 404 and never reaches storage`() {
+        testApp(
+            readApi =
+                object : NoOpReadApi() {
+                    override suspend fun getChapter(id: Id) = Result.Success(downloadedChapter)
+                },
+            commandApi = NoOpCommandApi(),
+            fileStorage =
+                object : ChapterPageSource {
+                    override suspend fun readPage(
+                        chapter: Chapter,
+                        index: Int,
+                    ): Result<Page> = ArrayList<Page>()[index].let { Result.Success(it) }
+
+                    override suspend fun countPages(chapter: Chapter) = Result.Success(0)
+                },
+        ) {
+            val response = client.get("/library/chapters/${downloadedChapter.id}/pages/-1") { bearerAuth("user-token") }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+    }
+
+    @Test
+    fun `a guest can browse the library but not change it`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            assertEquals(HttpStatusCode.OK, client.get("/library/series") { bearerAuth("guest-token") }.status)
+            assertEquals(HttpStatusCode.OK, client.get("/library/series/search?q=x") { bearerAuth("guest-token") }.status)
+            val add =
+                client.post("/library/series") {
+                    bearerAuth("guest-token")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"connectorId":"mangadex","externalId":"ext-001"}""")
+                }
+            assertEquals(HttpStatusCode.Forbidden, add.status)
+            assertEquals(HttpStatusCode.Forbidden, client.delete("/library/series/${fakeSeries.id}") { bearerAuth("guest-token") }.status)
+        }
+    }
+
+    @Test
+    fun `reading the library needs a valid token`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/library/series").status)
         }
     }
 }

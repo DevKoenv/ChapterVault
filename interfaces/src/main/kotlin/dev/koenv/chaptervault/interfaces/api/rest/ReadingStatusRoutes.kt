@@ -1,12 +1,10 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
+import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.kernel.library.ReadingStatus
 import dev.koenv.chaptervault.shared.result.Result
-import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -20,25 +18,9 @@ private data class SetReadingStatusRequest(
 
 fun Route.readingStatusRoutes(readingStatusApi: ReadingStatusApi) {
     patch("/library/series/{id}/status") {
-        val principal =
-            call.principal<KtorPrincipal>() ?: run {
-                call.respondForbidden()
-                return@patch
-            }
-        val seriesId =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid series ID")
-                return@patch
-            }
-        val request =
-            try {
-                call.receive<SetReadingStatusRequest>()
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid request body")
-                return@patch
-            }
+        val principal = call.requirePermission(Permission.WRITE_PROGRESS) ?: return@patch
+        val seriesId = call.idParam("id", "series") ?: return@patch
+        val request = call.receiveOrBadRequest<SetReadingStatusRequest>() ?: return@patch
         val status =
             runCatching { ReadingStatus.valueOf(request.status) }.getOrNull()
                 ?: run {
@@ -54,18 +36,8 @@ fun Route.readingStatusRoutes(readingStatusApi: ReadingStatusApi) {
     }
 
     delete("/library/series/{id}/status") {
-        val principal =
-            call.principal<KtorPrincipal>() ?: run {
-                call.respondForbidden()
-                return@delete
-            }
-        val seriesId =
-            try {
-                Id.from(call.parameters["id"]!!)
-            } catch (e: Exception) {
-                call.respondBadRequest("Invalid series ID")
-                return@delete
-            }
+        val principal = call.requirePermission(Permission.WRITE_PROGRESS) ?: return@delete
+        val seriesId = call.idParam("id", "series") ?: return@delete
         when (val result = readingStatusApi.clearStatus(principal.user.id, seriesId)) {
             is Result.Success -> call.respond(HttpStatusCode.NoContent)
             is Result.Failure -> call.respondError(result.error)
