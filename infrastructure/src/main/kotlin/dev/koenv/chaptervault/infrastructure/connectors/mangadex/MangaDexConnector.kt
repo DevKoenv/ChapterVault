@@ -30,6 +30,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
@@ -46,6 +47,7 @@ private val lenientJson = Json { ignoreUnknownKeys = true }
 class MangaDexConnector(
     private val httpClient: HttpClient,
     contentRatings: List<String> = listOf("safe", "suggestive"),
+    private val tokenLifetimeMs: Long = TOKEN_LIFETIME_MS,
 ) : HttpConnector(httpClient) {
     private val ratingParams = contentRatings.joinToString("") { "&contentRating[]=${it.lowercase()}" }
 
@@ -104,6 +106,8 @@ class MangaDexConnector(
 
     // one mutex per chapter ID so concurrent downloads of different chapters don't block each other
     private val tokenCacheLocks = ConcurrentHashMap<String, Mutex>()
+
+    internal fun cachedTokenCount(): Int = tokenCache.size
 
     companion object {
         private const val API_URL = "https://api.mangadex.org"
@@ -186,7 +190,7 @@ class MangaDexConnector(
     }
 
     override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> {
-        val url = "$API_URL/manga/$externalId?includes[]=cover_art&includes[]=author&includes[]=artist"
+        val url = "$API_URL/manga/${externalId.encodeURLPathPart()}?includes[]=cover_art&includes[]=author&includes[]=artist"
         return when (val r = context.getJson<MangaDexMangaResponse>(url)) {
             is Result.Failure -> r
             is Result.Success -> {
@@ -209,7 +213,7 @@ class MangaDexConnector(
         while (true) {
             val url =
                 buildString {
-                    append("$API_URL/manga/$externalId/feed")
+                    append("$API_URL/manga/${externalId.encodeURLPathPart()}/feed")
                     append("?translatedLanguage[]=$lang")
                     append("&order[chapter]=asc")
                     append("&includes[]=scanlation_group")
@@ -280,10 +284,16 @@ class MangaDexConnector(
         val lock = tokenCacheLocks.computeIfAbsent(chapterId) { Mutex() }
         return lock.withLock {
             val cached = tokenCache[chapterId]
-            if (cached != null && System.currentTimeMillis() - cached.timestamp < TOKEN_LIFETIME_MS) {
+            if (cached != null && System.currentTimeMillis() - cached.timestamp < tokenLifetimeMs) {
                 return@withLock Result.Success(cached)
             }
-            when (val r = context.getJson<MangaDexAtHomeResponse>("$API_URL/at-home/server/$chapterId", bucket = AT_HOME)) {
+            when (
+                val r =
+                    context.getJson<MangaDexAtHomeResponse>(
+                        "$API_URL/at-home/server/${chapterId.encodeURLPathPart()}",
+                        bucket = AT_HOME,
+                    )
+            ) {
                 is Result.Failure -> r
                 is Result.Success -> {
                     val entry =
@@ -293,6 +303,13 @@ class MangaDexConnector(
                             filenames = r.value.chapter.data,
                             timestamp = System.currentTimeMillis(),
                         )
+                    // expired entries are of no use any more: drop them and their locks so neither map only grows
+                    val now = System.currentTimeMillis()
+                    val expired = tokenCache.filter { (id, c) -> id != chapterId && now - c.timestamp >= tokenLifetimeMs }.keys
+                    expired.forEach {
+                        tokenCache.remove(it)
+                        tokenCacheLocks.remove(it)
+                    }
                     tokenCache[chapterId] = entry
                     Result.Success(entry)
                 }
@@ -326,7 +343,8 @@ class MangaDexConnector(
             pageCount = attributes.pages,
         )
 
-    private fun MangaDexMangaAttributes.preferredTitle(): String = title["en"] ?: title.values.firstOrNull() ?: ""
+    private fun MangaDexMangaAttributes.preferredTitle(): String =
+        (title["en"] ?: title.values.firstOrNull())?.takeIf { it.isNotBlank() } ?: "Untitled"
 
     private fun MangaDexMangaAttributes.preferredDescription(): String? =
         description["en"]?.takeIf { it.isNotBlank() }

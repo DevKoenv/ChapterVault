@@ -301,6 +301,53 @@ class MangaDexConnectorTest {
     }
 
     @Test
+    fun `ids are encoded when they go into a URL path`() {
+        val urls = mutableListOf<String>()
+        val connector =
+            makeConnector {
+                urls += it
+                """{"result":"ok","data":null,"total":0}"""
+            }
+
+        runBlocking {
+            connector.fetchSeries("a/b?c#d")
+            connector.fetchChapters("a/b?c#d")
+        }
+
+        assertTrue(urls.all { it.contains("/manga/a%2Fb%3Fc%23d") }, "unencoded id in $urls")
+    }
+
+    @Test
+    fun `a series without any title gets a placeholder instead of an empty one`() {
+        val connector = makeConnector { """{"result":"ok","data":{"id":"m1","attributes":{"title":{}},"relationships":[]}}""" }
+
+        val meta = assertSuccess(runBlocking { connector.fetchSeries("m1") })
+
+        assertEquals("Untitled", meta.title)
+    }
+
+    @Test
+    fun `expired at-home tokens are dropped when a new one is stored`() {
+        val engine =
+            MockEngine {
+                respond(
+                    """{"result":"ok","baseUrl":"https://cdn","chapter":{"hash":"h","data":["p1.jpg"]}}""",
+                    HttpStatusCode.OK,
+                    jsonHeaders,
+                )
+            }
+        val connector = MangaDexConnector(HttpClient(engine), tokenLifetimeMs = 1)
+
+        runBlocking {
+            connector.download(makeChapter("c1"), ChapterFormat.Cbz)
+            Thread.sleep(20)
+            connector.download(makeChapter("c2"), ChapterFormat.Cbz)
+        }
+
+        assertEquals(1, connector.cachedTokenCount())
+    }
+
+    @Test
     fun `fetchChapters filters out chapters with external URL`() {
         val connector =
             makeConnector {
