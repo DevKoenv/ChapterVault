@@ -23,6 +23,7 @@ import dev.koenv.chaptervault.kernel.runtime.TaskPayloadKeys
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
+import dev.koenv.chaptervault.kernel.runtime.downloadChapterTask
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
@@ -393,23 +394,7 @@ class TaskExecutorService(
         if (series.autoDownload) {
             for (chapter in insertedChapters) {
                 setChapterStatus(chapter, DownloadStatus.PENDING)
-                taskQueue.enqueue(
-                    Task(
-                        id = Id.generate(),
-                        type = TaskType.DOWNLOAD_CHAPTER,
-                        status = TaskStatus.PENDING,
-                        targetType = TargetType.CHAPTER,
-                        targetId = chapter.id,
-                        payload =
-                            mapOf(
-                                TaskPayloadKeys.CONNECTOR_ID to connectorId,
-                                TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
-                                TaskPayloadKeys.FORMAT to (series.defaultFormat?.toString() ?: "Cbz"),
-                            ),
-                        createdAt = Instant.now(),
-                        updatedAt = Instant.now(),
-                    ),
-                )
+                taskQueue.enqueue(downloadChapterTask(chapter.id, connectorId, series.defaultFormat?.toString() ?: "Cbz"))
             }
         }
 

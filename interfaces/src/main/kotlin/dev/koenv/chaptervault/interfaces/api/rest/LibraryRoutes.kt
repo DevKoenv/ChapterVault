@@ -20,6 +20,7 @@ import dev.koenv.chaptervault.kernel.runtime.TaskPayloadKeys
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
+import dev.koenv.chaptervault.kernel.runtime.downloadChapterTask
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
@@ -301,23 +302,7 @@ fun Route.libraryRoutes(
             }
         for (chapter in toDownload) {
             libraryCommand.markChapterPending(chapter.id)
-            taskQueue.enqueue(
-                Task(
-                    id = Id.generate(),
-                    type = TaskType.DOWNLOAD_CHAPTER,
-                    status = TaskStatus.PENDING,
-                    targetType = TargetType.CHAPTER,
-                    targetId = chapter.id,
-                    payload =
-                        mapOf(
-                            TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
-                            TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
-                            TaskPayloadKeys.FORMAT to format.toString(),
-                        ),
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
+            taskQueue.enqueue(downloadChapterTask(chapter.id, series.connectorId ?: "", format.toString(), now))
         }
         call.respond(HttpStatusCode.Accepted, mapOf("queued" to toDownload.size))
     }
@@ -344,23 +329,7 @@ fun Route.libraryRoutes(
         val format = series.defaultFormat ?: ChapterFormat.Cbz
         val now = Instant.now()
         libraryCommand.markChapterPending(chapter.id)
-        taskQueue.enqueue(
-            Task(
-                id = Id.generate(),
-                type = TaskType.DOWNLOAD_CHAPTER,
-                status = TaskStatus.PENDING,
-                targetType = TargetType.CHAPTER,
-                targetId = chapter.id,
-                payload =
-                    mapOf(
-                        TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
-                        TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
-                        TaskPayloadKeys.FORMAT to format.toString(),
-                    ),
-                createdAt = now,
-                updatedAt = now,
-            ),
-        )
+        taskQueue.enqueue(downloadChapterTask(chapter.id, series.connectorId ?: "", format.toString(), now))
         call.respond(HttpStatusCode.Accepted, mapOf("queued" to 1))
     }
 
@@ -386,23 +355,7 @@ fun Route.libraryRoutes(
         val format = series.defaultFormat ?: ChapterFormat.Cbz
         val now = Instant.now()
         libraryCommand.markChapterPending(chapter.id)
-        taskQueue.enqueue(
-            Task(
-                id = Id.generate(),
-                type = TaskType.DOWNLOAD_CHAPTER,
-                status = TaskStatus.PENDING,
-                targetType = TargetType.CHAPTER,
-                targetId = chapter.id,
-                payload =
-                    mapOf(
-                        TaskPayloadKeys.CONNECTOR_ID to (series.connectorId ?: ""),
-                        TaskPayloadKeys.CHAPTER_ID to chapter.id.toString(),
-                        TaskPayloadKeys.FORMAT to format.toString(),
-                    ),
-                createdAt = now,
-                updatedAt = now,
-            ),
-        )
+        taskQueue.enqueue(downloadChapterTask(chapter.id, series.connectorId ?: "", format.toString(), now))
         call.respond(HttpStatusCode.Accepted, mapOf("queued" to 1))
     }
 

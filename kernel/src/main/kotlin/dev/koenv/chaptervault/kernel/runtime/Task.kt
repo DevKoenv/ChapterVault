@@ -17,3 +17,26 @@ data class Task(
     /** A task is not started before this moment (set on retries). Null means as soon as a worker is free. */
     val runAfter: Instant? = null,
 )
+
+/** The task that downloads one chapter; every place that queues a download builds it here. */
+fun downloadChapterTask(
+    chapterId: Id,
+    connectorId: String,
+    format: String,
+    now: Instant = Instant.now(),
+): Task =
+    Task(
+        id = Id.generate(),
+        type = TaskType.DOWNLOAD_CHAPTER,
+        status = TaskStatus.PENDING,
+        targetType = TargetType.CHAPTER,
+        targetId = chapterId,
+        payload =
+            mapOf(
+                TaskPayloadKeys.CONNECTOR_ID to connectorId,
+                TaskPayloadKeys.CHAPTER_ID to chapterId.toString(),
+                TaskPayloadKeys.FORMAT to format,
+            ),
+        createdAt = now,
+        updatedAt = now,
+    )
