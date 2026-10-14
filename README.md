@@ -375,7 +375,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for a full breakdown of each module's r
 
 ## Development
 
-**Requirements:** JDK 21 or newer, Git. CI and the Docker image use JDK 21, and the build compiles against the JDK 21
+**Requirements:** JDK 21 must be installed (a newer JDK alone is not enough), Git. CI and the Docker image use JDK 21, and the build compiles against the JDK 21
 API even on a newer JDK, so a green local build cannot depend on a later API.
 
 ```bash

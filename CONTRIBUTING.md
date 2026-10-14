@@ -4,7 +4,7 @@ Thanks for your interest in contributing. This document covers how to set up the
 
 ## Prerequisites
 
-- JDK 21 or later
+- JDK 21 must be installed (a newer JDK alone is not enough)
 - Git
 
 No Docker required for development - tests use an embedded SQLite database.

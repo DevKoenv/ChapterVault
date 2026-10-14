@@ -10,6 +10,8 @@ ktlint {
 }
 
 kotlin {
+    // JDK 21 is the minimum and must be installed; a newer JDK alone is not enough
+    jvmToolchain(21)
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         freeCompilerArgs.addAll(

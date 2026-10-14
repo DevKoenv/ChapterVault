@@ -74,7 +74,7 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
   `X-Frame-Options`.
 - The release workflow builds and tests first, requires the tag to be on `master`, publishes `-rc`/suffixed tags as
   pre-releases without touching `latest`, and uses actions pinned by commit SHA. Dependabot is configured.
-- The build compiles against the JDK 21 API on any newer JDK.
+- The build compiles against the JDK 21 API on any newer JDK, and Gradle now requires a JDK 21 toolchain to be installed.
 
 #### Fixed
 
