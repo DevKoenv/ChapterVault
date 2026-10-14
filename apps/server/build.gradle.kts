@@ -6,8 +6,11 @@ plugins {
 }
 
 // The Docker build context has no .git (and the builder image no git); asking for it would fail the configuration cache.
+// The image build passes the revision in instead: -Prevision=<short hash>.
 val gitRevision: String =
-    if (rootProject.file(".git").exists()) {
+    if (providers.gradleProperty("revision").isPresent) {
+        providers.gradleProperty("revision").get()
+    } else if (rootProject.file(".git").exists()) {
         try {
             providers
                 .exec {

@@ -4,7 +4,9 @@ WORKDIR /build
 
 COPY . .
 
-RUN ./gradlew :apps:server:shadowJar --no-daemon -q
+# .git is not in the build context; pass the revision with --build-arg REVISION=$(git rev-parse --short HEAD)
+ARG REVISION=unknown
+RUN ./gradlew :apps:server:shadowJar --no-daemon -q -Prevision="$REVISION"
 
 FROM eclipse-temurin:21-jre-alpine
 
