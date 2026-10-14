@@ -86,6 +86,28 @@ class BackupRepositoryTest {
         }
 
     @Test
+    fun `the same external id in two languages keeps separate progress`() =
+        runBlocking<Unit> {
+            series.addToLibrary("mangadex", "ext-1", "nl", false)
+            importFor(
+                alice,
+                backup(
+                    progress =
+                        listOf(
+                            BackupProgress("mangadex", "ext-1", null, 3, "2026-01-02T03:04:05Z", "en"),
+                            BackupProgress("mangadex", "ext-1", null, 9, "2026-01-02T03:04:05Z", "nl"),
+                        ),
+                ),
+            )
+            val exported = (backups.exportBackup(alice, "now") as Result.Success).value
+
+            val summary = importFor(bob, exported)
+
+            assertEquals(2, summary.progressRestored)
+            assertEquals(setOf("en" to 3, "nl" to 9), exported.progress.map { it.language to it.latestPage }.toSet())
+        }
+
+    @Test
     fun `an unknown status is skipped and never stored`() =
         runBlocking<Unit> {
             val summary = importFor(alice, backup(statuses = listOf(BackupReadingStatus("mangadex", "ext-1", "NOT_A_STATUS"))))

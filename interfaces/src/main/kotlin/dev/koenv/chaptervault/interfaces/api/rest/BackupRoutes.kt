@@ -21,6 +21,7 @@ data class BackupProgressDto(
     val latestChapterExternalId: String?,
     val latestPage: Int,
     val readAt: String,
+    val language: String = "en",
 )
 
 @Serializable
@@ -28,6 +29,7 @@ data class BackupReadingStatusDto(
     val connectorId: String,
     val externalId: String,
     val status: String,
+    val language: String = "en",
 )
 
 @Serializable
@@ -64,9 +66,24 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                         exportedAt = backup.exportedAt,
                         progress =
                             backup.progress.map {
-                                BackupProgressDto(it.connectorId, it.externalId, it.latestChapterExternalId, it.latestPage, it.readAt)
+                                BackupProgressDto(
+                                    it.connectorId,
+                                    it.externalId,
+                                    it.latestChapterExternalId,
+                                    it.latestPage,
+                                    it.readAt,
+                                    it.language,
+                                )
                             },
-                        readingStatuses = backup.readingStatuses.map { BackupReadingStatusDto(it.connectorId, it.externalId, it.status) },
+                        readingStatuses =
+                            backup.readingStatuses.map {
+                                BackupReadingStatusDto(
+                                    it.connectorId,
+                                    it.externalId,
+                                    it.status,
+                                    it.language,
+                                )
+                            },
                     ),
                 )
             }
@@ -82,11 +99,11 @@ fun Route.backupRoutes(backupApi: BackupApi) {
                 exportedAt = dto.exportedAt,
                 progress =
                     dto.progress.map {
-                        BackupProgress(it.connectorId, it.externalId, it.latestChapterExternalId, it.latestPage, it.readAt)
+                        BackupProgress(it.connectorId, it.externalId, it.latestChapterExternalId, it.latestPage, it.readAt, it.language)
                     },
                 readingStatuses =
                     dto.readingStatuses.map {
-                        BackupReadingStatus(it.connectorId, it.externalId, it.status)
+                        BackupReadingStatus(it.connectorId, it.externalId, it.status, it.language)
                     },
             )
         when (val result = backupApi.importBackup(principal.user.id, backup)) {

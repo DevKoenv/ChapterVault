@@ -37,26 +37,19 @@ class BackupRepository : BackupApi {
             val progress =
                 UserSeriesProgressTable
                     .join(SeriesTable, JoinType.INNER, UserSeriesProgressTable.seriesId, SeriesTable.id)
+                    .join(ChapterTable, JoinType.LEFT, UserSeriesProgressTable.latestChapterId, ChapterTable.id)
                     .selectAll()
                     .where { UserSeriesProgressTable.userId eq uid }
                     .mapNotNull { row ->
                         val connectorId = row[SeriesTable.connectorId] ?: return@mapNotNull null
                         val externalId = row[SeriesTable.externalId] ?: return@mapNotNull null
-                        val latestChapterId = row[UserSeriesProgressTable.latestChapterId]
-                        val latestChapterExternalId =
-                            latestChapterId?.let { cid ->
-                                ChapterTable
-                                    .selectAll()
-                                    .where { ChapterTable.id eq cid }
-                                    .singleOrNull()
-                                    ?.get(ChapterTable.externalId)
-                            }
                         BackupProgress(
                             connectorId = connectorId,
                             externalId = externalId,
-                            latestChapterExternalId = latestChapterExternalId,
+                            latestChapterExternalId = row[ChapterTable.externalId],
                             latestPage = row[UserSeriesProgressTable.latestPage],
                             readAt = row[UserSeriesProgressTable.readAt].toJavaInstant().toString(),
+                            language = row[SeriesTable.language],
                         )
                     }
 
@@ -72,6 +65,7 @@ class BackupRepository : BackupApi {
                             connectorId = connectorId,
                             externalId = externalId,
                             status = row[UserSeriesStatusTable.status],
+                            language = row[SeriesTable.language],
                         )
                     }
 
@@ -108,7 +102,7 @@ class BackupRepository : BackupApi {
         uid: String,
         p: BackupProgress,
     ): Boolean {
-        val series = if (p.latestPage < 0) null else findSeries(p.connectorId, p.externalId)
+        val series = if (p.latestPage < 0) null else findSeries(p.connectorId, p.externalId, p.language)
         if (series == null) return false
         val seriesId = series[SeriesTable.id]
         val latestChapterId =
@@ -141,7 +135,7 @@ class BackupRepository : BackupApi {
     ): Boolean {
         // a status the server cannot read back would break the user's library listing
         val known = ReadingStatus.entries.any { it.name == s.status }
-        val series = if (known) findSeries(s.connectorId, s.externalId) else null
+        val series = if (known) findSeries(s.connectorId, s.externalId, s.language) else null
         if (series == null) return false
         UserSeriesStatusTable.upsert {
             it[UserSeriesStatusTable.userId] = uid
@@ -155,8 +149,10 @@ class BackupRepository : BackupApi {
     private fun Transaction.findSeries(
         connectorId: String,
         externalId: String,
+        language: String,
     ) = SeriesTable
         .selectAll()
-        .where { (SeriesTable.connectorId eq connectorId) and (SeriesTable.externalId eq externalId) }
-        .singleOrNull()
+        .where {
+            (SeriesTable.connectorId eq connectorId) and (SeriesTable.externalId eq externalId) and (SeriesTable.language eq language)
+        }.singleOrNull()
 }

@@ -9,12 +9,14 @@ data class BackupProgress(
     val latestChapterExternalId: String?,
     val latestPage: Int,
     val readAt: String,
+    val language: String = "en",
 )
 
 data class BackupReadingStatus(
     val connectorId: String,
     val externalId: String,
     val status: String,
+    val language: String = "en",
 )
 
 data class LibraryBackup(
