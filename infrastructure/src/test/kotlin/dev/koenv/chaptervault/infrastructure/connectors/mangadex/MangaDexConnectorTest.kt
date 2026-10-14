@@ -107,6 +107,22 @@ class MangaDexConnectorTest {
     }
 
     @Test
+    fun `search never asks for more than 100 results, the most MangaDex allows`() {
+        var capturedUrl = ""
+        val connector =
+            makeConnector { url ->
+                capturedUrl = url
+                """{"result":"ok","data":[],"limit":100,"offset":100,"total":500}"""
+            }
+
+        val page = assertSuccess(runBlocking { connector.search("", PageRequest(page = 1, size = 200)) })
+
+        assertTrue(capturedUrl.contains("limit=100"), "Expected limit=100 in URL, got: $capturedUrl")
+        assertTrue(capturedUrl.contains("offset=100"), "Expected offset=100 in URL, got: $capturedUrl")
+        assertEquals(100, page.size)
+    }
+
+    @Test
     fun `search asks only for safe and suggestive content by default`() {
         var capturedUrl = ""
         val connector =

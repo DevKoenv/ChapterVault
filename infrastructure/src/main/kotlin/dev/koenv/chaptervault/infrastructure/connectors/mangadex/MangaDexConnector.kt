@@ -112,6 +112,7 @@ class MangaDexConnector(
     companion object {
         private const val API_URL = "https://api.mangadex.org"
         private const val CDN_URL = "https://uploads.mangadex.org"
+        private const val MAX_SEARCH_PAGE_SIZE = 100
         private const val TOKEN_LIFETIME_MS = 5 * 60 * 1000L
         private const val REPORT_URL = "https://api.mangadex.network/report"
         private const val REPORT_TIMEOUT_MS = 5_000L
@@ -169,10 +170,12 @@ class MangaDexConnector(
         request: PageRequest,
     ): Result<Pagination<SeriesSearchResult>> {
         val url = "$API_URL/manga?includes[]=cover_art$ratingParams"
+        // GET /manga allows at most 100 per request (limit maximum in MangaDex's api.yaml); the page size reported back is the real one
+        val size = minOf(request.size, MAX_SEARCH_PAGE_SIZE)
         val params =
             buildMap<String, String> {
-                put("limit", request.size.toString())
-                put("offset", (request.page * request.size).toString())
+                put("limit", size.toString())
+                put("offset", (request.page * size).toString())
                 if (query.isNotBlank()) put("title", query)
             }
         return when (val r = context.getJson<MangaDexSearchResponse>(url, params = params)) {
@@ -182,7 +185,7 @@ class MangaDexConnector(
                     Pagination(
                         items = r.value.data.map { it.toSearchResult() },
                         page = request.page,
-                        size = request.size,
+                        size = size,
                         totalItems = r.value.total.toLong(),
                     ),
                 )
