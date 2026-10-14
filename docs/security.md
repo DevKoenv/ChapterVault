@@ -65,6 +65,27 @@ network request. They are **not signed, not verified and not sandboxed**. Only i
 and keep the `extensions/` folder writable only by you. An administrator can enable, disable, reload and unload them
 through the API, but cannot install one through the API (JARs are placed on disk).
 
+## Content sources
+
+The server ships one content source, MangaDex (`mangadex`), which talks to MangaDex's public API. The built-in `mock`
+and `custom` connectors are test helpers and are only registered when `debug.mockConnectorEnabled` is set. Any other
+source is an extension (see above).
+
+- The operator decides what is searched, added and downloaded, and is responsible for following the terms of each
+  source: for MangaDex its [API documentation and acceptable usage policy](https://api.mangadex.org/docs/) and its
+  [terms of service](https://mangadex.org/terms). The software does not check whether you are allowed to download a
+  given work.
+- The MangaDex connector sends a `ChapterVault/1.0` User-Agent, limits itself to 3 API requests per second and 40
+  at-home lookups per minute, and reports each image it loads from a MangaDex@Home node, as MangaDex asks.
+- A MangaDex search only returns works with the content ratings in `connectors.mangadex.contentRatings` (default
+  `safe` and `suggestive`; `erotica` and `pornographic` must be switched on by the operator). The setting filters
+  search results only; a series added by id is not checked against it.
+- Downloaded files are stored unmodified on your disk and served only to your own users. Do not expose the server to
+  people you do not intend to give access to, and do not put ads or paid access on top of MangaDex content: MangaDex's
+  policy forbids that for API users.
+- Extensions are third-party code with the same privileges as the server (see above); their sources and behaviour are
+  not reviewed by this project.
+
 ## Input and resource limits
 
 - Request bodies are limited to 10 MB.

@@ -54,6 +54,11 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
 - Size limits for downloaded pages (25 MB), covers (5 MB) and chapters (512 MB), and a limit on image dimensions.
 - Config problems (unknown keys, wrong types, invalid environment values) are reported in the log;
   `auth.sessionCleanupIntervalHours` is now read from the file.
+- `connectors.mangadex.contentRatings` (and `CHAPTERVAULT_MANGADEX_CONTENT_RATINGS`) to choose which MangaDex content
+  ratings a search returns; the default stays `safe` and `suggestive`.
+- MangaDex: images loaded from a MangaDex@Home node are reported to MangaDex as its API documentation asks, a failed
+  image makes the next download request a fresh at-home server, and at-home lookups are limited to 40 per minute.
+- A "Content sources" statement in the README and `docs/security.md`.
 - A `HEALTHCHECK` in the image, a Docker build and smoke test in CI, and a module-graph check in `./gradlew check`.
 - Operations guide and security/trust model in `docs/`.
 

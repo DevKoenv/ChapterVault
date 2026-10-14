@@ -334,6 +334,18 @@ curl -X POST http://localhost:8080/api/v1/library/series \
 
 ---
 
+## Content sources
+
+ChapterVault ships one source, [MangaDex](https://mangadex.org), through its public API. Other sources come only from
+extensions you install yourself. ChapterVault does not host or provide any content: you choose what the server fetches,
+and **you are responsible for what you download and for following the terms of every source you use** (for MangaDex:
+its [API documentation and acceptable usage policy](https://api.mangadex.org/docs/) and
+[terms of service](https://mangadex.org/terms)). Chapters are uploaded by scanlation groups; credit goes to them and to
+MangaDex. Extensions are third-party code that runs with full server privileges, see
+[Security and trust model](docs/security.md#content-sources).
+
+---
+
 ## More documentation
 
 - [Operations guide](docs/operations.md): install, reverse proxy and TLS, data layout, upgrades, backup and restore, troubleshooting, uninstall
