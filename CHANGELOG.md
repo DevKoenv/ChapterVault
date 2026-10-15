@@ -68,6 +68,10 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
   "Library Updates" entry uses the `http://opds-spec.org/sort/new` relation.
 - `GET /tasks` takes the filters `status`, `type` and `targetId` (for example `?status=FAILED`); tasks created at the
   same moment are ordered by id, so pages are stable.
+- Disk space: downloads stop while the library disk has less than `storage.minFreeMb` free (`CHAPTERVAULT_MIN_FREE_MB`,
+  default 1024, 0 = off). Such a download, and a write that fails because the disk filled up, is failed without retrying
+  and says how much space is free. `GET /system/storage` reports the library and thumbnail size and the disk's free and
+  total space.
 - A `HEALTHCHECK` in the image, a Docker build and smoke test in CI, and a module-graph check in `./gradlew check`.
 - Operations guide and security/trust model in `docs/`.
 
@@ -87,6 +91,9 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
 
 #### Fixed
 
+- Removing a series answered 500 when its files could not be deleted, although the series was already gone from the
+  database. It now succeeds and logs a warning; leftover files go to `library/.trash/` at the next start.
+- Nine tests never ran because their body was not `Unit` (JUnit skips test methods that return a value); they now run.
 - Deleting a user who had logged in returned 500.
 - A sole administrator could demote or delete themselves, leaving no administrator.
 - A password change did not revoke other sessions, and OPDS (Basic) access with a deleted, demoted or re-passworded

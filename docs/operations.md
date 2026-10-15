@@ -192,6 +192,7 @@ start. Do not `kill -9` it while it writes if you can avoid it, although the dat
 | Login or OPDS suddenly returns 429 | Too many failed attempts from your address; wait for `Retry-After` seconds. Behind a proxy, check `trustedProxies` |
 | A notification target is rejected | Its URL must be http(s) and not on the server itself. Allow localhost targets with `notifications.allowLocalTargets` |
 | A series folder disappeared from `library/` | It had no database entry; look in `library/.trash/` |
+| Downloads fail with `MB free on the library disk` | Less free space than `storage.minFreeMb` (default 1024). These are not retried. Free space (`library/.trash/` is never emptied automatically) and run `POST /api/v1/library/series/{id}/download` again; `GET /api/v1/system/storage` shows the numbers |
 
 ## Uninstall
 

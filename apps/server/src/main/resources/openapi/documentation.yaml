@@ -24,7 +24,7 @@ info:
     | `MANAGE_USERS` | yes | no | no | users and roles |
     | `MANAGE_EXTENSIONS` | yes | no | no | extensions |
     | `MANAGE_NOTIFICATIONS` | yes | no | no | notification targets |
-    | `MANAGE_SERVER` | yes | no | no | `/system/updates` |
+    | `MANAGE_SERVER` | yes | no | no | `/system/updates`, `/system/storage` |
 
     **Errors.** Every error, including 401, 404 and 405 produced by the server itself, is
     `{"error": "<CODE>", "message": "<text>"}`. A missing or invalid token is 401; a valid token without the needed
@@ -1629,5 +1629,29 @@ paths:
                   latestVersion:   { type: string, nullable: true, example: "1.1.0" }
                   releaseUrl:      { type: string, nullable: true }
                   updateAvailable: { type: boolean }
+        "401": { description: Not authenticated }
+        "403": { description: Forbidden; the user lacks the required permission }
+
+  /system/storage:
+    get:
+      tags: [system]
+      summary: Library size and free disk space (MANAGE_SERVER)
+      description: |
+        The sizes are counted by walking the library and thumbnail folders on every call (fast for CBZ, one file per
+        chapter; slower for the FOLDER format). Downloads stop, without retrying, while `freeBytes` is below `minFreeBytes`
+        (`storage.minFreeMb`, 0 = no check); the task fails with a message saying how much space is free.
+      responses:
+        "200":
+          description: Storage usage in bytes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  libraryBytes:    { type: integer, format: int64 }
+                  thumbnailsBytes: { type: integer, format: int64 }
+                  freeBytes:       { type: integer, format: int64, description: Free space on the disk that holds the library }
+                  totalBytes:      { type: integer, format: int64 }
+                  minFreeBytes:    { type: integer, format: int64 }
         "401": { description: Not authenticated }
         "403": { description: Forbidden; the user lacks the required permission }
