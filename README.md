@@ -28,6 +28,7 @@ It is not a multi-tenant or hosted service.
 - **Permission based access:** routes check permissions; roles (`ADMIN`, `USER`, `GUEST`) are bundles of them
 - **OPDS facets:** genre, language, and status navigation feeds for compatible OPDS clients
 - **OPDS search:** readers that support OpenSearch can search the library by title
+- **Sorting:** by title or by date added, in the API and as OPDS sort facets
 
 ---
 
@@ -211,8 +212,8 @@ Passwords: at least 8 characters, at most 72 bytes. Usernames are compared ignor
 
 | Method | Path | Permission | Description |
 |--------|------|-----------|-------------|
-| `GET` | `/library/series` | `READ_LIBRARY` | List all series (paginated) |
-| `GET` | `/library/series/search` | `READ_LIBRARY` | Search series by title |
+| `GET` | `/library/series` | `READ_LIBRARY` | List all series (paginated); `sort=title\|added`, `order=asc\|desc`, filters `readingStatus`, `genre`, `language`, `upstreamStatus` |
+| `GET` | `/library/series/search` | `READ_LIBRARY` | Search series by title (`q`); takes the same sort and filters |
 | `GET` | `/library/series/{id}` | `READ_LIBRARY` | Get a series by ID |
 | `GET` | `/library/series/{id}/cover` | none | Series cover image (public by design) |
 | `GET` | `/library/series/{id}/chapters` | `READ_LIBRARY` | List chapters for a series |

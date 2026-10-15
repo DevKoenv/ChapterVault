@@ -62,6 +62,10 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
   `/opds/v1/search.xml`, and `/opds/v1/search?q=` returns the matching series as an acquisition feed. The new
   `server.publicUrl` (`CHAPTERVAULT_PUBLIC_URL`) sets the absolute address used in that description; set it behind a
   reverse proxy that serves HTTPS.
+- Sorting and filtering: `GET /library/series` and `/library/series/search` take `sort=title|added`, `order=asc|desc`
+  and the filters `readingStatus`, `genre`, `language` and `upstreamStatus`, which combine. Titles are now sorted
+  ignoring case. The OPDS catalog has working sort facets (OPDS 1.2 section 4) that keep the active filters, and the
+  "Library Updates" entry uses the `http://opds-spec.org/sort/new` relation.
 - A `HEALTHCHECK` in the image, a Docker build and smoke test in CI, and a module-graph check in `./gradlew check`.
 - Operations guide and security/trust model in `docs/`.
 

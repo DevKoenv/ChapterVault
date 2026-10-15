@@ -63,6 +63,39 @@ components:
       type: http
       scheme: basic
 
+  # shared by GET /library/series and GET /library/series/search; filters combine with AND
+  parameters:
+    SeriesSort:
+      in: query
+      name: sort
+      schema: { type: string, enum: [title, added], default: title }
+      description: "`title` ignores case (ASCII letters); `added` is when the series was added to the library. Case-insensitive; any other value is rejected with 400"
+    SeriesOrder:
+      in: query
+      name: order
+      schema: { type: string, enum: [asc, desc] }
+      description: Default `asc` for `title`, `desc` (newest first) for `added`. Ties are broken by id, so pages are stable
+    SeriesReadingStatus:
+      in: query
+      name: readingStatus
+      schema: { type: string, enum: [PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD] }
+      description: Only series the current user gave this reading status. Case-insensitive; any other value is rejected with 400
+    SeriesGenre:
+      in: query
+      name: genre
+      schema: { type: string }
+      description: Only series with this genre (exact match)
+    SeriesLanguage:
+      in: query
+      name: language
+      schema: { type: string }
+      description: Only series in this language, e.g. `en`
+    SeriesUpstreamStatus:
+      in: query
+      name: upstreamStatus
+      schema: { type: string, enum: [ONGOING, COMPLETED, HIATUS, CANCELLED] }
+      description: Only series with this status at the source. Case-insensitive; any other value is rejected with 400
+
   schemas:
     LoginRequest:
       type: object
@@ -578,12 +611,19 @@ paths:
         - in: query
           name: size
           schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+        - $ref: "#/components/parameters/SeriesSort"
+        - $ref: "#/components/parameters/SeriesOrder"
+        - $ref: "#/components/parameters/SeriesReadingStatus"
+        - $ref: "#/components/parameters/SeriesGenre"
+        - $ref: "#/components/parameters/SeriesLanguage"
+        - $ref: "#/components/parameters/SeriesUpstreamStatus"
       responses:
         "200":
-          description: Paginated search results
+          description: Paginated search results, in the requested order
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PaginatedSeriesResponse" }
+        "400": { description: Invalid sort, order, readingStatus or upstreamStatus value }
 
   /library/series:
     get:
@@ -598,20 +638,19 @@ paths:
           name: size
           schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
           description: Values outside the range are clamped
-        - in: query
-          name: readingStatus
-          required: false
-          schema:
-            type: string
-            enum: [PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD]
-          description: Filter series by the current user's reading status; omit to return all series. Any other value is rejected with 400.
+        - $ref: "#/components/parameters/SeriesSort"
+        - $ref: "#/components/parameters/SeriesOrder"
+        - $ref: "#/components/parameters/SeriesReadingStatus"
+        - $ref: "#/components/parameters/SeriesGenre"
+        - $ref: "#/components/parameters/SeriesLanguage"
+        - $ref: "#/components/parameters/SeriesUpstreamStatus"
       responses:
         "200":
-          description: Paginated series list, ordered by title (then id)
+          description: Paginated series list, by title unless `sort` says otherwise
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PaginatedSeriesResponse" }
-        "400": { description: Invalid readingStatus value }
+        "400": { description: Invalid sort, order, readingStatus or upstreamStatus value }
 
     post:
       tags: [library]
@@ -1155,12 +1194,19 @@ paths:
         - in: query
           name: upstreamStatus
           schema: { type: string }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [title, added], default: title }
+          description: |
+            `title` A-Z, `added` newest first. The feed offers both as OPDS 1.2 facets (`rel="http://opds-spec.org/facet"`,
+            `opds:facetGroup="Sort"`, exactly one `opds:activeFacet`); facet and paging links keep the active filters.
       responses:
         "200":
           description: Atom XML acquisition feed
           content:
             application/atom+xml:
               schema: { type: string }
+        "400": { description: Invalid sort value }
 
   /opds/v1/search.xml:
     servers:
