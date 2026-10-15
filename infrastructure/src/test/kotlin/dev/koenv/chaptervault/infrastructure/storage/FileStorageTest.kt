@@ -171,7 +171,7 @@ class FileStorageTest {
 
     @Test
     fun `readPages returns NotFound when path does not exist`() =
-        runBlocking {
+        runBlocking<Unit> {
             val result =
                 storage.readPages(
                     chapter("ffffffff-0000-0000-0000-000000000000", "ffffffff-0000-0000-0000-000000000001"),
@@ -211,7 +211,7 @@ class FileStorageTest {
 
     @Test
     fun `readPage returns NotFound when index is out of range`() =
-        runBlocking {
+        runBlocking<Unit> {
             val sid = "10000000-0000-0000-0000-000000000005"
             val cid = "20000000-0000-0000-0000-000000000005"
             writeCbz(sid, cid, listOf("000.jpg" to byteArrayOf(1)))

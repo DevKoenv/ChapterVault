@@ -89,7 +89,7 @@ class NotificationServiceTest {
 
     @Test
     fun `sendTest returns Success for enabled NTFY target`() =
-        runBlocking {
+        runBlocking<Unit> {
             val target = mockTarget("NTFY", "https://ntfy.sh/test")
             val service = buildService(target)
             assertIs<Result.Success<Unit>>(service.sendTest(target.id))
@@ -97,7 +97,7 @@ class NotificationServiceTest {
 
     @Test
     fun `sendTest returns Failure for unknown target id`() =
-        runBlocking {
+        runBlocking<Unit> {
             val service = buildService(null)
             assertIs<Result.Failure>(service.sendTest(Id.generate()))
         }

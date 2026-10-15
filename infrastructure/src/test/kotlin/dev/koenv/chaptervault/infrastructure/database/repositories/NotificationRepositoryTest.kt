@@ -76,7 +76,7 @@ class NotificationRepositoryTest {
 
     @Test
     fun `findTarget returns NotFound for unknown id`() =
-        runBlocking {
+        runBlocking<Unit> {
             val result = repo.findTarget(Id.generate())
             assertIs<Result.Failure>(result)
         }
@@ -115,7 +115,7 @@ class NotificationRepositoryTest {
 
     @Test
     fun `deleteTarget returns NotFound for unknown id`() =
-        runBlocking {
+        runBlocking<Unit> {
             assertIs<Result.Failure>(repo.deleteTarget(Id.generate()))
         }
 
