@@ -6,9 +6,10 @@ import io.ktor.client.HttpClient
 
 abstract class HttpConnector(
     private val httpClient: HttpClient,
-    /** Base URL that relative endpoints passed to [context] are resolved against. Absolute URLs bypass it. */
-    private val baseUrl: String? = null,
 ) : Connector {
+    /** Base URL that relative endpoints passed to [context] are resolved against. Absolute URLs bypass it. */
+    protected open val baseUrl: String? = null
+
     abstract val bucketConfigs: Map<BucketKey, BucketConfig>
 
     private val buckets by lazy {

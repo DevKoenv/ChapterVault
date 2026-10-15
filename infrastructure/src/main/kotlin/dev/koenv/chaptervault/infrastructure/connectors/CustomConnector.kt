@@ -58,12 +58,11 @@ private data class ApiChapterPages(
 
 class CustomConnector(
     httpClient: HttpClient,
-    // TODO: replace with your site's base URL
-    baseUrl: String = "https://your-site.example.com",
-) : HttpConnector(httpClient, baseUrl = baseUrl) {
-    // TODO: change id and name to match your site
+) : HttpConnector(httpClient) {
+    // TODO: change id, name and base URL to match your site
     override val id: String = "custom"
     override val name: String = "Custom Connector"
+    override val baseUrl = "https://your-site.example.com"
 
     override val bucketConfigs: Map<BucketKey, BucketConfig> =
         mapOf(

@@ -49,9 +49,10 @@ class MangaDexConnector(
     private val httpClient: HttpClient,
     private val contentRatings: List<String> = listOf("safe", "suggestive"),
     private val tokenLifetimeMs: Long = TOKEN_LIFETIME_MS,
-) : HttpConnector(httpClient, baseUrl = API_URL) {
+) : HttpConnector(httpClient) {
     override val id = "mangadex"
     override val name = "MangaDex"
+    override val baseUrl = API_URL
 
     override val bucketConfigs: Map<BucketKey, BucketConfig> =
         mapOf(
