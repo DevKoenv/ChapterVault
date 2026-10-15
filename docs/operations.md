@@ -40,13 +40,32 @@ Linux in Docker is what is tested.
 ## First start
 
 On an empty install the server creates one administrator. If `CHAPTERVAULT_ADMIN_PASS` is not set it generates a
-password and prints it **once** in the log. It is not stored anywhere in readable form; if you lose it before
-logging in, stop the server, delete the data directory (nothing else exists yet) and start again, or set
-`CHAPTERVAULT_ADMIN_PASS` first.
+password and prints it **once** in the log. It is not stored anywhere in readable form; if you lose it, use the
+`reset-password` file (see [Accounts and lost passwords](#accounts-and-lost-passwords)).
 
 The administrator is only created when there are no users at all. Deleting the account later does not bring it back.
 On an empty install, a `CHAPTERVAULT_ADMIN_PASS` shorter than 8 characters stops the server from
 starting, with a message saying why. Once users exist the variable is not used any more.
+
+## Accounts and lost passwords
+
+Registration is off by default; an administrator creates accounts with `POST /api/v1/users` (without a password the
+server generates one and returns it once). A user who forgot their password gets a new one from an administrator with
+`POST /api/v1/users/{id}/password`.
+
+If the administrator password itself is lost and nobody else can log in as an administrator, put the username in a
+file called `reset-password` in the data directory and restart:
+
+```bash
+docker compose exec chaptervault sh -c 'echo admin > /app/data/reset-password'
+docker compose restart chaptervault
+docker compose logs chaptervault      # the new password, shown once
+```
+
+Without Docker: `echo admin > <data dir>/reset-password` and restart the service. The server removes the file before it
+changes anything, sets a generated password, prints it once in the log and signs that user out everywhere. If the file
+names an unknown user, or cannot be removed, nothing is reset and the log says why. Anyone who can write to the data
+directory can do this, which is no more than they could already do with the database file.
 
 ## Data layout
 
@@ -192,6 +211,7 @@ start. Do not `kill -9` it while it writes if you can avoid it, although the dat
 | Login or OPDS suddenly returns 429 | Too many failed attempts from your address; wait for `Retry-After` seconds. Behind a proxy, check `trustedProxies` |
 | A notification target is rejected | Its URL must be http(s) and not on the server itself. Allow localhost targets with `notifications.allowLocalTargets` |
 | A series folder disappeared from `library/` | It had no database entry; look in `library/.trash/` |
+| Nobody can log in as administrator any more | See [Accounts and lost passwords](#accounts-and-lost-passwords) |
 | Downloads fail with `MB free on the library disk` | Less free space than `storage.minFreeMb` (default 1024). These are not retried. Free space (`library/.trash/` is never emptied automatically) and run `POST /api/v1/library/series/{id}/download` again; `GET /api/v1/system/storage` shows the numbers |
 
 ## Uninstall

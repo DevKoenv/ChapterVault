@@ -551,6 +551,75 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/UserDto" }
         "403": { description: Forbidden; the user lacks the required permission }
+    post:
+      tags: [users]
+      summary: Create a user account (ADMIN)
+      description: |
+        Works whether or not `auth.registrationEnabled` is set. Without `password` the server generates one (24 characters
+        without look-alike letters) and returns it once in `generatedPassword`; it is stored only as a hash.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username: { type: string }
+                password: { type: string, minLength: 8, description: "Optional; at least 8 characters and at most 72 bytes" }
+                role:     { type: string, enum: [ADMIN, USER, GUEST], default: USER, description: Case-insensitive }
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:                { type: string, format: uuid }
+                  username:          { type: string }
+                  roles:             { type: array, items: { type: string } }
+                  createdAt:         { type: string, format: date-time }
+                  generatedPassword: { type: string, nullable: true, description: Only when no password was given }
+        "400": { description: Invalid body, role, username or password }
+        "403": { description: Forbidden; the user lacks the required permission }
+        "409": { description: Username already taken (compared ignoring case) }
+
+  /users/{id}/password:
+    post:
+      tags: [users]
+      summary: Set another user's password (ADMIN)
+      description: |
+        For a user who forgot their password. Signs that user out everywhere (sessions and Basic-auth access with the old
+        password). Send `{}` to have a password generated; it is returned once. Your own password is changed with
+        `/auth/change-password`. A lost administrator password with no other administrator is recovered with the
+        `reset-password` file, see docs/operations.md.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password: { type: string, minLength: 8, description: "Optional; at least 8 characters and at most 72 bytes" }
+      responses:
+        "200":
+          description: Password generated and set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  generatedPassword: { type: string }
+        "204": { description: The given password was set }
+        "400": { description: Your own account (SELF_PASSWORD_RESET), or the password breaks the password rules }
+        "403": { description: Forbidden; the user lacks the required permission }
+        "404": { description: User not found }
 
   /users/{id}:
     delete:

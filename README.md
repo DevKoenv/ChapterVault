@@ -207,6 +207,8 @@ Passwords: at least 8 characters, at most 72 bytes. Usernames are compared ignor
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/users` | List all user accounts |
+| `POST` | `/users` | Create an account (also with registration off); without a password one is generated and returned once |
+| `POST` | `/users/{id}/password` | Set another user's password, or `{}` to generate one; signs that user out everywhere |
 | `DELETE` | `/users/{id}` | Delete a user account (not yourself, not the last administrator) |
 | `PATCH` | `/users/{id}/role` | Change a user's role (the last administrator cannot be demoted) |
 

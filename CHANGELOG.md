@@ -72,6 +72,9 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
   default 1024, 0 = off). Such a download, and a write that fails because the disk filled up, is failed without retrying
   and says how much space is free. `GET /system/storage` reports the library and thumbnail size and the disk's free and
   total space.
+- Accounts without self-registration: `POST /users` creates an account, `POST /users/{id}/password` sets or generates
+  another user's password and signs them out (generated passwords are returned once). A lost administrator password is
+  recovered with a one-shot `reset-password` file in the data directory, see docs/operations.md.
 - A `HEALTHCHECK` in the image, a Docker build and smoke test in CI, and a module-graph check in `./gradlew check`.
 - Operations guide and security/trust model in `docs/`.
 
