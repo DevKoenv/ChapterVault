@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.server.di
 import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
+import dev.koenv.chaptervault.infrastructure.TaskRetention
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.infrastructure.database.repositories.BackupRepository
 import dev.koenv.chaptervault.infrastructure.database.repositories.ChapterRepository
@@ -93,6 +94,7 @@ val infrastructureModule =
         single { UpdateCheckerService(get(), BuildConfig.VERSION) }
         single<UpdateInfoApi> { get<UpdateCheckerService>() }
         single { SeriesRefreshScheduler(get(), get(), get<AppConfig>().refresh.intervalHours) }
+        single { TaskRetention(get(), get<AppConfig>().tasks.retentionDays) }
         single {
             TaskExecutorService(
                 taskQueue = get(),

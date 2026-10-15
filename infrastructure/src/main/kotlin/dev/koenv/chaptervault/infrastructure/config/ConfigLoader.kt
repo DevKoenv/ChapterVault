@@ -131,6 +131,7 @@ object ConfigLoader {
                 database = top.child("database")?.let { databaseFrom(it, derived.database) } ?: derived.database,
                 storage = top.child("storage")?.let { storageFrom(it, derived.storage, warn) } ?: derived.storage,
                 refresh = top.child("refresh")?.let { refreshFrom(it, derived.refresh) } ?: derived.refresh,
+                tasks = top.child("tasks")?.let { tasksFrom(it, derived.tasks) } ?: derived.tasks,
                 debug = top.child("debug")?.let { debugFrom(it, derived.debug) } ?: derived.debug,
                 auth = top.child("auth")?.let { authFrom(it, derived.auth) } ?: derived.auth,
                 notifications = top.child("notifications")?.let { notificationsFrom(it, derived.notifications) } ?: derived.notifications,
@@ -184,6 +185,11 @@ object ConfigLoader {
         s: Section,
         d: RefreshConfig,
     ) = RefreshConfig(intervalHours = s.int("intervalHours", d.intervalHours)).also { s.finish() }
+
+    private fun tasksFrom(
+        s: Section,
+        d: TasksConfig,
+    ) = TasksConfig(retentionDays = s.int("retentionDays", d.retentionDays)).also { s.finish() }
 
     private fun debugFrom(
         s: Section,
@@ -270,6 +276,10 @@ object ConfigLoader {
           # Hours between automatic library refreshes. 0 to disable.
           intervalHours: 24
 
+        tasks:
+          # Days to keep finished (completed, failed, cancelled) task records. 0 keeps them forever.
+          retentionDays: 30
+
         updates:
           # Ask GitHub once a day whether a newer ChapterVault release exists (shown in the log and /system/updates).
           # false = the server never contacts GitHub.
@@ -354,6 +364,10 @@ object ConfigLoader {
             refresh =
                 base.refresh.copy(
                     intervalHours = int("CHAPTERVAULT_REFRESH_HOURS") ?: base.refresh.intervalHours,
+                ),
+            tasks =
+                base.tasks.copy(
+                    retentionDays = int("CHAPTERVAULT_TASK_RETENTION_DAYS") ?: base.tasks.retentionDays,
                 ),
             debug =
                 base.debug.copy(

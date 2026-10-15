@@ -2,6 +2,7 @@ package dev.koenv.chaptervault.server.background
 
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
+import dev.koenv.chaptervault.infrastructure.TaskRetention
 import dev.koenv.chaptervault.infrastructure.config.AppConfig
 import dev.koenv.chaptervault.interfaces.api.websocket.EventProjectionService
 import dev.koenv.chaptervault.kernel.api.AuthApi
@@ -15,6 +16,7 @@ internal fun Application.launchBackgroundJobs(
     projectionService: EventProjectionService,
     executor: TaskExecutorService,
     refreshScheduler: SeriesRefreshScheduler,
+    taskRetention: TaskRetention,
 ) {
     launch { projectionService.start() }
     launch {
@@ -22,6 +24,7 @@ internal fun Application.launchBackgroundJobs(
         executor.start()
     }
     launch { refreshScheduler.start() }
+    launch { taskRetention.start() }
     launch {
         auth.cleanupExpiredSessions()
         val cleanupIntervalMs = config.auth.sessionCleanupIntervalHours * 60 * 60 * 1000L

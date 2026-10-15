@@ -86,6 +86,7 @@ Running without Docker: `./gradlew :apps:server:shadowJar`, then `java -jar apps
 | `CHAPTERVAULT_CORS_ORIGINS` | _(none)_ | Comma separated browser origins that may call the API from another site |
 | `CHAPTERVAULT_LIBRARY_PATH` / `CHAPTERVAULT_THUMBNAILS_PATH` / `CHAPTERVAULT_DATABASE_URL` | under the data dir | Override where individual parts live |
 | `CHAPTERVAULT_REFRESH_HOURS` | `24` | Hours between automatic library refreshes, `0` disables |
+| `CHAPTERVAULT_TASK_RETENTION_DAYS` | `30` | Days to keep finished task records, `0` keeps them forever |
 | `CHAPTERVAULT_UPDATE_CHECK` | `true` | `false` stops the server from contacting GitHub |
 | `CHAPTERVAULT_NOTIFICATIONS_ALLOW_LOCAL` | `false` | Allow notification targets on this machine (localhost) |
 | `CHAPTERVAULT_MANGADEX_CONTENT_RATINGS` | `safe,suggestive` | Comma separated MangaDex content ratings a search returns: `safe`, `suggestive`, `erotica`, `pornographic` |
@@ -104,6 +105,9 @@ storage:
 
 refresh:
   intervalHours: 24    # 0 to disable automatic library refresh
+
+tasks:
+  retentionDays: 30    # finished task records older than this are deleted; 0 to keep them
 
 updates:
   checkEnabled: true   # false: never contact GitHub

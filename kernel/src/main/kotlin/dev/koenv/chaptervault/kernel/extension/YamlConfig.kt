@@ -5,6 +5,7 @@ import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.error.YAMLException
 import java.io.File
 
+/** Safe to share between threads: every access to the in-memory map is synchronised on the instance. */
 class YamlConfig(
     val file: File,
 ) {
@@ -13,6 +14,7 @@ class YamlConfig(
     // a Yaml instance is not thread-safe, so every load and save gets its own
     private fun newYaml() = Yaml(DumperOptions().apply { defaultFlowStyle = DumperOptions.FlowStyle.BLOCK })
 
+    @Synchronized
     fun load(): YamlConfig {
         if (!file.exists()) return this
         val parsed: Any? =
@@ -35,6 +37,7 @@ class YamlConfig(
         return this
     }
 
+    @Synchronized
     fun save() {
         file.parentFile?.mkdirs()
         file.writer().use { newYaml().dump(data, it) }
@@ -60,6 +63,7 @@ class YamlConfig(
         default: Boolean? = null,
     ): Boolean? = get(path) as? Boolean ?: default
 
+    @Synchronized
     fun get(path: String): Any? {
         var current: Any? = data
         for (key in path.split(".")) {
@@ -68,6 +72,7 @@ class YamlConfig(
         return current
     }
 
+    @Synchronized
     fun set(
         path: String,
         value: Any?,
@@ -87,6 +92,7 @@ class YamlConfig(
         current[keys.last()] = value
     }
 
+    @Synchronized
     fun remove(path: String) {
         val keys = path.split(".")
         if (keys.size == 1) {
@@ -97,6 +103,7 @@ class YamlConfig(
         (get(keys.dropLast(1).joinToString(".")) as? MutableMap<String, Any?>)?.remove(keys.last())
     }
 
+    @Synchronized
     fun contains(path: String): Boolean {
         val keys = path.split(".")
         var current: Any? = data

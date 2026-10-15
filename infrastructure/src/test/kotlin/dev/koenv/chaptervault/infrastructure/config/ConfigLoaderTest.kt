@@ -122,6 +122,13 @@ class ConfigLoaderTest {
     }
 
     @Test
+    fun `finished tasks are kept for 30 days by default and the env var overrides it`() {
+        assertEquals(30, ConfigLoader.load("nonexistent.yaml", env = { null }).tasks.retentionDays)
+        val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_TASK_RETENTION_DAYS") "7" else null })
+        assertEquals(7, config.tasks.retentionDays)
+    }
+
+    @Test
     fun `env var overrides refresh hours`() {
         val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_REFRESH_HOURS") "12" else null })
         assertEquals(12, config.refresh.intervalHours)

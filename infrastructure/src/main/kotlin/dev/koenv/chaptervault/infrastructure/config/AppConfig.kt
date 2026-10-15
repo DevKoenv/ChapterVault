@@ -7,6 +7,7 @@ data class AppConfig(
     val database: DatabaseConfig = DatabaseConfig(),
     val storage: StorageConfig = StorageConfig(),
     val refresh: RefreshConfig = RefreshConfig(),
+    val tasks: TasksConfig = TasksConfig(),
     val debug: DebugConfig = DebugConfig(),
     val auth: AuthConfig = AuthConfig(),
     val notifications: NotificationConfig = NotificationConfig(),
@@ -41,6 +42,11 @@ data class DebugConfig(
 // intervalHours <= 0 disables auto-refresh
 data class RefreshConfig(
     val intervalHours: Int = 24,
+)
+
+data class TasksConfig(
+    // finished (completed, failed, cancelled) task rows older than this many days are deleted; 0 or less keeps them forever
+    val retentionDays: Int = 30,
 )
 
 data class ServerConfig(

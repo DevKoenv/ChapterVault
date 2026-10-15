@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.server
 import dev.koenv.chaptervault.infrastructure.NotificationService
 import dev.koenv.chaptervault.infrastructure.SeriesRefreshScheduler
 import dev.koenv.chaptervault.infrastructure.TaskExecutorService
+import dev.koenv.chaptervault.infrastructure.TaskRetention
 import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.infrastructure.update.UpdateCheckerService
@@ -78,6 +79,7 @@ fun Application.bootstrap() {
     val projectionService by inject<EventProjectionService>()
     val executor by inject<TaskExecutorService>()
     val refreshScheduler by inject<SeriesRefreshScheduler>()
+    val taskRetention by inject<TaskRetention>()
     val progressApi by inject<ProgressApi>()
     val backupApi by inject<BackupApi>()
     val readingStatusApi by inject<ReadingStatusApi>()
@@ -112,7 +114,7 @@ fun Application.bootstrap() {
 
     notificationService.start()
 
-    launchBackgroundJobs(config, auth, projectionService, executor, refreshScheduler)
+    launchBackgroundJobs(config, auth, projectionService, executor, refreshScheduler, taskRetention)
     logger.info {
         "ChapterVault v${BuildConfig.VERSION} (rev ${BuildConfig.REVISION}) " +
             "listening on http://${config.server.host}:${config.server.port}"

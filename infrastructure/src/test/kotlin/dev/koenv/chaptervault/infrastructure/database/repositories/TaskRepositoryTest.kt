@@ -61,6 +61,30 @@ class TaskRepositoryTest {
         )
 
     @Test
+    fun `deleteFinishedBefore removes only finished tasks older than the cutoff`() =
+        runBlocking<Unit> {
+            val now = Instant.now()
+            val old = now.minusSeconds(40L * 24 * 3600)
+            val oldDone = buildTask(TaskStatus.COMPLETED).copy(updatedAt = old)
+            val oldFailed = buildTask(TaskStatus.FAILED).copy(updatedAt = old)
+            val oldCancelled = buildTask(TaskStatus.CANCELLED).copy(updatedAt = old)
+            val oldPending = buildTask(TaskStatus.PENDING).copy(updatedAt = old)
+            val oldRunning = buildTask(TaskStatus.RUNNING).copy(updatedAt = old)
+            val freshDone = buildTask(TaskStatus.COMPLETED).copy(updatedAt = now)
+            listOf(oldDone, oldFailed, oldCancelled, oldPending, oldRunning, freshDone).forEach { repo.insert(it) }
+
+            val removed = repo.deleteFinishedBefore(now.minusSeconds(30L * 24 * 3600))
+
+            assertEquals(3, removed)
+            val left =
+                (repo.listTasks(PageRequest(0, 50)) as Result.Success)
+                    .value.items
+                    .map { it.id }
+                    .toSet()
+            assertEquals(setOf(oldPending.id, oldRunning.id, freshDone.id), left)
+        }
+
+    @Test
     fun `insert persists task and returns it`() {
         runBlocking {
             val task = buildTask(payload = mapOf("key" to "value"))

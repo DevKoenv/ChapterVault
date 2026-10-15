@@ -137,4 +137,20 @@ class YamlConfigTest {
         cfg.save()
         assertTrue(nested.exists())
     }
+
+    @Test
+    fun `concurrent sets on one config lose no key`() {
+        val cfg = YamlConfig(file()).load()
+        val pool =
+            java.util.concurrent.Executors
+                .newFixedThreadPool(16)
+        try {
+            val jobs = (0 until 16).map { t -> pool.submit { repeat(2000) { n -> cfg.set("key${t}_$n", n) } } }
+            jobs.forEach { it.get() }
+        } finally {
+            pool.shutdownNow()
+        }
+        val missing = (0 until 16).sumOf { t -> (0 until 2000).count { n -> cfg.getInt("key${t}_$n") != n } }
+        assertEquals(0, missing, "keys lost by concurrent set()")
+    }
 }

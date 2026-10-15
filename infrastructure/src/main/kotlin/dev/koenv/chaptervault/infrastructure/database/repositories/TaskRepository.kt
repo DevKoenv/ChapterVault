@@ -18,7 +18,11 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.Transaction
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -136,6 +140,13 @@ class TaskRepository : TaskReadStore {
                 .where { TaskTable.status eq status.name }
                 .orderBy(TaskTable.createdAt, SortOrder.ASC)
                 .map { it.toTask() }
+        }
+
+    /** Deletes completed, failed and cancelled tasks last changed before [cutoff]; returns how many. */
+    suspend fun deleteFinishedBefore(cutoff: java.time.Instant): Int =
+        dbQuery {
+            val finished = listOf(TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED).map { it.name }
+            TaskTable.deleteWhere { (status inList finished) and (updatedAt less cutoff.toKotlinInstant()) }
         }
 
     override suspend fun findTask(id: Id): Result<Task> = findById(id)
