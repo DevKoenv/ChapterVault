@@ -9,13 +9,14 @@ import dev.koenv.chaptervault.shared.ratelimit.RateLimiter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.decodeURLPart
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.auth.basicAuthenticationCredentials
 import io.ktor.server.request.httpMethod
-import io.ktor.server.request.uri
+import io.ktor.server.request.path
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.util.AttributeKey
@@ -221,6 +222,17 @@ internal class BasicAuthThrottle(
     }
 }
 
+/**
+ * The path as routing sees it: percent-escapes decoded and empty segments dropped. Comparing the raw URI instead let
+ * `/auth/logi%6E` reach the login route without being counted.
+ */
+internal fun routedPath(call: ApplicationCall): String =
+    call.request
+        .path()
+        .split('/')
+        .filter { it.isNotEmpty() }
+        .joinToString("/", prefix = "/") { it.decodeURLPart() }
+
 /** Set by [AuthRateLimiting] when enabled; the Basic auth provider reports failed attempts to it. */
 internal val BasicAuthThrottleKey = AttributeKey<BasicAuthThrottle>("BasicAuthThrottle")
 
@@ -272,7 +284,7 @@ val AuthRateLimiting =
                 return@intercept
             }
             val method = call.request.httpMethod
-            val uri = call.request.uri.substringBefore("?")
+            val uri = routedPath(call)
             val isRateLimited =
                 method == HttpMethod.Post && (uri.endsWith(LOGIN_PATH_SUFFIX) || uri.endsWith(REGISTER_PATH_SUFFIX))
             if (!isRateLimited) return@intercept

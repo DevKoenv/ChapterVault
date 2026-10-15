@@ -96,6 +96,20 @@ class AuthRateLimitPluginTest {
         }
 
     @Test
+    fun `a login path spelled differently cannot dodge the limit`() {
+        // each spelling that reaches the login route at all must be counted like the plain one
+        for (path in listOf("/api/v1/auth/logi%6E", "/api/v1/auth//login", "/api/v1/auth/%6Cogin", "/api/v1/auth/regist%65r")) {
+            testApplication {
+                setup(config())
+                val responses = List(5) { client.attempt(path) }
+                val reached = responses.count { it.status == HttpStatusCode.OK }
+                // login allows 3 attempts, register 2
+                assertTrue(reached <= 3, "$path reached its route $reached times: ${responses.map { it.status.value }}")
+            }
+        }
+    }
+
+    @Test
     fun `other endpoints are not limited`() =
         testApplication {
             setup(config())
