@@ -115,7 +115,12 @@ class TaskExecutorService(
     suspend fun start() {
         supervisorScope {
             eventBus.on<TaskEvents.TaskCancelled> { event ->
-                val job = running[event.taskId] ?: return@on
+                val job = running[event.taskId]
+                if (job == null) {
+                    // still queued: nothing to stop, but its chapter is no longer on its way
+                    if (event.taskType == TaskType.DOWNLOAD_CHAPTER) releaseCancelledDownload(event.targetId)
+                    return@on
+                }
                 cancelledByUser += event.taskId
                 job.cancel(CancellationException("Task cancelled by the user"))
             }
@@ -201,6 +206,7 @@ class TaskExecutorService(
             // cancelled by the user: the task ends quietly. Anything else is the server shutting down.
             if (task.id !in cancelledByUser) throw e
             logger.info { "Task ${task.id} [${task.type}] cancelled while running" }
+            if (task.type == TaskType.DOWNLOAD_CHAPTER) releaseCancelledDownload(chapterIdOf(task))
             return null
         } finally {
             running.remove(task.id)
@@ -414,7 +420,7 @@ class TaskExecutorService(
             connectorRegistry.findById(connectorId)
                 ?: return Result.Failure(AppError.InternalError("Connector not found: $connectorId"))
 
-        val chapterId = Id.from(task.payload[TaskPayloadKeys.CHAPTER_ID] ?: task.targetId.toString())
+        val chapterId = chapterIdOf(task)
         val chapter =
             when (val r = chapterRepository.getChapter(chapterId)) {
                 is Result.Success -> r.value
@@ -492,10 +498,28 @@ class TaskExecutorService(
             setChapterStatus(chapter, DownloadStatus.DOWNLOADED, pages.size, format)
             return Result.Success(Unit)
         } catch (e: Throwable) {
-            // also when the task is being cancelled: the chapter must not stay "downloading"
-            withContext(NonCancellable) { setChapterStatus(chapter, DownloadStatus.FAILED) }
+            // the chapter must not stay "downloading"
+            withContext(NonCancellable) { setChapterStatus(chapter, statusAfterInterruption(e)) }
             throw e
         }
+    }
+
+    // a timeout or an error is a failure (retried). Any other cancellation is the user (the executor then frees the
+    // chapter) or the server stopping, after which the task resumes at the next start.
+    private fun statusAfterInterruption(e: Throwable): DownloadStatus =
+        when (e) {
+            is TimeoutCancellationException -> DownloadStatus.FAILED
+            is CancellationException -> DownloadStatus.PENDING
+            else -> DownloadStatus.FAILED
+        }
+
+    private fun chapterIdOf(task: Task): Id = Id.from(task.payload[TaskPayloadKeys.CHAPTER_ID] ?: task.targetId.toString())
+
+    // a cancelled download is no longer on its way: back to available, or downloaded when a re-download was cancelled
+    private suspend fun releaseCancelledDownload(chapterId: Id) {
+        val chapter = (chapterRepository.getChapter(chapterId) as? Result.Success)?.value ?: return
+        val status = if (fileStorage.chapterExists(chapter)) DownloadStatus.DOWNLOADED else DownloadStatus.AVAILABLE
+        withContext(NonCancellable) { setChapterStatus(chapter, status) }
     }
 
     private suspend fun setChapterStatus(

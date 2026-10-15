@@ -265,6 +265,110 @@ class TaskExecutorConcurrencyTest {
             )
         }
 
+    private suspend fun chapterStatus(chapter: Chapter): DownloadStatus =
+        (chapterRepository.getChapter(chapter.id) as Result.Success).value.downloadStatus
+
+    // what SystemApiImpl.cancelTask does
+    private suspend fun cancel(
+        queue: TaskQueue,
+        task: Task,
+    ) {
+        queue.cancel(task.id)
+        eventBus.publish(TaskEvents.TaskCancelled(task.id, task.type, task.targetId, Instant.now()))
+    }
+
+    private val noTimeout = fast.copy(taskTimeoutMs = TaskType.entries.associateWith { 60_000L })
+
+    @Test
+    fun `a running download cancelled by the user leaves the chapter available`() =
+        runBlocking<Unit> {
+            val entered = CompletableDeferred<Unit>()
+            registry.register(
+                ScriptedConnector("slow") {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                },
+            )
+            val chapter = newChapter("a")
+            chapterRepository.updateDownloadStatus(chapter.id, DownloadStatus.PENDING) // what the download route does
+            val task = downloadTask(chapter, "slow")
+            val queue = newQueue()
+            run(executor(queue, noTimeout))
+            queue.enqueue(task)
+            withTimeout(5_000) { entered.await() }
+
+            cancel(queue, task)
+            awaitStatus(task.id, TaskStatus.CANCELLED)
+            delay(300)
+
+            assertEquals(DownloadStatus.AVAILABLE, chapterStatus(chapter))
+        }
+
+    @Test
+    fun `a download cancelled while it waits in the queue leaves the chapter available`() =
+        runBlocking<Unit> {
+            val entered = CompletableDeferred<Unit>()
+            registry.register(
+                ScriptedConnector("slow") {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                },
+            )
+            val busy = downloadTask(newChapter("a"), "slow")
+            val waiting = newChapter("b")
+            chapterRepository.updateDownloadStatus(waiting.id, DownloadStatus.PENDING)
+            val queued = downloadTask(waiting, "slow")
+            val queue = newQueue()
+            // one worker, busy with the first download, so the second one stays in the queue
+            run(executor(queue, noTimeout.copy(maxConcurrentTasks = 1)))
+            queue.enqueue(busy)
+            withTimeout(5_000) { entered.await() }
+            queue.enqueue(queued)
+
+            cancel(queue, queued)
+            delay(300)
+
+            assertEquals(TaskStatus.CANCELLED, statusOf(queued.id))
+            assertEquals(DownloadStatus.AVAILABLE, chapterStatus(waiting))
+        }
+
+    @Test
+    fun `a download interrupted by a shutdown stays queued and finishes after the next start`() =
+        runBlocking<Unit> {
+            val entered = CompletableDeferred<Unit>()
+            val hang = AtomicBoolean(true)
+            registry.register(
+                ScriptedConnector("stopped") {
+                    if (hang.get()) {
+                        entered.complete(Unit)
+                        awaitCancellation()
+                    } else {
+                        okDownload()
+                    }
+                },
+            )
+            val chapter = newChapter("a")
+            val task = downloadTask(chapter, "stopped")
+            val firstQueue = newQueue()
+            val first = scope.launch { executor(firstQueue, noTimeout).start() }
+            firstQueue.enqueue(task)
+            withTimeout(5_000) { entered.await() }
+            awaitStatus(task.id, TaskStatus.RUNNING)
+
+            first.cancelAndJoin() // stopping the server cancels the background jobs like this
+
+            assertEquals(TaskStatus.RUNNING, statusOf(task.id), "the task is left for the next start")
+            assertEquals(DownloadStatus.PENDING, chapterStatus(chapter), "the chapter is still queued, not failed")
+
+            hang.set(false)
+            val secondQueue = newQueue()
+            val second = executor(secondQueue, fast)
+            second.recoverOnBoot()
+            run(second)
+            awaitStatus(task.id, TaskStatus.COMPLETED)
+            assertEquals(DownloadStatus.DOWNLOADED, chapterStatus(chapter))
+        }
+
     @Test
     fun `a task that failed because its target does not exist is not retried`() =
         runBlocking<Unit> {
