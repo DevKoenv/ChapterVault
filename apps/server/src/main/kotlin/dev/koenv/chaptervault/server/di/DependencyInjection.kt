@@ -6,10 +6,12 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.SeriesReposit
 import dev.koenv.chaptervault.infrastructure.extensions.loader.ExtensionLoaderService
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.server.auth.AdminBootstrap
+import dev.koenv.chaptervault.server.auth.PasswordResetFile
 import dev.koenv.chaptervault.server.config.ConfigValidator
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
+import java.nio.file.Paths
 
 object DependencyInjection {
     fun start() {
@@ -24,6 +26,10 @@ object DependencyInjection {
 
         GlobalContext.get().get<ExtensionLoaderService>().loadAll()
 
-        runBlocking { AdminBootstrap(GlobalContext.get().get<AuthApi>()).run() }
+        runBlocking {
+            val auth = GlobalContext.get().get<AuthApi>()
+            AdminBootstrap(auth).run()
+            PasswordResetFile(auth, Paths.get(config.dataDir, "reset-password")).run()
+        }
     }
 }

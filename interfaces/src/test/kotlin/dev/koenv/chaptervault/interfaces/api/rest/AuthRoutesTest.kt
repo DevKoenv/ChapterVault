@@ -75,6 +75,11 @@ class AuthRoutesTest {
                 newPassword: String,
             ) = Result.Success(Unit)
 
+            override suspend fun setPassword(
+                id: Id,
+                newPassword: String,
+            ): Result<Unit> = error("not used")
+
             override suspend fun cleanupExpiredSessions() = Result.Success(Unit)
         }
 
@@ -107,6 +112,11 @@ class AuthRoutesTest {
                 currentPassword: String,
                 newPassword: String,
             ) = Result.Failure(AppError.Unauthorized("Current password is incorrect"))
+
+            override suspend fun setPassword(
+                id: Id,
+                newPassword: String,
+            ): Result<Unit> = error("not used")
 
             override suspend fun cleanupExpiredSessions() = Result.Success(Unit)
         }

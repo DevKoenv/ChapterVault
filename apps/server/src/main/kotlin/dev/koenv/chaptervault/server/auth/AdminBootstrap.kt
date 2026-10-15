@@ -2,23 +2,15 @@ package dev.koenv.chaptervault.server.auth
 
 import dev.koenv.chaptervault.kernel.api.AuthApi
 import dev.koenv.chaptervault.kernel.api.Credentials
+import dev.koenv.chaptervault.kernel.auth.PasswordGenerator
 import dev.koenv.chaptervault.kernel.auth.PasswordPolicy
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.result.Result
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.security.SecureRandom
 
 private val logger = KotlinLogging.logger {}
 
-private const val GENERATED_PASSWORD_LENGTH = 24
-private const val PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
-private val secureRandom = SecureRandom()
-
-/** A random password without look-alike characters (0/O, 1/l/I), so it can be typed from a log line. */
-internal fun generateAdminPassword(): String =
-    buildString {
-        repeat(GENERATED_PASSWORD_LENGTH) { append(PASSWORD_ALPHABET[secureRandom.nextInt(PASSWORD_ALPHABET.length)]) }
-    }
+internal fun generateAdminPassword(): String = PasswordGenerator.generate()
 
 /**
  * Creates the first administrator, and only on an install that has no users at all. Re-creating a deleted `admin`

@@ -52,6 +52,11 @@ class CachingAuthApi(
         newPassword: String,
     ): Result<Unit> = delegate.changePassword(userId, currentPassword, newPassword).also { if (it is Result.Success) forget(userId) }
 
+    override suspend fun setPassword(
+        id: Id,
+        newPassword: String,
+    ): Result<Unit> = delegate.setPassword(id, newPassword).also { if (it is Result.Success) forget(id) }
+
     private fun forget(userId: Id) {
         entries.entries.removeIf { (_, e) -> e.principal.id == userId }
     }

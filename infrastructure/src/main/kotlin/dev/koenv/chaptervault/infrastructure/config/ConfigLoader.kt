@@ -89,6 +89,7 @@ object ConfigLoader {
         // base config from dataDir, overridable per-field via YAML or env vars
         val derived =
             AppConfig(
+                dataDir = dataDir,
                 database = DatabaseConfig(url = "jdbc:sqlite:$dataDir/db/chaptervault.db"),
                 storage =
                     StorageConfig(
@@ -127,6 +128,7 @@ object ConfigLoader {
         val top = Section("", root, warn)
         val config =
             AppConfig(
+                dataDir = derived.dataDir,
                 server = top.child("server")?.let { serverFrom(it, derived.server) } ?: derived.server,
                 database = top.child("database")?.let { databaseFrom(it, derived.database) } ?: derived.database,
                 storage = top.child("storage")?.let { storageFrom(it, derived.storage, warn) } ?: derived.storage,

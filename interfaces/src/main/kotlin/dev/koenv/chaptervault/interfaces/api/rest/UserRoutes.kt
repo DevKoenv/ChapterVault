@@ -3,6 +3,8 @@ package dev.koenv.chaptervault.interfaces.api.rest
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.ErrorResponse
 import dev.koenv.chaptervault.interfaces.serialization.dto.v1.UserDto
 import dev.koenv.chaptervault.kernel.api.AuthApi
+import dev.koenv.chaptervault.kernel.api.Credentials
+import dev.koenv.chaptervault.kernel.auth.PasswordGenerator
 import dev.koenv.chaptervault.kernel.auth.PasswordPolicy
 import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.kernel.auth.Role
@@ -26,6 +28,33 @@ data class ChangePasswordRequest(
 @Serializable
 data class UpdateUserRoleRequest(
     val role: String,
+)
+
+@Serializable
+data class CreateUserRequest(
+    val username: String,
+    val password: String? = null,
+    val role: String = "USER",
+)
+
+@Serializable
+data class CreatedUserDto(
+    val id: String,
+    val username: String,
+    val roles: List<String>,
+    val createdAt: String,
+    // only when the server chose the password; it is not stored in a readable form, so this is the one chance to see it
+    val generatedPassword: String? = null,
+)
+
+@Serializable
+data class SetPasswordRequest(
+    val password: String? = null,
+)
+
+@Serializable
+data class GeneratedPasswordDto(
+    val generatedPassword: String,
 )
 
 fun Route.userRoutes(auth: AuthApi) {
@@ -77,6 +106,8 @@ fun Route.userRoutes(auth: AuthApi) {
         }
     }
 
+    userAccountRoutes(auth)
+
     delete("/users/{id}") {
         val principal = call.requirePermission(Permission.MANAGE_USERS) ?: return@delete
         val id = call.idParam("id", "user") ?: return@delete
@@ -112,6 +143,60 @@ fun Route.userRoutes(auth: AuthApi) {
                         createdAt = result.value.createdAt.toString(),
                     ),
                 )
+            is Result.Failure -> call.respondError(result.error)
+        }
+    }
+}
+
+// creating accounts and resetting passwords (MANAGE_USERS)
+private fun Route.userAccountRoutes(auth: AuthApi) {
+    // works with registration turned off: an administrator adds the accounts
+    post("/users") {
+        call.requirePermission(Permission.MANAGE_USERS) ?: return@post
+        val request = call.receiveOrBadRequest<CreateUserRequest>() ?: return@post
+        val role =
+            Role.entries.firstOrNull { it.name.equals(request.role, ignoreCase = true) }
+                ?: return@post call.respondBadRequest("Invalid role; must be ADMIN, USER, or GUEST")
+        request.password?.let { chosen -> PasswordPolicy.violation(chosen)?.let { return@post call.respondBadRequest(it) } }
+        val password = request.password ?: PasswordGenerator.generate()
+        when (val result = auth.register(Credentials(request.username, password), role)) {
+            is Result.Success ->
+                call.respond(
+                    HttpStatusCode.Created,
+                    with(result.value) {
+                        CreatedUserDto(
+                            id.toString(),
+                            username,
+                            roles.map { it.name },
+                            createdAt.toString(),
+                            password.takeIf {
+                                request.password ==
+                                    null
+                            },
+                        )
+                    },
+                )
+            is Result.Failure -> call.respondError(result.error)
+        }
+    }
+
+    post("/users/{id}/password") {
+        val principal = call.requirePermission(Permission.MANAGE_USERS) ?: return@post
+        val id = call.idParam("id", "user") ?: return@post
+        if (id == principal.user.id) {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("SELF_PASSWORD_RESET", "Use /auth/change-password for your own account"))
+            return@post
+        }
+        val request = call.receiveOrBadRequest<SetPasswordRequest>() ?: return@post
+        request.password?.let { chosen -> PasswordPolicy.violation(chosen)?.let { return@post call.respondBadRequest(it) } }
+        val password = request.password ?: PasswordGenerator.generate()
+        when (val result = auth.setPassword(id, password)) {
+            is Result.Success ->
+                if (request.password == null) {
+                    call.respond(HttpStatusCode.OK, GeneratedPasswordDto(password))
+                } else {
+                    call.respond(HttpStatusCode.NoContent)
+                }
             is Result.Failure -> call.respondError(result.error)
         }
     }

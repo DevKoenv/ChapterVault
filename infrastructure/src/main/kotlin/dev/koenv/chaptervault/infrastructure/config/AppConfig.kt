@@ -3,6 +3,8 @@ package dev.koenv.chaptervault.infrastructure.config
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 
 data class AppConfig(
+    // CHAPTERVAULT_DATA_DIR; not a config file setting, the config file lives in it
+    val dataDir: String = "data",
     val server: ServerConfig = ServerConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
     val storage: StorageConfig = StorageConfig(),

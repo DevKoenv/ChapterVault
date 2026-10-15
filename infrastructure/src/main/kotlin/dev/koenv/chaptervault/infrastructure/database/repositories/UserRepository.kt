@@ -33,6 +33,8 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Instant
 
+// implements all of AuthApi; the small private query helpers are what pushes it over the limit
+@Suppress("TooManyFunctions")
 class UserRepository : AuthApi {
     private suspend fun <T> dbQuery(block: Transaction.() -> T): T = newSuspendedTransaction(Dispatchers.IO) { block() }
 
@@ -202,6 +204,23 @@ class UserRepository : AuthApi {
             }
             // a stolen or forgotten token must not survive a password change
             SessionTable.deleteWhere { SessionTable.userId eq userId.toString() }
+            Result.Success(Unit)
+        }
+
+    override suspend fun setPassword(
+        id: Id,
+        newPassword: String,
+    ): Result<Unit> =
+        dbQuery {
+            PasswordPolicy.violation(newPassword)?.let {
+                return@dbQuery Result.Failure(AppError.ValidationError(it))
+            }
+            val updated =
+                UserTable.update({ UserTable.id eq id.toString() }) {
+                    it[UserTable.passwordHash] = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+                }
+            if (updated == 0) return@dbQuery Result.Failure(AppError.NotFound("User", id.toString()))
+            SessionTable.deleteWhere { SessionTable.userId eq id.toString() }
             Result.Success(Unit)
         }
 

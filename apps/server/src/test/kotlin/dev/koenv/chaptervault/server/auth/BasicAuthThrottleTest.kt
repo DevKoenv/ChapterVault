@@ -67,6 +67,11 @@ class BasicAuthThrottleTest {
             newPassword: String,
         ): Result<Unit> = error("unused")
 
+        override suspend fun setPassword(
+            id: Id,
+            newPassword: String,
+        ): Result<Unit> = error("not used")
+
         override suspend fun cleanupExpiredSessions(): Result<Unit> = error("unused")
     }
 

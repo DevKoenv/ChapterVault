@@ -47,5 +47,11 @@ interface AuthApi {
         newPassword: String,
     ): Result<Unit>
 
+    /** Sets a password without the old one (an administrator, or the reset file) and signs the user out everywhere. */
+    suspend fun setPassword(
+        id: Id,
+        newPassword: String,
+    ): Result<Unit>
+
     suspend fun cleanupExpiredSessions(): Result<Unit>
 }

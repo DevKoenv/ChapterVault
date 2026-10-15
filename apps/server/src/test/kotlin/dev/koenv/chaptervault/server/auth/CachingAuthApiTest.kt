@@ -67,6 +67,15 @@ class CachingAuthApiTest {
             return Result.Success(Unit)
         }
 
+        override suspend fun setPassword(
+            id: Id,
+            newPassword: String,
+        ): Result<Unit> {
+            if (failNextMutation) return Result.Failure(AppError.Conflict("no"))
+            accounts.values.first { it.principal.id == id }.password = newPassword
+            return Result.Success(Unit)
+        }
+
         override suspend fun register(
             credentials: Credentials,
             role: Role,
@@ -158,6 +167,18 @@ class CachingAuthApiTest {
 
             assertIs<Result.Failure>(auth.validateCredentials(creds("alice", "secret-pw")))
             assertIs<Result.Success<*>>(auth.validateCredentials(creds("alice", "another-pw")))
+        }
+
+    @Test
+    fun `an administrator's password reset ends access with the old one`() =
+        runBlocking<Unit> {
+            val alice = delegate.add("alice", "secret-pw")
+            auth.validateCredentials(creds("alice", "secret-pw"))
+
+            auth.setPassword(alice.id, "reset-pw-123")
+
+            assertIs<Result.Failure>(auth.validateCredentials(creds("alice", "secret-pw")))
+            assertIs<Result.Success<*>>(auth.validateCredentials(creds("alice", "reset-pw-123")))
         }
 
     @Test

@@ -7,6 +7,7 @@ import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
+import dev.koenv.chaptervault.shared.utils.Id
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
@@ -58,6 +59,28 @@ class UserLifecycleTest {
 
             assertIs<Result.Success<*>>(result)
             assertIs<Result.Failure>(repo.validateSession(token))
+        }
+
+    @Test
+    fun `setPassword replaces the password and signs the user out everywhere`() =
+        runBlocking<Unit> {
+            val (user, token) = registerAndLogin("alice")
+
+            assertIs<Result.Success<Unit>>(repo.setPassword(user.id, "a-brand-new-password"))
+
+            assertIs<Result.Failure>(repo.validateSession(token))
+            assertIs<Result.Failure>(repo.validateCredentials(Credentials("alice", "password-alice")))
+            assertIs<Result.Success<*>>(repo.validateCredentials(Credentials("alice", "a-brand-new-password")))
+        }
+
+    @Test
+    fun `setPassword checks the password policy and that the user exists`() =
+        runBlocking<Unit> {
+            val (user, _) = registerAndLogin("alice")
+
+            assertIs<AppError.ValidationError>((repo.setPassword(user.id, "short") as Result.Failure).error)
+            assertIs<Result.Success<*>>(repo.validateCredentials(Credentials("alice", "password-alice")))
+            assertIs<AppError.NotFound>((repo.setPassword(Id.generate(), "a-brand-new-password") as Result.Failure).error)
         }
 
     @Test

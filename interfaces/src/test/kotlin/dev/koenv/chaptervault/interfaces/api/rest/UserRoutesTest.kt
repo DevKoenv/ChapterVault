@@ -27,9 +27,15 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class UserRoutesTest {
@@ -46,11 +52,26 @@ class UserRoutesTest {
         val passwordChanges = mutableListOf<Triple<Id, String, String>>()
         var deleteResult: Result<Unit> = Result.Success(Unit)
         var roleResult: Result<UserPrincipal>? = null
+        val registered = mutableListOf<Pair<Credentials, Role>>()
+        var registerResult: Result<UserPrincipal>? = null
+        val passwordResets = mutableListOf<Pair<Id, String>>()
+        var setPasswordResult: Result<Unit> = Result.Success(Unit)
 
         override suspend fun register(
             credentials: Credentials,
             role: Role,
-        ): Result<UserPrincipal> = error("not used")
+        ): Result<UserPrincipal> {
+            registered += credentials to role
+            return registerResult ?: Result.Success(UserPrincipal(Id.generate(), credentials.username, setOf(role)))
+        }
+
+        override suspend fun setPassword(
+            id: Id,
+            newPassword: String,
+        ): Result<Unit> {
+            passwordResets += id to newPassword
+            return setPasswordResult
+        }
 
         override suspend fun authenticate(credentials: Credentials): Result<Pair<UserPrincipal, Session>> = error("not used")
 
@@ -207,6 +228,113 @@ class UserRoutesTest {
             val response = client.delete("/users/$userId") { bearerAuth("admin-token") }
 
             assertEquals(HttpStatusCode.Conflict, response.status)
+        }
+    }
+
+    private suspend fun ApplicationTestBuilder.postJson(
+        path: String,
+        token: String,
+        body: String,
+    ) = client.post(path) {
+        bearerAuth(token)
+        contentType(ContentType.Application.Json)
+        setBody(body)
+    }
+
+    private fun field(
+        body: String,
+        name: String,
+    ): String? = (Json.parseToJsonElement(body).jsonObject[name] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
+
+    @Test
+    fun `POST users creates a user with the given password and role`() {
+        val auth = RecordingAuth(listOf(admin, user))
+        testApp(auth) {
+            val response = postJson("/users", "admin-token", """{"username":"bob","password":"bobs-password","role":"guest"}""")
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val body = response.bodyAsText()
+            assertEquals("bob", field(body, "username"))
+            assertContains(body, "GUEST")
+            assertEquals(null, field(body, "generatedPassword"))
+            assertFalse("bobs-password" in body, "a chosen password is never echoed")
+        }
+        assertEquals(listOf(Credentials("bob", "bobs-password") to Role.GUEST), auth.registered)
+    }
+
+    @Test
+    fun `POST users without a password generates one and returns it once`() {
+        val auth = RecordingAuth(listOf(admin, user))
+        testApp(auth) {
+            val response = postJson("/users", "admin-token", """{"username":"bob"}""")
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val generated = assertNotNull(field(response.bodyAsText(), "generatedPassword"))
+            assertEquals(24, generated.length)
+            assertEquals(listOf(Credentials("bob", generated) to Role.USER), auth.registered)
+        }
+    }
+
+    @Test
+    fun `POST users rejects a short password and an unknown role, and is for admins only`() {
+        val auth = RecordingAuth(listOf(admin, user))
+        testApp(auth) {
+            assertEquals(HttpStatusCode.BadRequest, postJson("/users", "admin-token", """{"username":"bob","password":"short"}""").status)
+            assertEquals(HttpStatusCode.BadRequest, postJson("/users", "admin-token", """{"username":"bob","role":"king"}""").status)
+            assertEquals(HttpStatusCode.Forbidden, postJson("/users", "user-token", """{"username":"bob"}""").status)
+        }
+        assertTrue(auth.registered.isEmpty())
+    }
+
+    @Test
+    fun `POST users maps a taken username to 409`() {
+        val auth = RecordingAuth(listOf(admin, user))
+        auth.registerResult = Result.Failure(AppError.Conflict("Username 'alice' already taken"))
+        testApp(auth) {
+            assertEquals(HttpStatusCode.Conflict, postJson("/users", "admin-token", """{"username":"alice"}""").status)
+        }
+    }
+
+    @Test
+    fun `POST users-id-password sets the given password`() {
+        val auth = RecordingAuth(listOf(admin, user))
+        testApp(auth) {
+            val response = postJson("/users/$userId/password", "admin-token", """{"password":"a-new-password"}""")
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+        }
+        assertEquals(listOf(userId to "a-new-password"), auth.passwordResets)
+    }
+
+    @Test
+    fun `POST users-id-password without a password generates one and returns it`() {
+        val auth = RecordingAuth(listOf(admin, user))
+        testApp(auth) {
+            val response = postJson("/users/$userId/password", "admin-token", "{}")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val generated = assertNotNull(field(response.bodyAsText(), "generatedPassword"))
+            assertEquals(listOf(userId to generated), auth.passwordResets)
+        }
+    }
+
+    @Test
+    fun `POST users-id-password refuses your own account, a short password and non-admins`() {
+        val auth = RecordingAuth(listOf(admin, user))
+        testApp(auth) {
+            assertEquals(HttpStatusCode.BadRequest, postJson("/users/$adminId/password", "admin-token", "{}").status)
+            assertEquals(HttpStatusCode.BadRequest, postJson("/users/$userId/password", "admin-token", """{"password":"short"}""").status)
+            assertEquals(HttpStatusCode.Forbidden, postJson("/users/$adminId/password", "user-token", "{}").status)
+        }
+        assertTrue(auth.passwordResets.isEmpty())
+    }
+
+    @Test
+    fun `POST users-id-password maps an unknown user to 404`() {
+        val auth = RecordingAuth(listOf(admin, user))
+        auth.setPasswordResult = Result.Failure(AppError.NotFound("User", "x"))
+        testApp(auth) {
+            assertEquals(HttpStatusCode.NotFound, postJson("/users/${Id.generate()}/password", "admin-token", "{}").status)
         }
     }
 

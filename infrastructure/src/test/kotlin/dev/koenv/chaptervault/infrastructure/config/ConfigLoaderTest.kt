@@ -143,6 +143,29 @@ class ConfigLoaderTest {
     }
 
     @Test
+    fun `the data directory comes from the env var, also when a config file is read`(
+        @TempDir dir: Path,
+    ) {
+        val file = dir.resolve("application.yaml").toFile()
+        file.writeText("server:\n  port: 9090")
+        assertEquals("data", ConfigLoader.load(file.absolutePath, env = { null }).dataDir)
+        assertEquals(
+            "/srv/cv",
+            ConfigLoader
+                .load(file.absolutePath, env = {
+                    if (it ==
+                        "CHAPTERVAULT_DATA_DIR"
+                    ) {
+                        "/srv/cv"
+                    } else {
+                        null
+                    }
+                })
+                .dataDir,
+        )
+    }
+
+    @Test
     fun `downloads need 1024 MB free by default, set in yaml or the env var`(
         @TempDir dir: Path,
     ) {
