@@ -263,6 +263,24 @@ components:
         genres:         { type: array, nullable: true, items: { type: string } }
         clearFields:    { type: array, nullable: true, items: { type: string }, description: "Fields to release back to the source" }
 
+    BackupProgress:
+      type: object
+      required: [connectorId, externalId, latestPage, readAt]
+      properties:
+        connectorId:               { type: string }
+        externalId:                { type: string }
+        language:                  { type: string, default: en, description: "Series language; part of the series identity" }
+        latestChapterExternalId:   { type: string, nullable: true }
+        latestPage:                { type: integer, minimum: 0 }
+        readAt:                    { type: string, format: date-time }
+    BackupReadingStatus:
+      type: object
+      required: [connectorId, externalId, status]
+      properties:
+        connectorId: { type: string }
+        externalId:  { type: string }
+        language:    { type: string, default: en, description: "Series language; part of the series identity" }
+        status:      { type: string, enum: [PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD] }
     ExtensionDto:
       type: object
       properties:
@@ -586,13 +604,14 @@ paths:
           schema:
             type: string
             enum: [PLAN_TO_READ, READING, COMPLETED, DROPPED, ON_HOLD]
-          description: Filter series by the current user's reading status; omit to return all series
+          description: Filter series by the current user's reading status; omit to return all series. Any other value is rejected with 400.
       responses:
         "200":
-          description: Paginated series list
+          description: Paginated series list, ordered by title (then id)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PaginatedSeriesResponse" }
+        "400": { description: Invalid readingStatus value }
 
     post:
       tags: [library]
@@ -685,6 +704,7 @@ paths:
     get:
       tags: [library]
       summary: List chapters for a series (paginated), optionally filtered by download status
+      description: Ordered by chapter index, ties broken by id, so pages never repeat or skip a chapter.
       parameters:
         - in: path
           name: id
@@ -1021,6 +1041,7 @@ paths:
         - in: query
           name: size
           schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+          description: A connector can cap the page size lower than this (MangaDex allows at most 100 per request); the `size` in the answer is the one that was used
       responses:
         "200":
           content:
@@ -1330,6 +1351,7 @@ paths:
         Exports the current user's reading progress and reading statuses. Series are identified by connector and
         external id, so a backup can be imported into another ChapterVault that has the same series. Library files,
         series metadata, other users and server settings are not part of it. Series with no connector identity are excluded.
+        The same external id in two languages is two series; every entry carries its `language`.
       responses:
         "200":
           description: Backup JSON
@@ -1340,8 +1362,8 @@ paths:
                 properties:
                   version:        { type: integer, example: 1 }
                   exportedAt:     { type: string, format: date-time }
-                  progress:       { type: array, items: { type: object } }
-                  readingStatuses: { type: array, items: { type: object } }
+                  progress:       { type: array, items: { $ref: "#/components/schemas/BackupProgress" } }
+                  readingStatuses: { type: array, items: { $ref: "#/components/schemas/BackupReadingStatus" } }
         "401": { description: Not authenticated }
 
   /backup/import:
@@ -1351,6 +1373,8 @@ paths:
       description: |
         Restores reading progress and reading statuses for the current user. Entries for series that are not in the
         library, with a status the server does not know, or with a negative page are skipped and counted in the summary.
+        A series is matched by connector, external id and language; `language` defaults to `en` when absent, so backups
+        made before it existed still import.
         The body may be at most 10 MB.
       requestBody:
         required: true
@@ -1358,6 +1382,12 @@ paths:
           application/json:
             schema:
               type: object
+              required: [exportedAt, progress, readingStatuses]
+              properties:
+                version:         { type: integer, example: 1 }
+                exportedAt:      { type: string }
+                progress:        { type: array, items: { $ref: "#/components/schemas/BackupProgress" } }
+                readingStatuses: { type: array, items: { $ref: "#/components/schemas/BackupReadingStatus" } }
       responses:
         "200":
           description: Import summary
