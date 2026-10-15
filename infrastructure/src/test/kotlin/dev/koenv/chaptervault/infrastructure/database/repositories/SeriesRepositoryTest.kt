@@ -120,7 +120,7 @@ class SeriesRepositoryTest {
 
     @Test
     fun `removeSeries succeeds even when deleteSeriesFiles throws`() =
-        runBlocking {
+        runBlocking<Unit> {
             val series = (repo.addToLibrary("mangadex", "ext-del-fail", autoDownload = false) as Result.Success).value
             mockStorage.shouldFail = true
 
@@ -341,7 +341,7 @@ class SeriesRepositoryTest {
 
     @Test
     fun `evictChapter returns NotFound for unknown chapter`() =
-        runBlocking {
+        runBlocking<Unit> {
             val result = repo.evictChapter(Id.generate())
             assertIs<Result.Failure>(result)
             assertIs<AppError.NotFound>((result as Result.Failure).error)
@@ -411,7 +411,7 @@ class SeriesRepositoryTest {
 
     @Test
     fun `listChaptersPaginated reports an unknown series as not found`() =
-        runBlocking {
+        runBlocking<Unit> {
             val result = repo.listChaptersPaginated(Id.generate(), null, PageRequest(0, 10))
 
             assertIs<AppError.NotFound>((result as Result.Failure).error)

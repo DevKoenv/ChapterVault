@@ -19,6 +19,7 @@ import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
@@ -39,6 +40,8 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
+
+private val logger = KotlinLogging.logger {}
 
 class SeriesRepository(
     private val fileStorage: FileStorage,
@@ -256,7 +259,12 @@ class SeriesRepository(
                 }
             }
         if (result is Result.Success) {
-            fileStorage.deleteSeriesFiles(id.toString())
+            // the series is already gone from the database; leftover files are moved to .trash at the next start
+            try {
+                fileStorage.deleteSeriesFiles(id.toString())
+            } catch (e: Exception) {
+                logger.warn { "Series $id removed, but its files could not be deleted: ${e.message}" }
+            }
         }
         return result
     }
