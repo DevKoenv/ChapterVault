@@ -306,6 +306,31 @@ class FeedBuilder {
         )
     }
 
+    fun buildSearchFeed(
+        query: String,
+        series: List<Series>,
+        page: Int,
+        size: Int,
+        totalItems: Long,
+        now: String,
+    ): OpdsFeed {
+        val totalPages = if (size > 0) (totalItems + size - 1) / size else 1
+        val base = "/opds/v1/search?q=${encodeParam(query)}"
+        return OpdsFeed(
+            id = "urn:chaptervault:search:${encodeParam(query)}",
+            title = "Search: $query",
+            updated = series.maxOfOrNull { it.updatedAt }?.toString() ?: now,
+            selfHref = "$base&page=$page&size=$size",
+            kind = "acquisition",
+            nextHref = if (page + 1 < totalPages) "$base&page=${page + 1}&size=$size" else null,
+            prevHref = if (page > 0) "$base&page=${page - 1}&size=$size" else null,
+            totalResults = totalItems,
+            itemsPerPage = size,
+            startIndex = page * size + 1,
+            entries = series.map { buildSeriesEntry(it) },
+        )
+    }
+
     fun buildSeriesFeed(
         series: Series,
         chapters: List<Chapter>,
@@ -400,5 +425,7 @@ class FeedBuilder {
         const val REL_IMAGE_THUMBNAIL = "http://opds-spec.org/image/thumbnail"
         const val REL_ACQUISITION = "http://opds-spec.org/acquisition/open-access"
         const val REL_PSE = "http://vaemendis.net/opds-pse/stream"
+        const val TYPE_OPENSEARCH_DESCRIPTION = "application/opensearchdescription+xml"
+        const val SEARCH_DESCRIPTION_HREF = "/opds/v1/search.xml"
     }
 }

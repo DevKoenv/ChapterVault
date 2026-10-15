@@ -56,6 +56,26 @@ data class OpdsEntryXml(
 )
 
 @Serializable
+@XmlSerialName("Url", OS_NS, "")
+data class OpenSearchUrlXml(
+    val type: String,
+    val template: String,
+)
+
+/** OpenSearch 1.1 description document with only the required elements (ShortName at most 16 characters). */
+@Serializable
+@XmlSerialName("OpenSearchDescription", OS_NS, "")
+data class OpenSearchDescriptionXml(
+    @XmlSerialName("ShortName", OS_NS, "")
+    @XmlElement(true) val shortName: String = "ChapterVault",
+    @XmlSerialName("Description", OS_NS, "")
+    @XmlElement(true) val description: String = "Search the ChapterVault library by series title",
+    @XmlSerialName("InputEncoding", OS_NS, "")
+    @XmlElement(true) val inputEncoding: String = "UTF-8",
+    val url: OpenSearchUrlXml,
+)
+
+@Serializable
 @XmlSerialName("feed", ATOM_NS, "")
 data class OpdsFeedXml(
     @XmlElement(true) val id: String,
@@ -87,6 +107,15 @@ data class OpdsFeedXml(
                             rel = "start",
                             href = "/opds/v1",
                             type = "application/atom+xml;profile=opds-catalog;kind=navigation",
+                        ),
+                    )
+                    // OPDS 1.2 section 3: search is offered through an OpenSearch description document
+                    add(
+                        OpdsLinkXml(
+                            rel = "search",
+                            href = FeedBuilder.SEARCH_DESCRIPTION_HREF,
+                            type = FeedBuilder.TYPE_OPENSEARCH_DESCRIPTION,
+                            title = "Search",
                         ),
                     )
                     feed.coverHref?.let {

@@ -149,6 +149,7 @@ object ConfigLoader {
         port = s.int("port", d.port),
         host = s.string("host", d.host),
         corsOrigins = s.strings("corsOrigins", d.corsOrigins),
+        publicUrl = s.string("publicUrl", "").ifBlank { null } ?: d.publicUrl,
     ).also { s.finish() }
 
     private fun databaseFrom(
@@ -265,6 +266,9 @@ object ConfigLoader {
           # Empty = no cross-origin access (the API is still reachable from apps, OPDS readers and the same origin).
           # corsOrigins:
           #   - "http://192.168.1.10:3000"
+          # Scheme and host OPDS readers use to reach this server; the OPDS search needs an absolute address.
+          # Unset = taken from each request. Set it behind a reverse proxy that serves HTTPS.
+          # publicUrl: "https://manga.example.com"
 
         storage:
           # How downloaded chapters are stored on disk.
@@ -351,6 +355,7 @@ object ConfigLoader {
                             ?.map { it.trim() }
                             ?.filter { it.isNotEmpty() }
                             ?: base.server.corsOrigins,
+                    publicUrl = env("CHAPTERVAULT_PUBLIC_URL")?.ifBlank { null } ?: base.server.publicUrl,
                 ),
             database =
                 base.database.copy(

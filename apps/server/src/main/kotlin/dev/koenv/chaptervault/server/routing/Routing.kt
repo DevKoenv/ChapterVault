@@ -101,7 +101,7 @@ internal fun Application.configureRouting(
         }
     }
 
-    opdsRoutes(libraryRead, opdsRead, fileStorage)
+    opdsRoutes(libraryRead, opdsRead, fileStorage, config.server.publicUrl)
     opdsPageRoutes(libraryRead, fileStorage)
 
     // here rather than :interfaces because it needs FileStorage directly

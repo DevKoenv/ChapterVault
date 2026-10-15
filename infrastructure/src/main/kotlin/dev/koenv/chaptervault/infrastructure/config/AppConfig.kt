@@ -54,6 +54,8 @@ data class ServerConfig(
     val host: String = "0.0.0.0",
     // empty = anyHost() in dev, restrict with explicit origins in production
     val corsOrigins: List<String> = emptyList(),
+    // scheme and host readers reach the server on, e.g. https://manga.example.com; null = taken from each request
+    val publicUrl: String? = null,
 )
 
 data class DatabaseConfig(

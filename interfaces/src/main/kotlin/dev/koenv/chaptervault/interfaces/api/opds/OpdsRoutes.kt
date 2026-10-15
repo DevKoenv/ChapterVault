@@ -18,12 +18,15 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import java.security.MessageDigest
@@ -32,7 +35,7 @@ import java.time.Instant
 private val feedBuilder = FeedBuilder()
 private val opdsV1 = OpdsV1()
 
-private fun opdsContentType(call: io.ktor.server.application.ApplicationCall): ContentType {
+private fun opdsContentType(call: ApplicationCall): ContentType {
     val accept = call.request.header(HttpHeaders.Accept) ?: ""
     return if (accept.contains("text/html")) {
         ContentType.parse("text/xml;charset=utf-8")
@@ -41,10 +44,19 @@ private fun opdsContentType(call: io.ktor.server.application.ApplicationCall): C
     }
 }
 
+// scheme and host the reader used; behind a proxy that terminates HTTPS this says http, hence server.publicUrl
+private fun ApplicationCall.requestBaseUrl(): String {
+    val origin = request.origin
+    val defaultPort = if (origin.scheme == "https") 443 else 80
+    val port = if (origin.serverPort == defaultPort) "" else ":${origin.serverPort}"
+    return "${origin.scheme}://${origin.serverHost}$port"
+}
+
 fun Application.opdsRoutes(
     libraryRead: LibraryReadApi,
     opdsRead: OpdsReadApi,
     pageSource: ChapterPageSource,
+    publicUrl: String? = null,
 ) {
     routing {
         authenticate("auth-basic") {
@@ -100,6 +112,8 @@ fun Application.opdsRoutes(
                     }
                 }
             }
+
+            searchRoutes(libraryRead, publicUrl)
 
             get("/opds/v1/history") {
                 val principal = call.requirePrincipal() ?: return@get
@@ -208,6 +222,49 @@ fun Application.opdsRoutes(
                     )
                 call.respondText(opdsV1.serialize(feed), opdsContentType(call))
             }
+        }
+    }
+}
+
+// OPDS 1.2 section 3: an OpenSearch description document, and the acquisition feed its template points at
+private fun Route.searchRoutes(
+    libraryRead: LibraryReadApi,
+    publicUrl: String?,
+) {
+    get(FeedBuilder.SEARCH_DESCRIPTION_HREF) {
+        val base = publicUrl?.trimEnd('/') ?: call.requestBaseUrl()
+        call.respondText(
+            opdsV1.serializeSearchDescription("$base/opds/v1/search?q={searchTerms}"),
+            ContentType.parse("${FeedBuilder.TYPE_OPENSEARCH_DESCRIPTION};charset=utf-8"),
+        )
+    }
+
+    get("/opds/v1/search") {
+        // OpenSearch does not allow an empty {searchTerms}
+        val query =
+            call.request.queryParameters["q"]
+                ?.trim()
+                .orEmpty()
+        if (query.isEmpty()) {
+            call.respondBadRequest("Missing search terms (q)")
+            return@get
+        }
+        val pageRequest = call.pageRequest(defaultSize = 20)
+        when (val result = libraryRead.searchLibrary(query, pageRequest)) {
+            is Result.Success -> {
+                val p = result.value
+                val feed =
+                    feedBuilder.buildSearchFeed(
+                        query = query,
+                        series = p.items,
+                        page = pageRequest.page,
+                        size = p.size,
+                        totalItems = p.totalItems,
+                        now = Instant.now().toString(),
+                    )
+                call.respondText(opdsV1.serialize(feed), opdsContentType(call))
+            }
+            is Result.Failure -> call.respondError(result.error)
         }
     }
 }

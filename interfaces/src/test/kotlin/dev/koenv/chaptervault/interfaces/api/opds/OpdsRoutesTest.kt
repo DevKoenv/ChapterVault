@@ -44,7 +44,12 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import org.junit.jupiter.api.Test
+import org.w3c.dom.Document
+import org.w3c.dom.Element
+import org.xml.sax.InputSource
+import java.io.StringReader
 import java.time.Instant
+import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -254,45 +259,47 @@ class OpdsRoutesTest {
         block()
     }
 
-    private fun testApp(block: suspend ApplicationTestBuilder.() -> Unit) =
-        testApplication {
-            application {
-                install(ContentNegotiation) { json() }
-                install(Authentication) {
-                    basic("auth-basic") {
-                        realm = "ChapterVault"
-                        validate { cred ->
-                            if (cred.name == "user" && cred.password == "pass") {
-                                KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
-                            } else if (cred.name == "nobody" && cred.password == "pass") {
-                                KtorPrincipal(UserPrincipal(Id.generate(), "nobody", emptySet()))
-                            } else {
-                                null
-                            }
-                        }
-                    }
-                    bearer("auth-bearer") {
-                        authenticate { cred ->
-                            if (cred.token == "valid-token") {
-                                KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
-                            } else {
-                                null
-                            }
+    private fun testApp(
+        publicUrl: String? = null,
+        block: suspend ApplicationTestBuilder.() -> Unit,
+    ) = testApplication {
+        application {
+            install(ContentNegotiation) { json() }
+            install(Authentication) {
+                basic("auth-basic") {
+                    realm = "ChapterVault"
+                    validate { cred ->
+                        if (cred.name == "user" && cred.password == "pass") {
+                            KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                        } else if (cred.name == "nobody" && cred.password == "pass") {
+                            KtorPrincipal(UserPrincipal(Id.generate(), "nobody", emptySet()))
+                        } else {
+                            null
                         }
                     }
                 }
-                opdsRoutes(fakeLibraryRead, fakeOpdsRead, fakePageSource)
-                opdsPageRoutes(fakeLibraryRead, fakePageSource)
-                routing {
-                    authenticate("auth-bearer") {
-                        get("/library/chapters/{id}/pages/{index}") {
-                            call.respond(HttpStatusCode.OK)
+                bearer("auth-bearer") {
+                    authenticate { cred ->
+                        if (cred.token == "valid-token") {
+                            KtorPrincipal(UserPrincipal(Id.generate(), "user", setOf(Role.USER)))
+                        } else {
+                            null
                         }
                     }
                 }
             }
-            block()
+            opdsRoutes(fakeLibraryRead, fakeOpdsRead, fakePageSource, publicUrl)
+            opdsPageRoutes(fakeLibraryRead, fakePageSource)
+            routing {
+                authenticate("auth-bearer") {
+                    get("/library/chapters/{id}/pages/{index}") {
+                        call.respond(HttpStatusCode.OK)
+                    }
+                }
+            }
         }
+        block()
+    }
 
     @Test
     fun `navigation feed returns 200 with atom+xml content type`() =
@@ -486,6 +493,8 @@ class OpdsRoutesTest {
                     "/opds/v1/library-updates",
                     "/opds/v1/series/$seriesId",
                     "/opds/v1/chapters/$downloadedChapterId/pages/0",
+                    "/opds/v1/search.xml",
+                    "/opds/v1/search?q=test",
                 )
             paths.forEach { path ->
                 assertEquals(HttpStatusCode.Forbidden, client.get(path) { basicAuth("nobody", "pass") }.status, path)
@@ -888,4 +897,122 @@ class OpdsRoutesTest {
             assertEquals(HttpStatusCode.OK, res.status)
             assertContains(res.bodyAsText(), "Test Series")
         }
+
+    // search: OPDS 1.2 section 3 points to an OpenSearch 1.1 description document
+
+    @Test
+    fun `every feed has exactly one search link to the OpenSearch description`() =
+        testApp {
+            listOf(
+                "/opds/v1",
+                "/opds/v1/catalog",
+                "/opds/v1/catalog?genre=Action",
+                "/opds/v1/history",
+                "/opds/v1/library-updates",
+                "/opds/v1/library/genres",
+                "/opds/v1/series/$seriesId",
+                "/opds/v1/search?q=test",
+            ).forEach { path ->
+                val body = client.get(path) { basicAuth("user", "pass") }.bodyAsText()
+                val links = Regex("<link [^>]*rel=\"search\"[^>]*>").findAll(body).map { it.value }.toList()
+                assertEquals(1, links.size, "$path: $links")
+                assertContains(links.single(), "href=\"/opds/v1/search.xml\"")
+                assertContains(links.single(), "type=\"application/opensearchdescription+xml\"")
+            }
+        }
+
+    @Test
+    fun `the OpenSearch description has the required elements and an absolute acquisition template`() =
+        testApp {
+            val res = client.get("/opds/v1/search.xml") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertTrue(res.contentType()?.match("application/opensearchdescription+xml") == true, res.contentType().toString())
+            val root = parseXml(res.bodyAsText()).documentElement
+            assertEquals("OpenSearchDescription", root.localName)
+            assertEquals(OPENSEARCH_NS, root.namespaceURI)
+            assertEquals("ChapterVault", root.child("ShortName").textContent)
+            assertTrue(root.child("Description").textContent.isNotBlank())
+            val url = root.child("Url")
+            assertEquals("application/atom+xml;profile=opds-catalog;kind=acquisition", url.getAttribute("type"))
+            assertEquals("http://localhost/opds/v1/search?q={searchTerms}", url.getAttribute("template"))
+        }
+
+    @Test
+    fun `the search template uses the configured public url`() =
+        testApp(publicUrl = "https://manga.example.com/") {
+            val root = parseXml(client.get("/opds/v1/search.xml") { basicAuth("user", "pass") }.bodyAsText()).documentElement
+            assertEquals("https://manga.example.com/opds/v1/search?q={searchTerms}", root.child("Url").getAttribute("template"))
+        }
+
+    @Test
+    fun `without a public url the search template follows the Host header`() =
+        testApp {
+            val body =
+                client
+                    .get("/opds/v1/search.xml") {
+                        basicAuth("user", "pass")
+                        header(HttpHeaders.Host, "nas.local:18080")
+                    }.bodyAsText()
+            assertEquals(
+                "http://nas.local:18080/opds/v1/search?q={searchTerms}",
+                parseXml(body).documentElement.child("Url").getAttribute("template"),
+            )
+        }
+
+    @Test
+    fun `search returns an acquisition feed of matching series with paging that keeps the query`() {
+        var seen: Pair<String, PageRequest>? = null
+        val searching =
+            object : LibraryReadApi by fakeLibraryRead {
+                override suspend fun searchLibrary(
+                    query: String,
+                    request: PageRequest,
+                ): Result<Pagination<Series>> {
+                    seen = query to request
+                    return Result.Success(Pagination(List(request.size) { fakeSeries }, request.page, request.size, 25L))
+                }
+            }
+        testAppWith(searching) {
+            val res = client.get("/opds/v1/search?q=one%20piece&page=1&size=10") { basicAuth("user", "pass") }
+            assertEquals(HttpStatusCode.OK, res.status)
+            assertTrue(res.contentType()?.match("application/atom+xml") == true)
+            assertEquals("one piece", seen?.first)
+            assertEquals(1, seen?.second?.page)
+            val body = res.bodyAsText()
+            assertContains(body, "Test Series")
+            assertContains(body, "kind=acquisition")
+            assertContains(body, "href=\"/opds/v1/search?q=one+piece&amp;page=2&amp;size=10\"")
+            assertContains(body, "href=\"/opds/v1/search?q=one+piece&amp;page=0&amp;size=10\"")
+            assertContains(body, ">25<")
+        }
+    }
+
+    @Test
+    fun `search without search terms is a bad request`() =
+        testApp {
+            listOf("/opds/v1/search", "/opds/v1/search?q=", "/opds/v1/search?q=%20%20").forEach { path ->
+                assertEquals(HttpStatusCode.BadRequest, client.get(path) { basicAuth("user", "pass") }.status, path)
+            }
+        }
+
+    @Test
+    fun `search and its description need credentials`() =
+        testApp {
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/opds/v1/search.xml").status)
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/opds/v1/search?q=test").status)
+        }
+
+    private fun parseXml(xml: String): Document =
+        DocumentBuilderFactory
+            .newInstance()
+            .apply { isNamespaceAware = true }
+            .newDocumentBuilder()
+            .parse(InputSource(StringReader(xml)))
+
+    private fun Element.child(name: String): Element =
+        assertNotNull(getElementsByTagNameNS(OPENSEARCH_NS, name).item(0) as Element?, "missing $name")
+
+    private companion object {
+        const val OPENSEARCH_NS = "http://a9.com/-/spec/opensearch/1.1/"
+    }
 }

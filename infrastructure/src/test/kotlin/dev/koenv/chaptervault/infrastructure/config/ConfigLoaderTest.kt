@@ -122,6 +122,27 @@ class ConfigLoaderTest {
     }
 
     @Test
+    fun `public url is unset by default and read from yaml or the env var`(
+        @TempDir dir: Path,
+    ) {
+        assertEquals(null, ConfigLoader.load("nonexistent.yaml", env = { null }).server.publicUrl)
+        val file = dir.resolve("application.yaml").toFile()
+        file.writeText("server:\n  publicUrl: \"https://manga.example.com\"")
+        assertEquals("https://manga.example.com", ConfigLoader.load(file.absolutePath, env = { null }).server.publicUrl)
+        val fromEnv =
+            ConfigLoader.load(file.absolutePath, env = {
+                if (it ==
+                    "CHAPTERVAULT_PUBLIC_URL"
+                ) {
+                    "https://other.example.com"
+                } else {
+                    null
+                }
+            })
+        assertEquals("https://other.example.com", fromEnv.server.publicUrl)
+    }
+
+    @Test
     fun `finished tasks are kept for 30 days by default and the env var overrides it`() {
         assertEquals(30, ConfigLoader.load("nonexistent.yaml", env = { null }).tasks.retentionDays)
         val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_TASK_RETENTION_DAYS") "7" else null })

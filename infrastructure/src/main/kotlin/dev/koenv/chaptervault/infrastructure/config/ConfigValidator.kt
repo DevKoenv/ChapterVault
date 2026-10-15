@@ -1,5 +1,7 @@
 package dev.koenv.chaptervault.infrastructure.config
 
+import java.net.URI
+
 private val MANGADEX_CONTENT_RATINGS = setOf("safe", "suggestive", "erotica", "pornographic")
 
 internal fun AppConfig.validate() {
@@ -7,6 +9,9 @@ internal fun AppConfig.validate() {
 
     if (server.port !in 1..65535) errors += "server.port must be in 1..65535 (got ${server.port})"
     if (server.host.isBlank()) errors += "server.host must not be blank"
+    server.publicUrl?.takeUnless { isOrigin(it) }?.let {
+        errors += "server.publicUrl must be an http or https address without a path, such as https://manga.example.com (got '$it')"
+    }
 
     if (database.url.isBlank()) errors += "database.url must not be blank"
 
@@ -33,4 +38,15 @@ internal fun AppConfig.validate() {
     if (errors.isNotEmpty()) {
         error("Invalid configuration:\n" + errors.joinToString("\n") { "  - $it" })
     }
+}
+
+// the OPDS links are built as <publicUrl>/opds/v1/..., so a path, query or credentials in it would end up in every link
+private fun isOrigin(url: String): Boolean {
+    val uri = runCatching { URI(url) }.getOrNull() ?: return false
+    return uri.scheme?.lowercase() in setOf("http", "https") &&
+        !uri.host.isNullOrEmpty() &&
+        uri.rawUserInfo == null &&
+        uri.rawPath.orEmpty() in setOf("", "/") &&
+        uri.rawQuery == null &&
+        uri.rawFragment == null
 }

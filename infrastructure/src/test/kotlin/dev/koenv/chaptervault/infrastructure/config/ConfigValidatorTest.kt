@@ -57,6 +57,26 @@ class ConfigValidatorTest {
     }
 
     @Test
+    fun `a public url must be an absolute http or https address without a path`() {
+        listOf(
+            "manga.example.com",
+            "ftp://manga.example.com",
+            "https://",
+            "https://manga.example.com/opds",
+            "https://manga.example.com/?a=1",
+            "https://manga.example.com/#top",
+            "https://user@manga.example.com",
+            "not a url",
+        ).forEach { url ->
+            val ex = assertFailsWith<IllegalStateException>(url) { valid.copy(server = valid.server.copy(publicUrl = url)).validate() }
+            assertContains(ex.message!!, "server.publicUrl")
+        }
+        listOf("https://manga.example.com", "http://192.168.1.10:18080/", "https://[::1]:8443").forEach {
+            valid.copy(server = valid.server.copy(publicUrl = it)).validate()
+        }
+    }
+
+    @Test
     fun `multiple errors reported together`() {
         val ex =
             assertFailsWith<IllegalStateException> {
