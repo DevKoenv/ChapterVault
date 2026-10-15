@@ -185,9 +185,17 @@ not allowed: `403`.
 | `MANAGE_USERS` | yes | | | users and roles |
 | `MANAGE_EXTENSIONS` | yes | | | extensions |
 | `MANAGE_NOTIFICATIONS` | yes | | | notification targets |
-| `MANAGE_SERVER` | yes | | | update information |
+| `MANAGE_SERVER` | yes | | | update information, storage usage |
 
 Paths below are relative to `/api/v1` unless they start with `/health` or `/opds`.
+
+**Versioning.** ChapterVault follows [Semantic Versioning](https://semver.org). Within 1.x, `/api/v1` only grows: new
+routes, new optional parameters, new response fields and new enum values can appear, but nothing is removed, renamed or
+given a different meaning. Clients should ignore fields they do not know and handle enum values they do not know (a new
+task type, for example). A breaking change means a new prefix (`/api/v2`), announced in the CHANGELOG at least one minor
+release before `/api/v1` is removed. The same applies to the backup format (its `version` field) and to the extension
+SDK (an extension states the oldest server it needs in `minServerVersion`). The OPDS feeds follow OPDS 1.2. The
+OpenAPI document at `/swagger` is checked against the routes the server serves in the test suite.
 
 ### Auth
 
