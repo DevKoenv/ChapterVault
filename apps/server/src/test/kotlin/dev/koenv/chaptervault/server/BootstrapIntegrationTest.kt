@@ -18,6 +18,14 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.server.application.Application
+import io.ktor.server.application.plugin
+import io.ktor.server.routing.HttpMethodRouteSelector
+import io.ktor.server.routing.PathSegmentConstantRouteSelector
+import io.ktor.server.routing.PathSegmentParameterRouteSelector
+import io.ktor.server.routing.RoutingNode
+import io.ktor.server.routing.RoutingRoot
+import io.ktor.server.routing.getAllRoutes
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -144,6 +152,83 @@ class BootstrapIntegrationTest {
 
             assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
         }
+
+    @Test
+    fun `the routes the server serves are exactly the routes the OpenAPI document describes`() {
+        lateinit var served: Set<String>
+        testApplication {
+            lateinit var app: Application
+            application {
+                bootstrap()
+                app = this
+            }
+            startApplication()
+            served =
+                app
+                    .plugin(RoutingRoot)
+                    .getAllRoutes()
+                    .mapNotNull { it.methodAndPath() }
+                    .filterNot { it.substringAfter(' ').startsWith("/swagger") } // the UI itself, not part of the API
+                    .toSet()
+        }
+        val documented = documentedRoutes()
+        // guards against both sides being empty, which would make the comparison pass trivially
+        for (route in listOf("GET /health", "POST /api/v1/auth/login", "DELETE /api/v1/users/{id}", "GET /opds/v1/search.xml")) {
+            assertTrue(route in served, "$route is not among the ${served.size} served routes")
+            assertTrue(route in documented, "$route is not among the ${documented.size} documented routes")
+        }
+
+        assertEquals(emptySet(), documented - served, "documented in openapi/documentation.yaml but not served")
+        assertEquals(emptySet(), served - documented, "served but missing from openapi/documentation.yaml")
+    }
+
+    // "GET /api/v1/users/{id}" for a route that ends in a method; authentication and other non-path selectors are skipped
+    private fun RoutingNode.methodAndPath(): String? {
+        val method = (selector as? HttpMethodRouteSelector)?.method?.value ?: return null
+        val segments =
+            generateSequence(parent) { it.parent }.toList().asReversed().mapNotNull { node ->
+                when (val s = node.selector) {
+                    is PathSegmentConstantRouteSelector -> s.value
+                    is PathSegmentParameterRouteSelector -> "{${s.name}}"
+                    else -> null
+                }
+            }
+        return "$method /${segments.joinToString("/")}"
+    }
+
+    // the paths section: a path item with its own `servers:` is served from the root, all others under /api/v1
+    private fun documentedRoutes(): Set<String> {
+        val lines =
+            checkNotNull(javaClass.getResourceAsStream("/openapi/documentation.yaml")) { "openapi/documentation.yaml is missing" }
+                .use { it.readBytes().decodeToString() }
+                .lines()
+        val start = lines.indexOf("paths:")
+        val end = (start + 1 until lines.size).firstOrNull { lines[it].isNotBlank() && !lines[it].startsWith(" ") } ?: lines.size
+        val routes = mutableSetOf<String>()
+        var path: String? = null
+        var fromRoot = false
+        val methods = mutableListOf<String>()
+
+        fun flush() {
+            path?.let { p -> methods.forEach { routes += "$it ${if (fromRoot) p else "/api/v1$p"}" } }
+            methods.clear()
+            fromRoot = false
+        }
+        for (line in lines.subList(start + 1, end)) {
+            val pathItem = Regex("""^ {2}(/\S*):\s*$""").matchEntire(line)
+            val operation = Regex("""^ {4}(get|post|put|patch|delete):\s*$""").matchEntire(line)
+            when {
+                pathItem != null -> {
+                    flush()
+                    path = pathItem.groupValues[1]
+                }
+                line.trimEnd() == "    servers:" -> fromRoot = true
+                operation != null -> methods += operation.groupValues[1].uppercase()
+            }
+        }
+        flush()
+        return routes
+    }
 
     @Test
     fun `responses carry the security headers`() =
