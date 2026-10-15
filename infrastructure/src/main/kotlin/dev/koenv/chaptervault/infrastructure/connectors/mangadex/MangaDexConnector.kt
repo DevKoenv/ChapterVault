@@ -16,6 +16,7 @@ import dev.koenv.chaptervault.kernel.connector.ChapterMetadata
 import dev.koenv.chaptervault.kernel.connector.DownloadPage
 import dev.koenv.chaptervault.kernel.connector.DownloadResult
 import dev.koenv.chaptervault.kernel.connector.HttpConnector
+import dev.koenv.chaptervault.kernel.connector.QueryParams
 import dev.koenv.chaptervault.kernel.connector.SeriesMetadata
 import dev.koenv.chaptervault.kernel.connector.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.connector.getJson
@@ -46,11 +47,9 @@ private val lenientJson = Json { ignoreUnknownKeys = true }
 
 class MangaDexConnector(
     private val httpClient: HttpClient,
-    contentRatings: List<String> = listOf("safe", "suggestive"),
+    private val contentRatings: List<String> = listOf("safe", "suggestive"),
     private val tokenLifetimeMs: Long = TOKEN_LIFETIME_MS,
-) : HttpConnector(httpClient) {
-    private val ratingParams = contentRatings.joinToString("") { "&contentRating[]=${it.lowercase()}" }
-
+) : HttpConnector(httpClient, baseUrl = API_URL) {
     override val id = "mangadex"
     override val name = "MangaDex"
 
@@ -169,16 +168,16 @@ class MangaDexConnector(
         query: String,
         request: PageRequest,
     ): Result<Pagination<SeriesSearchResult>> {
-        val url = "$API_URL/manga?includes[]=cover_art$ratingParams"
         // GET /manga allows at most 100 per request (limit maximum in MangaDex's api.yaml); the page size reported back is the real one
         val size = minOf(request.size, MAX_SEARCH_PAGE_SIZE)
         val params =
-            buildMap<String, String> {
-                put("limit", size.toString())
-                put("offset", (request.page * size).toString())
-                if (query.isNotBlank()) put("title", query)
-            }
-        return when (val r = context.getJson<MangaDexSearchResponse>(url, params = params)) {
+            QueryParams.of(
+                "includes" to listOf("cover_art"),
+                "contentRating" to contentRatings.map { it.lowercase() },
+                "limit" to size,
+                "offset" to request.page * size,
+            ) + if (query.isNotBlank()) mapOf("title" to query) else emptyMap()
+        return when (val r = context.getJson<MangaDexSearchResponse>("/manga", params = params)) {
             is Result.Failure -> r
             is Result.Success ->
                 Result.Success(
@@ -193,8 +192,9 @@ class MangaDexConnector(
     }
 
     override suspend fun fetchSeries(externalId: String): Result<SeriesMetadata> {
-        val url = "$API_URL/manga/${externalId.encodeURLPathPart()}?includes[]=cover_art&includes[]=author&includes[]=artist"
-        return when (val r = context.getJson<MangaDexMangaResponse>(url)) {
+        val url = "/manga/${externalId.encodeURLPathPart()}"
+        val params = QueryParams.of("includes" to listOf("cover_art", "author", "artist"))
+        return when (val r = context.getJson<MangaDexMangaResponse>(url, params = params)) {
             is Result.Failure -> r
             is Result.Success -> {
                 val data =
@@ -214,16 +214,16 @@ class MangaDexConnector(
         var offset = 0
 
         while (true) {
-            val url =
-                buildString {
-                    append("$API_URL/manga/${externalId.encodeURLPathPart()}/feed")
-                    append("?translatedLanguage[]=$lang")
-                    append("&order[chapter]=asc")
-                    append("&includes[]=scanlation_group")
-                    append("&limit=500")
-                    append("&offset=$offset")
-                }
-            when (val r = context.getJson<MangaDexChapterListResponse>(url)) {
+            val url = "/manga/${externalId.encodeURLPathPart()}/feed"
+            val params =
+                QueryParams.of(
+                    "translatedLanguage" to listOf(lang),
+                    "order" to mapOf("chapter" to "asc"),
+                    "includes" to listOf("scanlation_group"),
+                    "limit" to 500,
+                    "offset" to offset,
+                )
+            when (val r = context.getJson<MangaDexChapterListResponse>(url, params = params)) {
                 is Result.Failure -> return r
                 is Result.Success -> {
                     val page = r.value
@@ -293,7 +293,7 @@ class MangaDexConnector(
             when (
                 val r =
                     context.getJson<MangaDexAtHomeResponse>(
-                        "$API_URL/at-home/server/${chapterId.encodeURLPathPart()}",
+                        "/at-home/server/${chapterId.encodeURLPathPart()}",
                         bucket = AT_HOME,
                     )
             ) {

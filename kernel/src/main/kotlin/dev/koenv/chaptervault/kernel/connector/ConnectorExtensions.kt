@@ -12,7 +12,7 @@ internal val lenientJson = Json { ignoreUnknownKeys = true }
 
 suspend inline fun <reified T> ConnectorContext.getJson(
     url: String,
-    params: Map<String, String> = emptyMap(),
+    params: QueryParams = QueryParams.of(),
     bucket: BucketKey = Bucket.API,
     headers: Map<String, String> = emptyMap(),
 ): Result<T> {
@@ -30,7 +30,7 @@ suspend inline fun <reified T> ConnectorContext.getJson(
 
 suspend fun ConnectorContext.getDocument(
     url: String,
-    params: Map<String, String> = emptyMap(),
+    params: QueryParams = QueryParams.of(),
     bucket: BucketKey = Bucket.API,
     headers: Map<String, String> = emptyMap(),
 ): Result<Document> {

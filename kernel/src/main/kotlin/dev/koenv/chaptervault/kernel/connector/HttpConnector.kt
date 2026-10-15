@@ -6,6 +6,8 @@ import io.ktor.client.HttpClient
 
 abstract class HttpConnector(
     private val httpClient: HttpClient,
+    /** Base URL that relative endpoints passed to [context] are resolved against. Absolute URLs bypass it. */
+    private val baseUrl: String? = null,
 ) : Connector {
     abstract val bucketConfigs: Map<BucketKey, BucketConfig>
 
@@ -14,7 +16,7 @@ abstract class HttpConnector(
     }
 
     protected val context: ConnectorContext by lazy {
-        DefaultConnectorContext(httpClient, buckets)
+        DefaultConnectorContext(httpClient, buckets, baseUrl = baseUrl)
     }
 
     override suspend fun fetchPage(page: DownloadPage): Result<ByteArray> =

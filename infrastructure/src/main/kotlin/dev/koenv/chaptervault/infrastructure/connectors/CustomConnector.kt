@@ -7,6 +7,7 @@ import dev.koenv.chaptervault.kernel.connector.ChapterMetadata
 import dev.koenv.chaptervault.kernel.connector.DownloadPage
 import dev.koenv.chaptervault.kernel.connector.DownloadResult
 import dev.koenv.chaptervault.kernel.connector.HttpConnector
+import dev.koenv.chaptervault.kernel.connector.QueryParams
 import dev.koenv.chaptervault.kernel.connector.SeriesMetadata
 import dev.koenv.chaptervault.kernel.connector.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.connector.getJson
@@ -58,8 +59,8 @@ private data class ApiChapterPages(
 class CustomConnector(
     httpClient: HttpClient,
     // TODO: replace with your site's base URL
-    private val baseUrl: String = "https://your-site.example.com",
-) : HttpConnector(httpClient) {
+    baseUrl: String = "https://your-site.example.com",
+) : HttpConnector(httpClient, baseUrl = baseUrl) {
     // TODO: change id and name to match your site
     override val id: String = "custom"
     override val name: String = "Custom Connector"
@@ -77,12 +78,12 @@ class CustomConnector(
         // TODO: adjust endpoint path and params for your search API
         val response =
             context.getJson<ApiSearchResponse>(
-                url = "$baseUrl/api/search",
+                url = "/api/search",
                 params =
-                    mapOf(
+                    QueryParams.of(
                         "q" to query,
-                        "page" to request.page.toString(),
-                        "limit" to request.size.toString(),
+                        "page" to request.page,
+                        "limit" to request.size,
                     ),
             )
         return when (response) {
@@ -105,7 +106,7 @@ class CustomConnector(
         // TODO: adjust endpoint path
         val response =
             context.getJson<ApiSeriesDetail>(
-                url = "$baseUrl/api/series/$externalId",
+                url = "/api/series/$externalId",
             )
         return when (response) {
             is Result.Failure -> response
@@ -120,7 +121,7 @@ class CustomConnector(
         // TODO: adjust endpoint path
         val response =
             context.getJson<List<ApiChapterItem>>(
-                url = "$baseUrl/api/series/$externalId/chapters",
+                url = "/api/series/$externalId/chapters",
             )
         return when (response) {
             is Result.Failure -> response
@@ -138,7 +139,7 @@ class CustomConnector(
                 ?: return Result.Failure(AppError.InternalError("Cannot download chapter ${chapter.id}: no external ID"))
         val response =
             context.getJson<ApiChapterPages>(
-                url = "$baseUrl/api/chapters/$chapterExternalId/pages",
+                url = "/api/chapters/$chapterExternalId/pages",
                 bucket = Bucket.CDN,
             )
         return when (response) {

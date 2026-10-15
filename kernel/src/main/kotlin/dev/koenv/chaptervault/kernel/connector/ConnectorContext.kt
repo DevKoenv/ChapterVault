@@ -4,9 +4,13 @@ import dev.koenv.chaptervault.shared.result.Result
 import io.ktor.client.statement.HttpResponse
 
 interface ConnectorContext {
+    /**
+     * [url] is either absolute (passed through unchanged) or relative, resolved against the
+     * connector's own base URL.
+     */
     suspend fun get(
         url: String,
-        params: Map<String, String> = emptyMap(),
+        params: QueryParams = QueryParams.of(),
         bucket: BucketKey = Bucket.API,
         headers: Map<String, String> = emptyMap(),
     ): Result<HttpResponse>
