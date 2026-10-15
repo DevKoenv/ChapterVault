@@ -1162,6 +1162,54 @@ paths:
             application/atom+xml:
               schema: { type: string }
 
+  /opds/v1/search.xml:
+    servers:
+      - url: http://localhost:8080
+    get:
+      tags: [opds]
+      summary: OpenSearch 1.1 description document (OPDS 1.2 section 3)
+      description: |
+        Every OPDS feed links here with `rel="search"` and type `application/opensearchdescription+xml`. The one `Url`
+        element has type `application/atom+xml;profile=opds-catalog;kind=acquisition` and the absolute template
+        `<base>/opds/v1/search?q={searchTerms}`, where `<base>` is `server.publicUrl` or, when that is unset, the scheme
+        and host of this request.
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: OpenSearch description document
+          content:
+            application/opensearchdescription+xml:
+              schema: { type: string }
+
+  /opds/v1/search:
+    servers:
+      - url: http://localhost:8080
+    get:
+      tags: [opds]
+      summary: OPDS v1 search results (series whose title contains the search terms)
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: q
+          required: true
+          description: Search terms; matched against series titles like `GET /library/series/search`
+          schema: { type: string, minLength: 1 }
+        - in: query
+          name: page
+          schema: { type: integer, default: 0, minimum: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Atom XML acquisition feed; `next` and `previous` links keep `q`
+          content:
+            application/atom+xml:
+              schema: { type: string }
+        "400": { description: "`q` is missing or blank" }
+
   /opds/v1/history:
     servers:
       - url: http://localhost:8080

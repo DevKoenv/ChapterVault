@@ -58,6 +58,10 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
 - MangaDex: images loaded from a MangaDex@Home node are reported to MangaDex as its API documentation asks, a failed
   image makes the next download request a fresh at-home server, and at-home lookups are limited to 40 per minute.
 - A "Content sources" statement in the README and `docs/security.md`.
+- OPDS search (OPDS 1.2 section 3): every feed has a `search` link to an OpenSearch 1.1 description at
+  `/opds/v1/search.xml`, and `/opds/v1/search?q=` returns the matching series as an acquisition feed. The new
+  `server.publicUrl` (`CHAPTERVAULT_PUBLIC_URL`) sets the absolute address used in that description; set it behind a
+  reverse proxy that serves HTTPS.
 - A `HEALTHCHECK` in the image, a Docker build and smoke test in CI, and a module-graph check in `./gradlew check`.
 - Operations guide and security/trust model in `docs/`.
 

@@ -27,6 +27,7 @@ It is not a multi-tenant or hosted service.
 - **Extension system:** load third-party connectors and metadata enrichers at runtime from the extensions directory (extensions are trusted code, see [security](docs/security.md#extensions))
 - **Permission based access:** routes check permissions; roles (`ADMIN`, `USER`, `GUEST`) are bundles of them
 - **OPDS facets:** genre, language, and status navigation feeds for compatible OPDS clients
+- **OPDS search:** readers that support OpenSearch can search the library by title
 
 ---
 
@@ -84,6 +85,7 @@ Running without Docker: `./gradlew :apps:server:shadowJar`, then `java -jar apps
 | `CHAPTERVAULT_PORT` / `CHAPTERVAULT_HOST` | `8080` / `0.0.0.0` | Where the server listens |
 | `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED` | `false` | Allow anyone to create a USER account via `POST /api/v1/auth/register` |
 | `CHAPTERVAULT_CORS_ORIGINS` | _(none)_ | Comma separated browser origins that may call the API from another site |
+| `CHAPTERVAULT_PUBLIC_URL` | _(taken from each request)_ | Scheme and host readers use to reach the server, e.g. `https://manga.example.com`; set it behind a reverse proxy (see [OPDS](#opds)) |
 | `CHAPTERVAULT_LIBRARY_PATH` / `CHAPTERVAULT_THUMBNAILS_PATH` / `CHAPTERVAULT_DATABASE_URL` | under the data dir | Override where individual parts live |
 | `CHAPTERVAULT_REFRESH_HOURS` | `24` | Hours between automatic library refreshes, `0` disables |
 | `CHAPTERVAULT_TASK_RETENTION_DAYS` | `30` | Days to keep finished task records, `0` keeps them forever |
@@ -100,6 +102,9 @@ restart. Environment variables override it. A misspelled key or a value of the w
 startup instead of being ignored silently.
 
 ```yaml
+server:
+  # publicUrl: "https://manga.example.com"   # see OPDS; unset = taken from each request
+
 storage:
   defaultFormat: CBZ   # CBZ (default) or FOLDER
 
@@ -318,6 +323,13 @@ http://<your-server>:8080/opds/v1
 
 **Basic auth sends the password with every request.** Use `https://` through a reverse proxy whenever the server is
 reachable by anyone but you.
+
+**Search.** Every feed links to an OpenSearch description (`/opds/v1/search.xml`, as OPDS 1.2 section 3 describes);
+readers that support it show a search field. Results come from `/opds/v1/search?q=<terms>` and match series titles,
+like the REST search. OpenSearch needs an absolute address in that description. Without `server.publicUrl` the server
+uses the scheme and host of the request, so **behind a reverse proxy that serves HTTPS, set `server.publicUrl`**
+(or `CHAPTERVAULT_PUBLIC_URL`) to the address readers use, e.g. `https://manga.example.com`. Otherwise the search
+address says `http://`.
 
 Tested with: Panels (iOS).
 

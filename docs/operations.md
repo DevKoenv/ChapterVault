@@ -123,6 +123,15 @@ If the proxy runs in another container, use that container's network address (fo
 gateway such as `172.18.0.1/32` or the proxy's service address). Check the startup log: the warning about
 `trustedProxies` should be gone.
 
+Also set the address readers use, so the OPDS search description points at `https://` and not at the plain HTTP the
+proxy forwards:
+
+```yaml
+# config.yaml
+server:
+  publicUrl: "https://manga.example.com"   # scheme and host only, no path
+```
+
 If a separately hosted web UI on another origin calls the API from a browser, list its origin in
 `server.corsOrigins`. With nothing listed, browsers are not allowed to call the API from other sites (apps, OPDS readers
 and a UI served from the same origin are unaffected).
