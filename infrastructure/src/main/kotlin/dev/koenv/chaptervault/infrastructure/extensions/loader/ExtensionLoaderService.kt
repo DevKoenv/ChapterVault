@@ -190,6 +190,10 @@ class ExtensionLoaderService(
             )
             logger.info { "Extension '$canonicalId' enabled (source=$source)" }
         } catch (e: Throwable) {
+            // whatever it registered before failing must not stay behind
+            trackingConnectors.registeredIds.forEach { connectorRegistryDelegate.unregister(it) }
+            trackingEnrichers.registeredIds.forEach { enricherRegistryDelegate.unregister(it) }
+            trackingNotifications.registeredTypeIds.forEach { notificationRegistryDelegate.unregister(it) }
             extensionRegistry.updateStatus(canonicalId, ExtensionStatus.FAILED, e.message)
             logger.error { "Extension '$canonicalId' failed to enable: ${e.message}" }
         }

@@ -10,6 +10,8 @@ class TrackingConnectorRegistry(
     val registeredIds: List<String> get() = _registeredIds.toList()
 
     override fun register(connector: Connector) {
+        // an extension may not replace a connector that is already there, a built-in one above all
+        check(delegate.findById(connector.id) == null) { "A connector with id '${connector.id}' is already registered" }
         delegate.register(connector)
         _registeredIds.add(connector.id)
     }

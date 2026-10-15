@@ -10,6 +10,7 @@ class TrackingNotificationRegistry(
     val registeredTypeIds: List<String> get() = _registeredTypeIds.toList()
 
     override fun register(channel: NotificationChannel) {
+        check(delegate.find(channel.typeId) == null) { "A notification channel of type '${channel.typeId}' is already registered" }
         delegate.register(channel)
         _registeredTypeIds.add(channel.typeId)
     }

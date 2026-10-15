@@ -13,6 +13,7 @@ class TrackingEnricherRegistry(
         enricher: MetadataEnricher,
         priority: Int,
     ) {
+        check(delegate.all().none { it.id == enricher.id }) { "A metadata enricher with id '${enricher.id}' is already registered" }
         delegate.register(enricher, priority)
         _registeredIds.add(enricher.id)
     }

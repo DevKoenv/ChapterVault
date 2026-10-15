@@ -65,6 +65,11 @@ class ExternalExtensionLoader(
             classLoader.close()
             logger.warn { "Skipping ${manifest.id}: failed to instantiate entry point -- ${e.message}" }
             null
+        } catch (e: LinkageError) {
+            // a class built for a newer Java, a missing dependency or a failing static initializer: this JAR is unusable, the server is not
+            classLoader.close()
+            logger.warn { "Skipping ${manifest.id}: the JAR cannot be loaded -- ${e::class.simpleName}: ${e.message}" }
+            null
         }
     }
 
