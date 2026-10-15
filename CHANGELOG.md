@@ -66,6 +66,8 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
   and the filters `readingStatus`, `genre`, `language` and `upstreamStatus`, which combine. Titles are now sorted
   ignoring case. The OPDS catalog has working sort facets (OPDS 1.2 section 4) that keep the active filters, and the
   "Library Updates" entry uses the `http://opds-spec.org/sort/new` relation.
+- `GET /tasks` takes the filters `status`, `type` and `targetId` (for example `?status=FAILED`); tasks created at the
+  same moment are ordered by id, so pages are stable.
 - A `HEALTHCHECK` in the image, a Docker build and smoke test in CI, and a module-graph check in `./gradlew check`.
 - Operations guide and security/trust model in `docs/`.
 

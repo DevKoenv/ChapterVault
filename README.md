@@ -252,12 +252,14 @@ Passwords: at least 8 characters, at most 72 bytes. Usernames are compared ignor
 
 | Method | Path | Permission | Description |
 |--------|------|-----------|-------------|
-| `GET` | `/tasks` | `VIEW_TASKS` | List background tasks |
+| `GET` | `/tasks` | `VIEW_TASKS` | List background tasks, newest first; filters `status`, `type`, `targetId` |
 | `GET` | `/tasks/{id}` | `VIEW_TASKS` | Get a task by ID |
 | `POST` | `/tasks/{id}/cancel` | `TRIGGER_TASKS` | Cancel a task (a running task is stopped) |
 
 Tasks run up to three at a time, at most two per source, with a timeout per task. A failed task is retried up to three
-times (after 30 s, 2 min, 10 min); the wait survives a restart.
+times (after 30 s, 2 min, 10 min); the wait survives a restart. To find what still failed after that, use
+`GET /api/v1/tasks?status=FAILED`; to try again, start the work again with `POST /library/chapters/{id}/download`,
+`POST /library/series/{id}/download` (every available or failed chapter) or `POST /library/series/{id}/refresh`.
 
 ### Events
 

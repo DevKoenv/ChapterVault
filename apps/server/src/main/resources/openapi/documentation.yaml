@@ -1004,7 +1004,11 @@ paths:
   /tasks:
     get:
       tags: [tasks]
-      summary: List background tasks
+      summary: List background tasks, newest first
+      description: |
+        Filters combine with AND. To retry a failed task, start the work again: `POST /library/chapters/{id}/download`
+        (one chapter), `POST /library/series/{id}/download` (all available and failed chapters of a series) or
+        `POST /library/series/{id}/refresh` (metadata and chapter list).
       parameters:
         - in: query
           name: page
@@ -1012,11 +1016,24 @@ paths:
         - in: query
           name: size
           schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+        - in: query
+          name: status
+          schema: { type: string, enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED] }
+          description: Case-insensitive; any other value is rejected with 400
+        - in: query
+          name: type
+          schema: { type: string, enum: [DOWNLOAD_CHAPTER, FETCH_SERIES_METADATA, FETCH_CHAPTERS] }
+          description: Case-insensitive; any other value is rejected with 400
+        - in: query
+          name: targetId
+          schema: { type: string, format: uuid }
+          description: The chapter or series the task works on
       responses:
         "200":
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PaginatedTaskResponse" }
+        "400": { description: Invalid status, type or targetId value }
 
   /tasks/{id}:
     get:
