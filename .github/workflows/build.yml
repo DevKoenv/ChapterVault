@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Build the image
-        run: docker build -t chaptervault:ci .
+        run: docker build --build-arg REVISION="$(git rev-parse --short HEAD)" -t chaptervault:ci .
 
       - name: Run the container and check it
         run: |

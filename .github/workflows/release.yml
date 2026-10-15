@@ -66,6 +66,7 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "REVISION=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           { echo 'TAGS<<EOF'; echo "$TAGS"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
 
       - name: Build shadow JAR
@@ -94,4 +95,7 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            REVISION=${{ steps.version.outputs.REVISION }}
+            VERSION=${{ steps.version.outputs.VERSION }}
           tags: ${{ steps.version.outputs.TAGS }}

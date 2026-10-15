@@ -4,9 +4,11 @@ WORKDIR /build
 
 COPY . .
 
-# .git is not in the build context; pass the revision with --build-arg REVISION=$(git rev-parse --short HEAD)
+# .git is not in the build context, so the revision and (for a release) the version come in as build arguments:
+#   docker build --build-arg REVISION=$(git rev-parse --short HEAD) --build-arg VERSION=1.0.0-rc1 .
 ARG REVISION=unknown
-RUN ./gradlew :apps:server:shadowJar --no-daemon -q -Prevision="$REVISION"
+ARG VERSION=
+RUN ./gradlew :apps:server:shadowJar --no-daemon -q -Prevision="$REVISION" ${VERSION:+-PreleaseVersion="$VERSION"}
 
 FROM eclipse-temurin:21-jre-alpine
 
