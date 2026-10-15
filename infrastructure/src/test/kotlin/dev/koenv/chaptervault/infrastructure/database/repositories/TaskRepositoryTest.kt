@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
+import dev.koenv.chaptervault.kernel.runtime.TaskQuery
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -186,21 +187,51 @@ class TaskRepositoryTest {
     }
 
     @Test
-    fun `listByStatus returns only tasks with matching status`() {
+    fun `listTasks filters on status, type and target and combines them`() =
         runBlocking {
-            repo.insert(buildTask(status = TaskStatus.PENDING))
-            repo.insert(buildTask(status = TaskStatus.PENDING))
-            val runningTask = buildTask(status = TaskStatus.RUNNING)
-            repo.insert(runningTask)
+            val target = Id.generate()
+            val failedDownload = buildTask(TaskStatus.FAILED).copy(targetId = target)
+            val failedRefresh = buildTask(TaskStatus.FAILED).copy(type = TaskType.FETCH_CHAPTERS, targetType = TargetType.SERIES)
+            val pendingDownload = buildTask(TaskStatus.PENDING).copy(targetId = target)
+            listOf(failedDownload, failedRefresh, pendingDownload).forEach { repo.insert(it) }
 
-            val result = repo.listByStatus(TaskStatus.PENDING, PageRequest(page = 0, size = 20))
-            val page = assertIs<Result.Success<*>>(result).value as dev.koenv.chaptervault.shared.paging.Pagination<*>
-            assertEquals(2, page.items.size)
-            assertEquals(2L, page.totalItems)
+            suspend fun ids(query: TaskQuery) =
+                (repo.listTasks(query, PageRequest(0, 50)) as Result.Success)
+                    .value.items
+                    .map { it.id }
+                    .toSet()
 
-            val resultRunning = repo.listByStatus(TaskStatus.RUNNING, PageRequest(page = 0, size = 20))
-            val pageRunning = assertIs<Result.Success<*>>(resultRunning).value as dev.koenv.chaptervault.shared.paging.Pagination<*>
-            assertEquals(1, pageRunning.items.size)
+            assertEquals(setOf(failedDownload.id, failedRefresh.id), ids(TaskQuery(status = TaskStatus.FAILED)))
+            assertEquals(setOf(failedRefresh.id), ids(TaskQuery(type = TaskType.FETCH_CHAPTERS)))
+            assertEquals(setOf(failedDownload.id, pendingDownload.id), ids(TaskQuery(targetId = target)))
+            val combined =
+                (
+                    repo.listTasks(
+                        TaskQuery(status = TaskStatus.FAILED, targetId = target),
+                        PageRequest(0, 50),
+                    ) as Result.Success
+                ).value
+            assertEquals(listOf(failedDownload.id), combined.items.map { it.id })
+            assertEquals(1L, combined.totalItems)
         }
-    }
+
+    @Test
+    fun `tasks created at the same moment keep a stable order across pages`() =
+        runBlocking {
+            val moment = Instant.parse("2026-10-15T12:00:00Z")
+            repeat(5) { repo.insert(buildTask().copy(createdAt = moment, updatedAt = moment)) }
+
+            val ids =
+                (0..2).flatMap {
+                    (
+                        repo.listTasks(
+                            TaskQuery(),
+                            PageRequest(it, 2),
+                        ) as Result.Success
+                    ).value.items.map { t -> t.id.toString() }
+                }
+
+            assertEquals(5, ids.toSet().size)
+            assertEquals(ids.sorted(), ids)
+        }
 }

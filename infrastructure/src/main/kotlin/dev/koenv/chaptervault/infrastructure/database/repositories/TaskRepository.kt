@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.infrastructure.database.repositories
 import dev.koenv.chaptervault.infrastructure.database.entities.TaskTable
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
+import dev.koenv.chaptervault.kernel.runtime.TaskQuery
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
 import dev.koenv.chaptervault.kernel.runtime.TaskType
@@ -16,8 +17,10 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.Transaction
@@ -99,34 +102,21 @@ class TaskRepository : TaskReadStore {
             Result.Success(row.toTask())
         }
 
-    override suspend fun listTasks(request: PageRequest): Result<Pagination<Task>> =
-        dbQuery {
-            val total = TaskTable.selectAll().count()
-            val items =
-                TaskTable
-                    .selectAll()
-                    .orderBy(TaskTable.createdAt, SortOrder.DESC)
-                    .limit(request.size)
-                    .offset((request.page.toLong() * request.size))
-                    .map { it.toTask() }
-            Result.Success(Pagination(items, request.page, request.size, total))
-        }
-
-    suspend fun listByStatus(
-        status: TaskStatus,
+    override suspend fun listTasks(
+        query: TaskQuery,
         request: PageRequest,
     ): Result<Pagination<Task>> =
         dbQuery {
-            val total =
-                TaskTable
-                    .selectAll()
-                    .where { TaskTable.status eq status.name }
-                    .count()
+            var condition: Op<Boolean> = Op.TRUE
+            query.status?.let { condition = condition and (TaskTable.status eq it.name) }
+            query.type?.let { condition = condition and (TaskTable.type eq it.name) }
+            query.targetId?.let { condition = condition and (TaskTable.targetId eq it.toString()) }
+            val total = TaskTable.selectAll().where { condition }.count()
             val items =
                 TaskTable
                     .selectAll()
-                    .where { TaskTable.status eq status.name }
-                    .orderBy(TaskTable.createdAt, SortOrder.DESC)
+                    .where { condition }
+                    .orderBy(TaskTable.createdAt to SortOrder.DESC, TaskTable.id to SortOrder.ASC)
                     .limit(request.size)
                     .offset((request.page.toLong() * request.size))
                     .map { it.toTask() }

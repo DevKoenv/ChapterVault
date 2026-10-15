@@ -13,6 +13,7 @@ import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TargetType
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskEvents
+import dev.koenv.chaptervault.kernel.runtime.TaskQuery
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
 import dev.koenv.chaptervault.kernel.runtime.TaskStatus
@@ -58,8 +59,10 @@ private class CapturingEventBus : EventBus {
 private class FakeTaskReadStore(
     private val tasks: List<Task> = emptyList(),
 ) : TaskReadStore {
-    override suspend fun listTasks(request: PageRequest): Result<Pagination<Task>> =
-        Result.Success(Pagination(tasks, request.page, request.size, tasks.size.toLong()))
+    override suspend fun listTasks(
+        query: TaskQuery,
+        request: PageRequest,
+    ): Result<Pagination<Task>> = Result.Success(Pagination(tasks, request.page, request.size, tasks.size.toLong()))
 
     override suspend fun findTask(id: Id): Result<Task> =
         tasks

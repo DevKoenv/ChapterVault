@@ -2,13 +2,19 @@ package dev.koenv.chaptervault.kernel.api
 
 import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
 import dev.koenv.chaptervault.kernel.runtime.Task
+import dev.koenv.chaptervault.kernel.runtime.TaskQuery
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.paging.Pagination
 import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 
 interface SystemApi {
-    suspend fun listTasks(request: PageRequest): Result<Pagination<Task>>
+    suspend fun listTasks(
+        query: TaskQuery,
+        request: PageRequest,
+    ): Result<Pagination<Task>>
+
+    suspend fun listTasks(request: PageRequest): Result<Pagination<Task>> = listTasks(TaskQuery(), request)
 
     suspend fun getTask(id: Id): Result<Task>
 

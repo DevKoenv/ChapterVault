@@ -6,6 +6,7 @@ import dev.koenv.chaptervault.kernel.extension.ExtensionEntry
 import dev.koenv.chaptervault.kernel.extension.ExtensionRegistry
 import dev.koenv.chaptervault.kernel.runtime.Task
 import dev.koenv.chaptervault.kernel.runtime.TaskEvents
+import dev.koenv.chaptervault.kernel.runtime.TaskQuery
 import dev.koenv.chaptervault.kernel.runtime.TaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TaskReadStore
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -20,7 +21,10 @@ class SystemApiImpl(
     private val taskReadStore: TaskReadStore,
     private val eventBus: EventBus,
 ) : SystemApi {
-    override suspend fun listTasks(request: PageRequest): Result<Pagination<Task>> = taskReadStore.listTasks(request)
+    override suspend fun listTasks(
+        query: TaskQuery,
+        request: PageRequest,
+    ): Result<Pagination<Task>> = taskReadStore.listTasks(query, request)
 
     override suspend fun getTask(id: Id): Result<Task> = taskReadStore.findTask(id)
 
