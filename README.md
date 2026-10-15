@@ -59,7 +59,7 @@ log**, between two lines of `=` characters:
 ```
 
 Log in with it and change it. To choose the password yourself, set `CHAPTERVAULT_ADMIN_PASS` before the first start
-(at least 8 characters, and not `changeme`). Nothing is created again on later starts, even if you delete the account.
+(at least 8 characters). Nothing is created again on later starts, even if you delete the account.
 
 ```bash
 curl http://localhost:8080/health
@@ -79,7 +79,7 @@ Running without Docker: `./gradlew :apps:server:shadowJar`, then `java -jar apps
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CHAPTERVAULT_ADMIN_USER` | `admin` | Username of the first administrator (only used on an empty install) |
-| `CHAPTERVAULT_ADMIN_PASS` | _generated and printed once_ | Password of the first administrator; at least 8 characters, not `changeme` |
+| `CHAPTERVAULT_ADMIN_PASS` | _generated and printed once_ | Password of the first administrator; at least 8 characters |
 | `CHAPTERVAULT_DATA_DIR` | `data` | Root directory for the database, library files, thumbnails, extensions and config |
 | `CHAPTERVAULT_PORT` / `CHAPTERVAULT_HOST` | `8080` / `0.0.0.0` | Where the server listens |
 | `CHAPTERVAULT_AUTH_REGISTRATION_ENABLED` | `false` | Allow anyone to create a USER account via `POST /api/v1/auth/register` |

@@ -25,8 +25,7 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
   `PATCH /library/series/{id}`; fields you set are kept across refreshes until listed in `clearFields`. Backups no longer
   contain overrides.
 - **No more default administrator password.** The first administrator is created only on an empty install, with a
-  generated password printed once in the log (or `CHAPTERVAULT_ADMIN_PASS`; `changeme` and passwords under 8 characters are
-  refused). A deleted `admin` account is no longer re-created at every start.
+  generated password printed once in the log (or `CHAPTERVAULT_ADMIN_PASS`, at least 8 characters). A deleted `admin` account is no longer re-created at every start.
 - Passwords must be 8 to 72 bytes; usernames are compared ignoring case.
 - `GET /notifications` no longer returns the token, only `hasToken`. Notification URLs must be http(s) and not point at the
   server itself unless `notifications.allowLocalTargets` is set.

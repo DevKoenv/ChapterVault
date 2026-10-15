@@ -45,7 +45,7 @@ logging in, stop the server, delete the data directory (nothing else exists yet)
 `CHAPTERVAULT_ADMIN_PASS` first.
 
 The administrator is only created when there are no users at all. Deleting the account later does not bring it back.
-On an empty install, `CHAPTERVAULT_ADMIN_PASS=changeme` (or anything shorter than 8 characters) stops the server from
+On an empty install, a `CHAPTERVAULT_ADMIN_PASS` shorter than 8 characters stops the server from
 starting, with a message saying why. Once users exist the variable is not used any more.
 
 ## Data layout

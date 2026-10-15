@@ -26,7 +26,7 @@ Everything else needs a bearer token (REST) or Basic credentials (OPDS).
 ## Accounts and permissions
 
 - The first administrator is created only on an empty install. Its password is random and shown once, or taken from
-  `CHAPTERVAULT_ADMIN_PASS`; `changeme` and anything under 8 characters are refused.
+  `CHAPTERVAULT_ADMIN_PASS`, which must be at least 8 characters.
 - Registration is **off** by default. Turn it on only if strangers should be able to create accounts.
 - Passwords are stored as BCrypt hashes. New passwords must be 8 to 72 bytes (BCrypt ignores anything after 72).
 - Bearer tokens are random and only a SHA-256 hash is stored, so a copy of the database or a backup does not contain

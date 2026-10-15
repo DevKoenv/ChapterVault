@@ -12,7 +12,6 @@ private val logger = KotlinLogging.logger {}
 
 private const val GENERATED_PASSWORD_LENGTH = 24
 private const val PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
-private const val DEFAULT_PASSWORD = "changeme"
 private val secureRandom = SecureRandom()
 
 /** A random password without look-alike characters (0/O, 1/l/I), so it can be typed from a log line. */
@@ -40,9 +39,6 @@ internal class AdminBootstrap(
         val username = env("CHAPTERVAULT_ADMIN_USER")?.takeIf { it.isNotBlank() } ?: "admin"
         val configured = env("CHAPTERVAULT_ADMIN_PASS")
         if (configured != null) {
-            check(!configured.equals(DEFAULT_PASSWORD, ignoreCase = true)) {
-                "CHAPTERVAULT_ADMIN_PASS must not be '$DEFAULT_PASSWORD'. Choose another password or unset it to get a generated one."
-            }
             PasswordPolicy.violation(configured)?.let { error("CHAPTERVAULT_ADMIN_PASS is not acceptable: $it") }
         }
         val password = configured ?: generateAdminPassword()

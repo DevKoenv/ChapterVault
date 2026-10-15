@@ -79,14 +79,6 @@ class AdminBootstrapTest {
         }
 
     @Test
-    fun `the default password changeme is refused and nothing is created`() {
-        assertFailsWith<IllegalStateException> {
-            runBlocking { bootstrap(mapOf("CHAPTERVAULT_ADMIN_PASS" to "changeme")).run() }
-        }
-        assertEquals(emptyList(), usernames())
-    }
-
-    @Test
     fun `a password that breaks the policy is refused and nothing is created`() {
         assertFailsWith<IllegalStateException> {
             runBlocking { bootstrap(mapOf("CHAPTERVAULT_ADMIN_PASS" to "short")).run() }

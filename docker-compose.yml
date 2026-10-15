@@ -13,7 +13,7 @@ services:
     environment:
       - JAVA_OPTS=-Xmx512m
       # The first start prints a generated administrator password in the log (docker compose logs chaptervault).
-      # To choose it yourself, set it before the first start; it must not be "changeme".
+      # To choose it yourself, set it before the first start (at least 8 characters).
       # - CHAPTERVAULT_ADMIN_PASS=
     restart: unless-stopped
     stop_grace_period: 30s
