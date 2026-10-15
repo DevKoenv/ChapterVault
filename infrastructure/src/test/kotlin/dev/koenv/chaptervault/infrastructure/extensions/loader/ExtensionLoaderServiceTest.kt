@@ -321,6 +321,61 @@ class ExtensionLoaderServiceTest {
         assertNotNull(entry.errorMessage)
     }
 
+    private fun extensionRegistering(
+        connectorId: String,
+        thenFail: Boolean,
+    ) = object : Extension {
+        override val id = "registering-ext"
+        override val name = "Registering"
+        override val version = "1.0.0"
+
+        override fun capabilities() = setOf(Capability.CanFetchSeries)
+
+        override fun onEnable(ctx: ExtensionContext) {
+            ctx.connectorRegistry.register(fakeConnector(connectorId))
+            if (thenFail) error("fails after registering")
+        }
+
+        override fun onDisable() {}
+    }
+
+    @Test
+    fun `an extension that fails while enabling leaves nothing registered`() {
+        val connRegistry = simpleRegistry()
+        val extRegistry = DefaultExtensionRegistry()
+        val (svc, _) =
+            makeService(
+                bundled = listOf(extensionRegistering("leaky", thenFail = true)),
+                connRegistry = connRegistry,
+                extRegistry = extRegistry,
+            )
+
+        svc.loadAll()
+
+        assertEquals(ExtensionStatus.FAILED, extRegistry.findById("registering-ext")!!.status)
+        assertNull(connRegistry.findById("leaky"), "the connector of the failed extension must not stay registered")
+    }
+
+    @Test
+    fun `an extension cannot take over the id of a connector that is already registered`() {
+        val builtIn = fakeConnector("mangadex")
+        val connRegistry = simpleRegistry().also { it.register(builtIn) }
+        val extRegistry = DefaultExtensionRegistry()
+        val (svc, _) =
+            makeService(
+                bundled = listOf(extensionRegistering("mangadex", thenFail = false)),
+                connRegistry = connRegistry,
+                extRegistry = extRegistry,
+            )
+
+        svc.loadAll()
+
+        assertEquals(ExtensionStatus.FAILED, extRegistry.findById("registering-ext")!!.status)
+        assertTrue(connRegistry.findById("mangadex") === builtIn, "the built-in connector must stay")
+        svc.disable("registering-ext")
+        assertTrue(connRegistry.findById("mangadex") === builtIn, "disabling the extension must not remove the built-in connector")
+    }
+
     @Test
     fun `extracted config yml is readable by extension on first enable`() {
         ConfigReadingTestExtension.capturedBaseUrl = null // reset before test

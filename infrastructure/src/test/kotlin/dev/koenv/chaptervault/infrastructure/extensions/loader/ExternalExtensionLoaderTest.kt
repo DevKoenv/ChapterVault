@@ -171,6 +171,52 @@ class ExternalExtensionLoaderTest {
     }
 
     @Test
+    fun `a JAR with a class file built for a newer Java is skipped and the others still load`() {
+        val manifest =
+            """
+            id: "future"
+            name: "Future"
+            version: "1.0.0"
+            minServerVersion: "1.0.0"
+            description: "Test"
+            author: "Test"
+            capabilities:
+              - connector
+            entryPoint: "future.FutureExtension"
+            """.trimIndent()
+        val future = buildJar(manifest, fileName = "a-future.jar")
+        // a class file starts with CAFEBABE, the minor version and the major version; 99 is a Java that does not exist yet
+        val header = byteArrayOf(0xCA.toByte(), 0xFE.toByte(), 0xBA.toByte(), 0xBE.toByte(), 0, 0, 0, 99)
+        JarOutputStream(Files.newOutputStream(future)).use { jos ->
+            jos.putNextEntry(JarEntry("extension.yaml"))
+            jos.write(manifest.toByteArray())
+            jos.closeEntry()
+            jos.putNextEntry(JarEntry("future/FutureExtension.class"))
+            jos.write(header)
+            jos.closeEntry()
+        }
+        buildJar(
+            """
+            id: "test-extension"
+            name: "Test Extension"
+            version: "1.0.0"
+            minServerVersion: "1.0.0"
+            description: "Test"
+            author: "Test"
+            capabilities:
+              - connector
+            entryPoint: "dev.koenv.chaptervault.infrastructure.extensions.loader.TestExtension"
+            """.trimIndent(),
+            TestExtension::class.java,
+            fileName = "b-good.jar",
+        )
+
+        val results = makeLoader().loadAll()
+
+        assertEquals(listOf("test-extension"), results.map { it.manifest.id })
+    }
+
+    @Test
     fun `ignores non-jar files in directory`() {
         Files.writeString(tempDir.resolve("readme.txt"), "not a jar")
         val results = makeLoader().loadAll()
