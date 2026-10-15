@@ -354,6 +354,7 @@ MangaDex. Extensions are third-party code that runs with full server privileges,
 
 - [Operations guide](docs/operations.md): install, reverse proxy and TLS, data layout, upgrades, backup and restore, troubleshooting, uninstall
 - [Security and trust model](docs/security.md): who can do what, what is public by design, extensions, hardening checklist
+- [Writing an extension](docs/extensions.md): manifest, entry point, the sample extension, what the server enforces
 - [Architecture notes](docs/architecture/kernel.md)
 
 ---
