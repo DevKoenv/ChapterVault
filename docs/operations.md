@@ -193,9 +193,12 @@ skipped and counted in the answer.
 
 ## Stopping
 
-`docker compose stop` (or SIGTERM) shuts the server down; tasks that were running are put back in the queue at the next
-start. Do not `kill -9` it while it writes if you can avoid it, although the database and downloads are crash-safe
-(downloads are written to a temporary file first).
+`docker compose stop` (or SIGTERM) shuts the server down, usually within a few seconds; tasks that were running are put
+back in the queue at the next start, and a chapter whose download was interrupted stays queued instead of failed. The
+compose file gives the server 30 s (`stop_grace_period`). With plain `docker run`, pass `--stop-timeout 30`: the default
+can be shorter than the shutdown needs (on Docker Desktop for Windows it was 1 s, after which Docker kills the process).
+Do not `kill -9` it while it writes if you can avoid it, although the database and downloads are crash-safe (downloads
+are written to a temporary file first).
 
 ## Troubleshooting
 

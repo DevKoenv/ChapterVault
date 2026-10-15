@@ -97,6 +97,9 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
 - Removing a series answered 500 when its files could not be deleted, although the series was already gone from the
   database. It now succeeds and logs a warning; leftover files go to `library/.trash/` at the next start.
 - Nine tests never ran because their body was not `Unit` (JUnit skips test methods that return a value); they now run.
+- Cancelling a download left its chapter `FAILED` (while running) or `PENDING` for good (while queued); it now goes back
+  to `AVAILABLE`, or `DOWNLOADED` when a re-download was cancelled. A download interrupted by stopping the server leaves
+  the chapter `PENDING` instead of `FAILED`; the task resumes at the next start as before.
 - Deleting a user who had logged in returned 500.
 - A sole administrator could demote or delete themselves, leaving no administrator.
 - A password change did not revoke other sessions, and OPDS (Basic) access with a deleted, demoted or re-passworded
