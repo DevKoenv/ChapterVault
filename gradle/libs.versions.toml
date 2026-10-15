@@ -20,6 +20,7 @@ shadow = "9.6.1"
 buildconfig = "5.3.5"
 kotlin-logging = "7.0.14"
 xmlutil = "0.90.5"
+flyway = "12.9.0"
 
 [libraries]
 # Ktor server
@@ -54,6 +55,8 @@ exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "e
 exposed-kotlin-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", version.ref = "exposed" }
 
 # Database
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-sqlite = { module = "org.flywaydb:flyway-database-nc-sqlite", version.ref = "flyway" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 
 # Kotlin extensions

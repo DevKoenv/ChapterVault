@@ -134,9 +134,12 @@ and a UI served from the same origin are unaffected).
   server, restore that file as `chaptervault.db` (delete the `-wal` and `-shm` files next to it) and start the previous
   version. Migrations run in one transaction, so a failed migration leaves the database as it was.
 - **Downgrades are not supported.** Going back means restoring the `.pre-V<N>` copy.
-- Pre-release databases (from before 1.0.0 shipped) are not upgraded: the schema was reset for 1.0.0. If you see
-  `Migration V1 ... checksum mismatch`, that database predates 1.0.0; export your reading progress with
-  `GET /api/v1/backup/export`, start with an empty data directory, re-add your series and import the progress.
+- Migrations are applied with Flyway; its bookkeeping lives in the table `flyway_schema_history`. An edited, already applied
+  migration stops the server at startup with a Flyway validation error.
+- Pre-release databases (from before 1.0.0 shipped) are not upgraded: the schema was reset for 1.0.0. A database from the
+  latest pre-release build (only `V1` in its old `schema_version` table) is adopted as it is; an older one stops the server with
+  a message pointing here. In that case export your reading progress with `GET /api/v1/backup/export`, start with an empty
+  data directory, re-add your series and import the progress.
 - The server asks GitHub once a day for the latest release and logs a message when yours is older (see
   `GET /api/v1/system/updates`). Set `updates.checkEnabled: false` (or `CHAPTERVAULT_UPDATE_CHECK=false`) to stop that.
 
@@ -174,7 +177,7 @@ start. Do not `kill -9` it while it writes if you can avoid it, although the dat
 | Container exits with permission errors on `/app/data` | The data folder is not writable for uid 10001. Use the named volume or `chown 10001:10001` |
 | `Server startup aborted due to ... configuration error(s)` | The log lines above it say which path or value is wrong |
 | Log line `Unknown setting` / `must be a number` | A typo or wrong type in `config.yaml`; the default is used for that setting |
-| `Migration V1 ... checksum mismatch` | The database is from a pre-1.0.0 build, see Upgrading |
+| `This database was made by a pre-release build` / a Flyway validation error | The database is from an older pre-1.0.0 build or a migration file was edited, see Upgrading |
 | `/health` returns 503 | `database` or `executor` is `error` in the body. A busy download does not cause this; check the log |
 | Every OPDS request returns 401 | The reader sends no Basic credentials, or the account is not allowed to read. Use the same username and password as the API |
 | Login or OPDS suddenly returns 429 | Too many failed attempts from your address; wait for `Retry-After` seconds. Behind a proxy, check `trustedProxies` |

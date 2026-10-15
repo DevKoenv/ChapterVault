@@ -1,69 +1,63 @@
 package dev.koenv.chaptervault.infrastructure.database
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.IntegerColumnType
-import org.jetbrains.exposed.sql.TextColumnType
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.nio.file.Files
 import java.nio.file.Path
-import java.security.MessageDigest
 import java.sql.DriverManager
 
 private val logger = KotlinLogging.logger {}
 
-private const val MIGRATION_FOLDER = "db/migration"
-private val MIGRATION_FILE = Regex("^V(\\d+)__(.+)\\.sql$")
 private const val SQLITE_URL_PREFIX = "jdbc:sqlite:"
 
 /**
- * Applies the numbered `.sql` files in `resources/db/migration` (listed in `index.txt`) that the database has not seen.
+ * Applies the numbered `.sql` files in `resources/db/migration` that the database has not seen, with Flyway.
  *
- * Every applied migration's checksum is verified on startup, and all pending migrations run in one transaction, so a
- * failure leaves the schema as it was. Before changing an existing database it is copied to `<file>.pre-V<N>` with
- * `VACUUM INTO`, which also gives a consistent copy of a database in WAL mode.
+ * Flyway verifies the checksum of every applied migration on startup and refuses to run if one was edited. All pending
+ * migrations run in one transaction, so a failure leaves the schema as it was. Before changing an existing database it is
+ * copied to `<file>.pre-V<N>` with `VACUUM INTO`, which also gives a consistent copy of a database in WAL mode.
+ *
+ * A database made by a pre-release build (it has a `schema_version` table but no Flyway history) is adopted as version 1.
  */
 object DatabaseMigrations {
-    internal data class Migration(
-        val version: Int,
-        val name: String,
-        val statements: List<String>,
-    ) {
-        val checksum: String by lazy {
-            val digest = MessageDigest.getInstance("SHA-256")
-            statements.forEach { digest.update(it.toByteArray(Charsets.UTF_8)) }
-            digest.digest().joinToString("") { "%02x".format(it) }
-        }
-    }
+    private const val CLASSPATH_LOCATION = "classpath:db/migration"
+    private const val LEGACY_TABLE = "schema_version"
 
-    internal val migrations: List<Migration> by lazy { loadFromClasspath() }
-
-    fun migrate(db: Database) = migrate(db, migrations)
+    fun migrate(db: Database) = migrate(db, CLASSPATH_LOCATION)
 
     internal fun migrate(
         db: Database,
-        migrations: List<Migration>,
+        location: String,
     ) {
-        transaction(db) { runMigrations(migrations, backupSource(db.url)) }
-    }
-
-    private fun loadFromClasspath(): List<Migration> {
-        val loader = DatabaseMigrations::class.java.classLoader
-        val index =
-            loader.getResourceAsStream("$MIGRATION_FOLDER/index.txt")?.bufferedReader()?.readText()
-                ?: error("Missing $MIGRATION_FOLDER/index.txt")
-        val loaded =
-            index.lines().map { it.trim() }.filter { it.isNotEmpty() }.map { file ->
-                val match = MIGRATION_FILE.matchEntire(file) ?: error("Migration file name '$file' must look like V1__name.sql")
-                val sql =
-                    loader.getResourceAsStream("$MIGRATION_FOLDER/$file")?.bufferedReader()?.readText()
-                        ?: error("Migration '$file' is listed in index.txt but missing")
-                Migration(match.groupValues[1].toInt(), match.groupValues[2], SqlScript.split(sql))
-            }
-        check(loaded.map { it.version } == (1..loaded.size).toList()) {
-            "Migration versions must be 1..${loaded.size} without gaps, in order: ${loaded.map { it.version }}"
+        val adoptLegacy = hasTable(db.url, LEGACY_TABLE) && !hasTable(db.url, "flyway_schema_history")
+        check(!adoptLegacy || legacyVersions(db.url) == listOf(1)) {
+            "This database was made by a pre-release build and cannot be upgraded in place. " +
+                "Export your reading progress and start with an empty data directory, see \"Upgrading\" in docs/operations.md."
         }
-        return loaded
+        val flyway =
+            Flyway
+                .configure()
+                .dataSource(db.url, null, null)
+                .locations(location)
+                .group(true)
+                .baselineOnMigrate(adoptLegacy)
+                .baselineVersion("1")
+                .initSql("PRAGMA foreign_keys = ON")
+                .load()
+
+        val info = flyway.info()
+        val pending = info.pending().toList()
+        // an adopted pre-release database already has V1; only what comes after it changes the data
+        val changing = if (adoptLegacy) pending.filter { it.version.version != "1" } else pending
+        val hasData = info.applied().isNotEmpty() || adoptLegacy
+        if (changing.isNotEmpty() && hasData) {
+            backupSource(db.url)?.let { backUp(it, changing.first().version.version) }
+        }
+        flyway.migrate()
+        // the database that was just migrated is the one this thread works with next (what transaction(db) used to do here)
+        TransactionManager.resetCurrent(TransactionManager.managerFor(db))
     }
 
     private class BackupSource(
@@ -81,7 +75,7 @@ object DatabaseMigrations {
 
     private fun backUp(
         source: BackupSource,
-        firstPendingVersion: Int,
+        firstPendingVersion: String,
     ) {
         val target = source.file.resolveSibling(source.file.fileName.toString() + ".pre-V$firstPendingVersion")
         Files.deleteIfExists(target)
@@ -91,59 +85,23 @@ object DatabaseMigrations {
         logger.info { "Copied the database to $target before upgrading" }
     }
 
-    private fun org.jetbrains.exposed.sql.Transaction.runMigrations(
-        migrations: List<Migration>,
-        backupSource: BackupSource?,
-    ) {
-        exec(
-            """
-            CREATE TABLE IF NOT EXISTS schema_version (
-                version INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                applied_at TEXT NOT NULL,
-                checksum TEXT
-            )
-            """.trimIndent(),
-        )
-
-        val applied: Map<Int, String?> =
-            exec(
-                "SELECT version, checksum FROM schema_version",
-            ) { rs ->
-                buildMap {
-                    while (rs.next()) put(rs.getInt("version"), rs.getString("checksum"))
+    private fun legacyVersions(url: String): List<Int> =
+        DriverManager.getConnection(url).use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT version FROM $LEGACY_TABLE ORDER BY version").use { rs ->
+                    buildList { while (rs.next()) add(rs.getInt(1)) }
                 }
-            } ?: emptyMap()
-
-        migrations.filter { it.version in applied }.forEach { migration ->
-            val stored = applied[migration.version]
-            if (stored != null && stored != migration.checksum) {
-                error(
-                    "Migration V${migration.version} ('${migration.name}') checksum mismatch: " +
-                        "stored=$stored computed=${migration.checksum}. " +
-                        "Never modify a migration after it has been applied.",
-                )
             }
         }
 
-        val pending = migrations.filter { it.version !in applied }
-        if (pending.isNotEmpty() && applied.isNotEmpty() && backupSource != null) {
-            // done through a second connection: VACUUM cannot run inside this transaction
-            backUp(backupSource, pending.first().version)
+    private fun hasTable(
+        url: String,
+        name: String,
+    ): Boolean =
+        DriverManager.getConnection(url).use { connection ->
+            connection.prepareStatement("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").use { statement ->
+                statement.setString(1, name)
+                statement.executeQuery().use { it.next() }
+            }
         }
-
-        pending.forEach { migration ->
-            logger.info { "Applying migration V${migration.version}: ${migration.name}" }
-            migration.statements.forEach { exec(it) }
-            exec(
-                "INSERT INTO schema_version (version, name, applied_at, checksum) VALUES (?, ?, datetime('now'), ?)",
-                listOf(
-                    IntegerColumnType() to migration.version,
-                    TextColumnType() to migration.name,
-                    TextColumnType() to migration.checksum,
-                ),
-            )
-            logger.info { "Migration V${migration.version} applied, checksum: ${migration.checksum}" }
-        }
-    }
 }

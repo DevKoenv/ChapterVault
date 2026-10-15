@@ -39,6 +39,8 @@ kover {
 }
 
 tasks.shadowJar {
+    // without INCLUDE, Gradle drops duplicate service files before mergeServiceFiles() sees them (Flyway finds no database plugin)
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
 }
 

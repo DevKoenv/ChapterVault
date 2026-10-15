@@ -9,6 +9,8 @@ dependencies {
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.bundles.exposed)
     implementation(libs.sqlite.jdbc)
+    implementation(libs.flyway.core)
+    implementation(libs.flyway.sqlite)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)

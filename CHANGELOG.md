@@ -15,9 +15,9 @@ Changes made after the first 1.0.0 feature set, before it ships. Anyone who ran 
 #### Breaking changes (compared with pre-release builds)
 
 - **The database schema was reset.** The two early migrations are now one `V1__initial_schema.sql`. A database created
-  by a pre-release build stops at startup with `Migration V1 ... checksum mismatch`. Export your reading progress
+  by an older pre-release build stops at startup with a message pointing to the upgrade notes. Export your reading progress
   (`GET /api/v1/backup/export`), start with an empty data directory, re-add your series and import the progress.
-  Migrations are plain `.sql` files in `infrastructure/src/main/resources/db/migration`.
+  Migrations are plain `.sql` files in `infrastructure/src/main/resources/db/migration`, applied with Flyway.
 - **All REST endpoints live under `/api/v1`** (`/health`, the OPDS feeds and `/swagger` are unprefixed). The OpenAPI
   document's server URL reflects this.
 - `POST /auth/logout` is now `DELETE /auth/logout`; `PUT /library/series/{id}/status` is now `PATCH`.

@@ -1,5 +1,6 @@
 package dev.koenv.chaptervault.infrastructure.database
 
+import org.flywaydb.core.api.FlywayException
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -17,19 +18,24 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MigrationUpgradeTest {
-    private val v1 = DatabaseMigrations.Migration(1, "first", listOf("CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT NOT NULL)"))
+    private val v1 = "V1__first.sql" to "CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT NOT NULL);"
     private val v2 =
-        DatabaseMigrations.Migration(
-            2,
-            "add_tags",
-            listOf("CREATE TABLE tags (id INTEGER PRIMARY KEY)", "ALTER TABLE notes ADD COLUMN tag TEXT"),
-        )
+        "V2__add_tags.sql" to
+            "CREATE TABLE tags (id INTEGER PRIMARY KEY);\nALTER TABLE notes ADD COLUMN tag TEXT;"
     private val brokenV2 =
-        DatabaseMigrations.Migration(
-            2,
-            "broken",
-            listOf("CREATE TABLE tags (id INTEGER PRIMARY KEY)", "ALTER TABLE does_not_exist ADD COLUMN x TEXT"),
-        )
+        "V2__broken.sql" to
+            "CREATE TABLE tags (id INTEGER PRIMARY KEY);\nALTER TABLE does_not_exist ADD COLUMN x TEXT;"
+
+    /** A folder holding exactly the given migration files, in the form Flyway takes as a location. */
+    private fun migrations(
+        dir: Path,
+        vararg files: Pair<String, String>,
+    ): String {
+        val folder = Files.createDirectories(dir.resolve("migrations"))
+        folder.listDirectoryEntries().forEach { Files.delete(it) }
+        files.forEach { (name, sql) -> Files.writeString(folder.resolve(name), sql) }
+        return "filesystem:$folder"
+    }
 
     private fun open(dir: Path): Database = Database.connect("jdbc:sqlite:${dir.resolve("chaptervault.db")}", "org.sqlite.JDBC")
 
@@ -44,7 +50,7 @@ class MigrationUpgradeTest {
     fun `a fresh database is created without a backup`(
         @TempDir dir: Path,
     ) {
-        DatabaseMigrations.migrate(open(dir), listOf(v1))
+        DatabaseMigrations.migrate(open(dir), migrations(dir, v1))
 
         assertEquals(emptyList(), backups(dir))
     }
@@ -54,10 +60,10 @@ class MigrationUpgradeTest {
         @TempDir dir: Path,
     ) {
         val db = open(dir)
-        DatabaseMigrations.migrate(db, listOf(v1))
+        DatabaseMigrations.migrate(db, migrations(dir, v1))
         transaction(db) { exec("INSERT INTO notes (body) VALUES ('keep me')") }
 
-        DatabaseMigrations.migrate(db, listOf(v1, v2))
+        DatabaseMigrations.migrate(db, migrations(dir, v1, v2))
 
         assertEquals(listOf("chaptervault.db.pre-V2"), backups(dir))
         assertTrue("tags" in tables(db))
@@ -78,9 +84,9 @@ class MigrationUpgradeTest {
         @TempDir dir: Path,
     ) {
         val db = open(dir)
-        DatabaseMigrations.migrate(db, listOf(v1))
+        DatabaseMigrations.migrate(db, migrations(dir, v1))
 
-        DatabaseMigrations.migrate(db, listOf(v1))
+        DatabaseMigrations.migrate(db, migrations(dir, v1))
 
         assertEquals(emptyList(), backups(dir))
     }
@@ -90,16 +96,16 @@ class MigrationUpgradeTest {
         @TempDir dir: Path,
     ) {
         val db = open(dir)
-        DatabaseMigrations.migrate(db, listOf(v1))
+        DatabaseMigrations.migrate(db, migrations(dir, v1))
         transaction(db) { exec("INSERT INTO notes (body) VALUES ('keep me')") }
 
-        assertFailsWith<ExposedSQLException> { DatabaseMigrations.migrate(db, listOf(v1, brokenV2)) }
+        assertFailsWith<FlywayException> { DatabaseMigrations.migrate(db, migrations(dir, v1, brokenV2)) }
 
         assertFalse("tags" in tables(db), "the first statement of the failed migration must be rolled back")
         assertEquals(
             1,
             transaction(db) {
-                exec("SELECT COUNT(*) FROM schema_version") {
+                exec("SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1 AND version IS NOT NULL") {
                     it.next()
                     it.getInt(1)
                 }
@@ -108,22 +114,103 @@ class MigrationUpgradeTest {
         assertTrue(dir.resolve("chaptervault.db.pre-V2").exists())
 
         // fixing the migration and starting again works
-        DatabaseMigrations.migrate(db, listOf(v1, v2))
+        DatabaseMigrations.migrate(db, migrations(dir, v1, v2))
         assertTrue("tags" in tables(db))
     }
 
     @Test
-    fun `an in-memory database is migrated without trying to copy it`() {
+    fun `an in-memory database is migrated without trying to copy it`(
+        @TempDir dir: Path,
+    ) {
         val url = "jdbc:sqlite:file:mem-upgrade?mode=memory&cache=shared"
         // a shared in-memory database only exists while some connection to it is open
         DriverManager.getConnection(url).use {
             val db = Database.connect(url, "org.sqlite.JDBC")
-            DatabaseMigrations.migrate(db, listOf(v1))
+            DatabaseMigrations.migrate(db, migrations(dir, v1))
 
-            DatabaseMigrations.migrate(db, listOf(v1, v2))
+            DatabaseMigrations.migrate(db, migrations(dir, v1, v2))
 
             assertTrue("tags" in tables(db))
         }
+    }
+
+    @Test
+    fun `a trigger and a semicolon inside a string are plain SQL`(
+        @TempDir dir: Path,
+    ) {
+        val db = open(dir)
+        val sql =
+            "CREATE TABLE a (id INTEGER PRIMARY KEY, note TEXT);\n" +
+                "CREATE TABLE log (msg TEXT);\n" +
+                "CREATE TRIGGER a_ins AFTER INSERT ON a BEGIN INSERT INTO log VALUES ('added; ok'); END;"
+        DatabaseMigrations.migrate(db, migrations(dir, "V1__trigger.sql" to sql))
+
+        transaction(db) { exec("INSERT INTO a (note) VALUES ('x')") }
+
+        assertEquals(
+            "added; ok",
+            transaction(db) {
+                exec("SELECT msg FROM log") {
+                    it.next()
+                    it.getString(1)
+                }
+            },
+        )
+    }
+
+    @Test
+    fun `a database from a pre-release build is adopted as version 1 and upgraded with a backup`(
+        @TempDir dir: Path,
+    ) {
+        val db = open(dir)
+        // what the old migrator left behind: the V1 tables and its own bookkeeping table, no Flyway history
+        transaction(db) {
+            exec("CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT NOT NULL)")
+            exec("INSERT INTO notes (body) VALUES ('old data')")
+            exec("CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, checksum TEXT)")
+            exec("INSERT INTO schema_version VALUES (1, 'first', 'then', 'abc')")
+        }
+
+        DatabaseMigrations.migrate(db, migrations(dir, v1, v2))
+
+        assertTrue("tags" in tables(db))
+        assertEquals(listOf("chaptervault.db.pre-V2"), backups(dir))
+        assertEquals(
+            "old data",
+            transaction(db) {
+                exec("SELECT body FROM notes") {
+                    it.next()
+                    it.getString(1)
+                }
+            },
+        )
+    }
+
+    @Test
+    fun `a pre-release database that is not at the squashed V1 is refused with a pointer to the upgrade notes`(
+        @TempDir dir: Path,
+    ) {
+        val db = open(dir)
+        transaction(db) {
+            exec("CREATE TABLE notes (id INTEGER PRIMARY KEY)")
+            exec("CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, checksum TEXT)")
+            exec("INSERT INTO schema_version VALUES (1, 'old_first', 'then', 'abc')")
+            exec("INSERT INTO schema_version VALUES (2, 'old_second', 'then', 'def')")
+        }
+
+        val error = assertFailsWith<IllegalStateException> { DatabaseMigrations.migrate(db, migrations(dir, v1, v2)) }
+
+        assertTrue("Upgrading" in error.message.orEmpty(), error.message)
+    }
+
+    @Test
+    fun `a non-empty database without Flyway history or the old bookkeeping table is refused`(
+        @TempDir dir: Path,
+    ) {
+        val db = open(dir)
+        transaction(db) { exec("CREATE TABLE something_else (id INTEGER)") }
+
+        assertFailsWith<FlywayException> { DatabaseMigrations.migrate(db, migrations(dir, v1)) }
     }
 
     @Test
@@ -176,25 +263,5 @@ class MigrationUpgradeTest {
             }
         }
         transaction(db) { exec("SELECT run_after FROM tasks LIMIT 0") { } }
-    }
-
-    @Test
-    fun `every migration file is listed in the index in order`() {
-        val folder = Path.of(javaClass.classLoader.getResource("db/migration")!!.toURI())
-        val files =
-            Files.list(folder).use { s ->
-                s.map { it.fileName.toString() }.filter { Regex("V\\d+__.+\\.sql").matches(it) }.toList()
-            }
-        val sorted = files.sortedBy { Regex("V(\\d+)__").find(it)!!.groupValues[1].toInt() }
-
-        val listed =
-            javaClass.classLoader
-                .getResource("db/migration/index.txt")!!
-                .readText()
-                .lines()
-                .filter { it.isNotBlank() }
-
-        assertEquals(sorted, listed)
-        assertEquals((1..listed.size).toList(), DatabaseMigrations.migrations.map { it.version })
     }
 }

@@ -1,1 +1,0 @@
-V1__initial_schema.sql

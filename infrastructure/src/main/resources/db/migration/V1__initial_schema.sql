@@ -1,8 +1,8 @@
 -- ChapterVault initial schema (1.0.0).
 --
 -- Rules for this folder:
---   * one statement per `;`, no triggers and no `;` inside string literals (see SqlScript)
---   * never edit a migration after a release has shipped it; add the next VN__name.sql and list it in index.txt
+--   * Flyway runs these files; the name must be VN__description.sql with N counting up from 1 without gaps
+--   * never edit a migration after a release has shipped it; add the next VN__name.sql
 --   * the checksum of every applied migration is verified at startup
 
 CREATE TABLE users (
