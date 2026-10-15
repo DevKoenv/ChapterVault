@@ -63,6 +63,13 @@ class QueryParamsTest {
     }
 
     @Test
+    fun `toString renders a readable key-value string for logging`() {
+        val params = QueryParams.of("keyword" to "One Piece", "content_rating" to listOf("safe", "suggestive"))
+
+        assertEquals("keyword=One Piece&content_rating[]=safe&content_rating[]=suggestive", params.toString())
+    }
+
+    @Test
     fun `the full example from the connector spec flattens to the expected pairs`() {
         val sortField = "follows_total"
         val params =

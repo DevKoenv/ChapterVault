@@ -11,6 +11,9 @@ class QueryParams(
 
     fun toMap(): Map<String, Any?> = values
 
+    /** A readable, unencoded "key=value&..." rendering for logging; not what is sent on the wire. */
+    override fun toString(): String = flatten().joinToString("&") { (k, v) -> "$k=$v" }
+
     companion object {
         fun of(vararg entries: Pair<String, Any?>): QueryParams = QueryParams(mapOf(*entries))
     }
