@@ -143,6 +143,30 @@ class ConfigLoaderTest {
     }
 
     @Test
+    fun `downloads need 1024 MB free by default, set in yaml or the env var`(
+        @TempDir dir: Path,
+    ) {
+        assertEquals(1024, ConfigLoader.load("nonexistent.yaml", env = { null }).storage.minFreeMb)
+        val file = dir.resolve("application.yaml").toFile()
+        file.writeText("storage:\n  minFreeMb: 0")
+        assertEquals(0, ConfigLoader.load(file.absolutePath, env = { null }).storage.minFreeMb)
+        assertEquals(
+            2048,
+            ConfigLoader
+                .load(file.absolutePath, env = {
+                    if (it ==
+                        "CHAPTERVAULT_MIN_FREE_MB"
+                    ) {
+                        "2048"
+                    } else {
+                        null
+                    }
+                })
+                .storage.minFreeMb,
+        )
+    }
+
+    @Test
     fun `finished tasks are kept for 30 days by default and the env var overrides it`() {
         assertEquals(30, ConfigLoader.load("nonexistent.yaml", env = { null }).tasks.retentionDays)
         val config = ConfigLoader.load("nonexistent.yaml", env = { if (it == "CHAPTERVAULT_TASK_RETENTION_DAYS") "7" else null })

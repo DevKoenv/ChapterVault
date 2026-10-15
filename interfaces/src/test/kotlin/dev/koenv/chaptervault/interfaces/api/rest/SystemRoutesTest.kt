@@ -1,9 +1,12 @@
 package dev.koenv.chaptervault.interfaces.api.rest
 
+import dev.koenv.chaptervault.kernel.api.StorageApi
+import dev.koenv.chaptervault.kernel.api.StorageUsage
 import dev.koenv.chaptervault.kernel.api.UpdateInfo
 import dev.koenv.chaptervault.kernel.api.UpdateInfoApi
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
+import dev.koenv.chaptervault.shared.result.Result
 import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -28,6 +31,11 @@ class SystemRoutesTest {
             override fun getUpdateInfo() = UpdateInfo("1.0.0", "1.2.0", "https://example.org/release", true)
         }
 
+    private val storage =
+        object : StorageApi {
+            override suspend fun storageUsage() = Result.Success(StorageUsage(1500, 70, 123, 456, 1024))
+        }
+
     private fun testApp(block: suspend ApplicationTestBuilder.() -> Unit) =
         testApplication {
             application {
@@ -43,7 +51,7 @@ class SystemRoutesTest {
                         }
                     }
                 }
-                routing { authenticate("auth-bearer") { systemRoutes(updates) } }
+                routing { authenticate("auth-bearer") { systemRoutes(updates, storage) } }
             }
             block()
         }
@@ -65,6 +73,24 @@ class SystemRoutesTest {
     fun `GET system-updates is not for ordinary users`() =
         testApp {
             assertEquals(HttpStatusCode.Forbidden, client.get("/system/updates") { bearerAuth("user-token") }.status)
+        }
+
+    @Test
+    fun `GET system-storage reports library size and disk space to an admin`() =
+        testApp {
+            val response = client.get("/system/storage") { bearerAuth("admin-token") }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(
+                """{"libraryBytes":1500,"thumbnailsBytes":70,"freeBytes":123,"totalBytes":456,"minFreeBytes":1024}""",
+                response.bodyAsText(),
+            )
+        }
+
+    @Test
+    fun `GET system-storage is not for ordinary users`() =
+        testApp {
+            assertEquals(HttpStatusCode.Forbidden, client.get("/system/storage") { bearerAuth("user-token") }.status)
         }
 
     @Test

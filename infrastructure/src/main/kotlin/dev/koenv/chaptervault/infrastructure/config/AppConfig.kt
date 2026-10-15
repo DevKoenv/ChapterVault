@@ -67,6 +67,8 @@ data class StorageConfig(
     val libraryPath: String = "data/library",
     val thumbnailsPath: String = "data/thumbnails",
     val defaultFormat: ChapterFormat = ChapterFormat.Cbz,
+    // downloads stop while the library disk has less free space than this; 0 = no check
+    val minFreeMb: Int = 1024,
 )
 
 data class AuthConfig(

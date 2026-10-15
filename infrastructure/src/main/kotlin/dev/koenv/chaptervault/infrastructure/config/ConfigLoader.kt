@@ -179,6 +179,7 @@ object ConfigLoader {
             libraryPath = s.string("libraryPath", d.libraryPath),
             thumbnailsPath = s.string("thumbnailsPath", d.thumbnailsPath),
             defaultFormat = defaultFormat,
+            minFreeMb = s.int("minFreeMb", d.minFreeMb),
         ).also { s.finish() }
     }
 
@@ -275,6 +276,9 @@ object ConfigLoader {
           # CBZ    - single zip archive per chapter (default, space-efficient)
           # FOLDER - one image file per page inside a directory
           defaultFormat: CBZ
+          # Downloads stop (and are not retried) while the library disk has less free space than this, in MB.
+          # 0 turns the check off.
+          minFreeMb: 1024
 
         refresh:
           # Hours between automatic library refreshes. 0 to disable.
@@ -365,6 +369,7 @@ object ConfigLoader {
                 base.storage.copy(
                     libraryPath = env("CHAPTERVAULT_LIBRARY_PATH") ?: base.storage.libraryPath,
                     thumbnailsPath = env("CHAPTERVAULT_THUMBNAILS_PATH") ?: base.storage.thumbnailsPath,
+                    minFreeMb = int("CHAPTERVAULT_MIN_FREE_MB") ?: base.storage.minFreeMb,
                 ),
             refresh =
                 base.refresh.copy(

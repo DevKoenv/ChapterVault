@@ -15,6 +15,7 @@ suspend fun ApplicationCall.respondError(error: AppError) {
             is AppError.Unauthorized -> HttpStatusCode.Unauthorized to "UNAUTHORIZED"
             is AppError.Forbidden -> HttpStatusCode.Forbidden to "FORBIDDEN"
             is AppError.InternalError -> HttpStatusCode.InternalServerError to "INTERNAL_ERROR"
+            is AppError.InsufficientStorage -> HttpStatusCode.InsufficientStorage to "INSUFFICIENT_STORAGE"
         }
     respond(status, ErrorResponse(code, error.message))
 }

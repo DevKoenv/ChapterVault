@@ -77,6 +77,12 @@ class ConfigValidatorTest {
     }
 
     @Test
+    fun `a negative minimum free space fails`() {
+        val ex = assertFailsWith<IllegalStateException> { valid.copy(storage = valid.storage.copy(minFreeMb = -1)).validate() }
+        assertContains(ex.message!!, "storage.minFreeMb")
+    }
+
+    @Test
     fun `multiple errors reported together`() {
         val ex =
             assertFailsWith<IllegalStateException> {

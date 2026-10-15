@@ -10,7 +10,9 @@ import dev.koenv.chaptervault.infrastructure.database.repositories.TaskRepositor
 import dev.koenv.chaptervault.infrastructure.enricher.DefaultMetadataEnricherRegistry
 import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
 import dev.koenv.chaptervault.infrastructure.storage.CbzWriter
+import dev.koenv.chaptervault.infrastructure.storage.DiskSpace
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
+import dev.koenv.chaptervault.infrastructure.storage.JpegThumbnailFormat
 import dev.koenv.chaptervault.kernel.connector.Bucket
 import dev.koenv.chaptervault.kernel.connector.BucketConfig
 import dev.koenv.chaptervault.kernel.connector.BucketKey
@@ -22,6 +24,7 @@ import dev.koenv.chaptervault.kernel.connector.SeriesMetadata
 import dev.koenv.chaptervault.kernel.connector.SeriesSearchResult
 import dev.koenv.chaptervault.kernel.event.InMemoryEventBus
 import dev.koenv.chaptervault.kernel.library.Chapter
+import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.runtime.EventPublishingTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.InMemoryTaskQueue
 import dev.koenv.chaptervault.kernel.runtime.TargetType
@@ -275,6 +278,46 @@ class TaskExecutorConcurrencyTest {
             delay(500)
 
             assertEquals(emptyList(), taskRepository.listAllByStatus(TaskStatus.PENDING), "a permanent failure must not be retried")
+        }
+
+    @Test
+    fun `a download on a full disk fails without fetching pages and is not retried`() =
+        runBlocking<Unit> {
+            val asked = AtomicInteger(0)
+            registry.register(
+                ScriptedConnector("full") {
+                    asked.incrementAndGet()
+                    okDownload()
+                },
+            )
+            val fullDisk =
+                object : DiskSpace {
+                    override fun usableBytes(path: Path) = 10L * 1024 * 1024
+
+                    override fun totalBytes(path: Path) = 100L * 1024 * 1024
+                }
+            fileStorage =
+                FileStorage(
+                    dir.resolve("lib"),
+                    dir.resolve("thumbs"),
+                    ArchiveWriterSelector(listOf(CbzWriter())),
+                    JpegThumbnailFormat,
+                    1024L * 1024 * 1024,
+                    fullDisk,
+                )
+            val chapter = newChapter("a")
+            val task = downloadTask(chapter, "full")
+            val queue = newQueue()
+            run(executor(queue, fast))
+
+            queue.enqueue(task)
+            awaitStatus(task.id, TaskStatus.FAILED)
+            delay(500)
+
+            assertEquals(0, asked.get(), "nothing may be downloaded while the disk is full")
+            assertEquals(emptyList(), taskRepository.listAllByStatus(TaskStatus.PENDING), "a full disk must not be retried")
+            assertTrue("MB free" in (taskRepository.findById(task.id) as Result.Success).value.errorMessage.orEmpty())
+            assertEquals(DownloadStatus.FAILED, (chapterRepository.getChapter(chapter.id) as Result.Success).value.downloadStatus)
         }
 
     @Test

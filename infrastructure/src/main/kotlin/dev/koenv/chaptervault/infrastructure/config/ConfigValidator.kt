@@ -17,6 +17,7 @@ internal fun AppConfig.validate() {
 
     if (storage.libraryPath.isBlank()) errors += "storage.libraryPath must not be blank"
     if (storage.thumbnailsPath.isBlank()) errors += "storage.thumbnailsPath must not be blank"
+    if (storage.minFreeMb < 0) errors += "storage.minFreeMb must be >= 0 (got ${storage.minFreeMb})"
 
     val login = auth.rateLimiting.login
     if (login.maxAttempts < 1) errors += "auth.rateLimiting.login.maxAttempts must be >= 1 (got ${login.maxAttempts})"

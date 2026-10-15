@@ -89,6 +89,7 @@ val infrastructureModule =
                 thumbnailsPath = Paths.get(get<AppConfig>().storage.thumbnailsPath),
                 writerSelector = get(),
                 thumbnailFormat = JpegThumbnailFormat,
+                minFreeBytes = get<AppConfig>().storage.minFreeMb * 1024L * 1024L,
             )
         }
         single { UpdateCheckerService(get(), BuildConfig.VERSION) }

@@ -227,8 +227,12 @@ class TaskExecutorService(
                 taskRepository.updateStatus(task.id, TaskStatus.FAILED, result.error.message)
                 eventBus.publish(TaskEvents.TaskFailed(task.id, task.type, task.targetId, result.error.message, Instant.now()))
                 logger.error { "Task ${task.id} [${task.type}] failed: ${result.error.message}" }
-                // a missing or invalid target does not get better by waiting
-                if (result.error !is AppError.NotFound && result.error !is AppError.ValidationError) scheduleRetry(task)
+                // a missing or invalid target, or a full disk, does not get better by waiting
+                val permanent =
+                    result.error is AppError.NotFound ||
+                        result.error is AppError.ValidationError ||
+                        result.error is AppError.InsufficientStorage
+                if (!permanent) scheduleRetry(task)
             }
         }
         taskQueue.forget(task.id)
@@ -416,6 +420,13 @@ class TaskExecutorService(
                 is Result.Success -> r.value
                 is Result.Failure -> return r
             }
+
+        // checked before any page is fetched: downloading first would only use bandwidth and fail at the write
+        val room = fileStorage.checkFreeSpace()
+        if (room is Result.Failure) {
+            setChapterStatus(chapter, DownloadStatus.FAILED)
+            return room
+        }
 
         setChapterStatus(chapter, DownloadStatus.DOWNLOADING)
 

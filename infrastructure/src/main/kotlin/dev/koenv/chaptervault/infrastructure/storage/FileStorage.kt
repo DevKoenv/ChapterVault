@@ -1,12 +1,16 @@
 package dev.koenv.chaptervault.infrastructure.storage
 
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
+import dev.koenv.chaptervault.kernel.api.StorageApi
+import dev.koenv.chaptervault.kernel.api.StorageUsage
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.Page
 import dev.koenv.chaptervault.shared.format.ChapterFormat
 import dev.koenv.chaptervault.shared.result.AppError
 import dev.koenv.chaptervault.shared.result.Result
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.OutputStream
 import java.nio.file.Files
@@ -24,8 +28,41 @@ open class FileStorage(
     private val thumbnailsPath: Path,
     private val writerSelector: ArchiveWriterSelector,
     private val thumbnailFormat: ThumbnailFormat = JpegThumbnailFormat,
-) : ChapterPageSource {
+    private val minFreeBytes: Long = 0,
+    private val diskSpace: DiskSpace = SystemDiskSpace,
+) : ChapterPageSource,
+    StorageApi {
     private val logger = KotlinLogging.logger {}
+
+    /** Fails with [AppError.InsufficientStorage] when the library disk has less than `storage.minFreeMb` (plus [extraBytes]) free. */
+    fun checkFreeSpace(extraBytes: Long = 0): Result<Unit> {
+        val needed = minFreeBytes + extraBytes
+        if (needed <= 0) return Result.Success(Unit)
+        val free = diskSpace.usableBytes(libraryPath)
+        if (free >= needed) return Result.Success(Unit)
+        return Result.Failure(
+            AppError.InsufficientStorage("Only ${free / MB} MB free on the library disk, ${needed / MB} MB needed (storage.minFreeMb)"),
+        )
+    }
+
+    override suspend fun storageUsage(): Result<StorageUsage> =
+        withContext(Dispatchers.IO) {
+            Result.Success(
+                StorageUsage(
+                    libraryBytes = sizeOf(libraryPath),
+                    thumbnailsBytes = sizeOf(thumbnailsPath),
+                    freeBytes = diskSpace.usableBytes(libraryPath),
+                    totalBytes = diskSpace.totalBytes(libraryPath),
+                    minFreeBytes = minFreeBytes,
+                ),
+            )
+        }
+
+    // walks the folder on every call: one file per chapter for CBZ, one per page for FOLDER
+    private fun sizeOf(dir: Path): Long {
+        if (!Files.isDirectory(dir)) return 0
+        return Files.walk(dir).use { files -> files.filter { Files.isRegularFile(it) }.mapToLong { Files.size(it) }.sum() }
+    }
 
     fun ensureDirectories() {
         Files.createDirectories(libraryPath)
@@ -235,11 +272,17 @@ open class FileStorage(
     ): Result<Unit> {
         val base = resolvePath(seriesId, chapterId)
         val dest = if (format is ChapterFormat.Cbz) base.resolveSibling(base.fileName.toString() + ".cbz") else base
-        return try {
-            writerSelector.write(pages, dest, format)
-        } catch (e: Exception) {
-            Result.Failure(AppError.InternalError("writeChapter failed: ${e.message}", e))
-        }
+        val result =
+            try {
+                writerSelector.write(pages, dest, format)
+            } catch (e: Exception) {
+                Result.Failure(AppError.InternalError("writeChapter failed: ${e.message}", e))
+            }
+        if (result is Result.Success) return result
+        // the error text of a full disk differs per OS; asking the disk works everywhere
+        val chapterBytes = runCatching { pages.sumOf { it.data.size.toLong() } }.getOrDefault(0L)
+        val roomForChapter = checkFreeSpace(chapterBytes)
+        return if (roomForChapter is Result.Failure) roomForChapter else result
     }
 
     private fun readPagesFromFolder(dir: Path): Result<List<Page>> {
@@ -328,5 +371,6 @@ open class FileStorage(
     private companion object {
         const val TRASH_DIR = ".trash"
         const val INDEX_CACHE_SIZE = 64
+        const val MB = 1024L * 1024L
     }
 }

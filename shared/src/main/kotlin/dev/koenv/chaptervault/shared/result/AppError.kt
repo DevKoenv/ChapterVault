@@ -21,6 +21,11 @@ sealed class AppError(
         val cause: Throwable? = null,
     ) : AppError(message)
 
+    /** The disk is (nearly) full; retrying does not help until space is freed. */
+    data class InsufficientStorage(
+        override val message: String,
+    ) : AppError(message)
+
     data class Unauthorized(
         override val message: String = "Unauthorized",
     ) : AppError(message)

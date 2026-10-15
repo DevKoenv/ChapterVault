@@ -96,7 +96,7 @@ internal fun Application.configureRouting(
                 notificationRoutes(notificationApi, notificationDispatch)
                 extensionRoutes(extensionLoaderService)
                 sseRoutes(projectionService)
-                systemRoutes(updates)
+                systemRoutes(updates, fileStorage)
             }
         }
     }
