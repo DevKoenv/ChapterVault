@@ -4,6 +4,8 @@ import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
+import dev.koenv.chaptervault.kernel.api.SeriesSort
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.connector.Connector
@@ -269,7 +271,10 @@ class LibraryRoutesTest {
                 object : LibraryReadApi {
                     override suspend fun getSeries(id: Id) = Result.Failure(AppError.NotFound("Series", id.toString()))
 
-                    override suspend fun listSeries(request: PageRequest) = Result.Success(Pagination(listOf(fakeSeries), 0, 20, 1L))
+                    override suspend fun listSeries(
+                        query: SeriesQuery,
+                        request: PageRequest,
+                    ) = Result.Success(Pagination(listOf(fakeSeries), 0, 20, 1L))
 
                     override suspend fun searchLibrary(
                         query: String,
@@ -654,10 +659,10 @@ class LibraryRoutesTest {
         testApp(
             readApi =
                 object : NoOpReadApi() {
-                    override suspend fun searchLibrary(
-                        query: String,
+                    override suspend fun listSeries(
+                        query: SeriesQuery,
                         request: PageRequest,
-                    ) = Result.Success(Pagination(listOf(fakeSeries), 0, 20, 1L))
+                    ) = Result.Success(Pagination(if (query.titleContains == "One") listOf(fakeSeries) else emptyList(), 0, 20, 1L))
                 },
             commandApi = NoOpCommandApi(),
         ) {
@@ -1009,7 +1014,10 @@ class LibraryRoutesTest {
         testApp(
             readApi =
                 object : NoOpReadApi() {
-                    override suspend fun listSeries(request: PageRequest): Result.Success<Pagination<Series>> {
+                    override suspend fun listSeries(
+                        query: SeriesQuery,
+                        request: PageRequest,
+                    ): Result.Success<Pagination<Series>> {
                         seen = request
                         return Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
                     }
@@ -1071,6 +1079,80 @@ class LibraryRoutesTest {
         }
     }
 
+    private fun capturingReadApi(seen: MutableList<SeriesQuery>) =
+        object : NoOpReadApi() {
+            override suspend fun listSeries(
+                query: SeriesQuery,
+                request: PageRequest,
+            ): Result<Pagination<Series>> {
+                seen += query
+                return Result.Success(Pagination(listOf(fakeSeries), request.page, request.size, 1L))
+            }
+        }
+
+    @Test
+    fun `GET library series sorts by title by default and passes sort, order and filters on`() {
+        val seen = mutableListOf<SeriesQuery>()
+        testApp(readApi = capturingReadApi(seen), commandApi = NoOpCommandApi()) {
+            listOf(
+                "/library/series",
+                "/library/series?sort=added",
+                "/library/series?sort=ADDED&order=asc&genre=Action&language=ja&upstreamStatus=ongoing",
+            ).forEach { path -> assertEquals(HttpStatusCode.OK, client.get(path) { bearerAuth("user-token") }.status, path) }
+        }
+        assertEquals(
+            listOf(
+                SeriesQuery(),
+                SeriesQuery(sort = SeriesSort.ADDED, descending = true),
+                SeriesQuery(sort = SeriesSort.ADDED, descending = false, genre = "Action", language = "ja", upstreamStatus = "ONGOING"),
+            ),
+            seen,
+        )
+    }
+
+    @Test
+    fun `GET library series combines a reading status with the other filters`() {
+        val seen = mutableListOf<SeriesQuery>()
+        val reading = setOf(fakeSeries.id)
+        val statuses =
+            object : ReadingStatusApi by NoOpReadingStatusApi() {
+                override suspend fun getSeriesIdsWithStatus(
+                    userId: Id,
+                    status: ReadingStatus,
+                ): Set<Id> = if (status == ReadingStatus.READING) reading else emptySet()
+            }
+        testApp(readApi = capturingReadApi(seen), commandApi = NoOpCommandApi(), readingStatusApi = statuses) {
+            val response = client.get("/library/series?readingStatus=reading&genre=Action") { bearerAuth("user-token") }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(response.bodyAsText(), "\"readingStatus\":\"READING\"")
+        }
+        assertEquals(listOf(SeriesQuery(ids = reading, genre = "Action")), seen)
+    }
+
+    @Test
+    fun `GET library series search takes the same sort and filters`() {
+        val seen = mutableListOf<SeriesQuery>()
+        testApp(readApi = capturingReadApi(seen), commandApi = NoOpCommandApi()) {
+            val response = client.get("/library/series/search?q=One&sort=added&language=ja") { bearerAuth("user-token") }
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+        assertEquals(listOf(SeriesQuery(sort = SeriesSort.ADDED, titleContains = "One", language = "ja")), seen)
+    }
+
+    @Test
+    fun `GET library series rejects an unknown sort, order or upstream status`() {
+        testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
+            listOf("sort=popular", "order=up", "upstreamStatus=BOGUS").forEach { param ->
+                assertEquals(HttpStatusCode.BadRequest, client.get("/library/series?$param") { bearerAuth("user-token") }.status, param)
+                assertEquals(
+                    HttpStatusCode.BadRequest,
+                    client.get("/library/series/search?q=x&$param") { bearerAuth("user-token") }.status,
+                    param,
+                )
+            }
+        }
+    }
+
     @Test
     fun `a guest can browse the library but not change it`() {
         testApp(readApi = NoOpReadApi(), commandApi = NoOpCommandApi()) {
@@ -1097,6 +1179,11 @@ class LibraryRoutesTest {
 
 private open class NoOpReadApi : LibraryReadApi {
     override suspend fun getSeries(id: Id): Result<Series> = Result.Failure(AppError.NotFound("Series", id.toString()))
+
+    override suspend fun listSeries(
+        query: SeriesQuery,
+        request: PageRequest,
+    ): Result<Pagination<Series>> = Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
 
     override suspend fun listSeries(request: PageRequest) = Result.Success(Pagination(emptyList<Series>(), 0, 20, 0L))
 

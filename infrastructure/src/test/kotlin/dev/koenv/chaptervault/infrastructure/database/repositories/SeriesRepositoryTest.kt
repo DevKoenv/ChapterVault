@@ -8,6 +8,8 @@ import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgres
 import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
 import dev.koenv.chaptervault.infrastructure.storage.ArchiveWriterSelector
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
+import dev.koenv.chaptervault.kernel.api.SeriesSort
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.shared.paging.PageRequest
 import dev.koenv.chaptervault.shared.result.AppError
@@ -452,6 +454,105 @@ class SeriesRepositoryTest {
             val pages = pages { runBlocking { (repo.listSeriesByIds(ids, it) as Result.Success).value.items.map { s -> s.title } } }
 
             assertEquals(listOf(listOf("A", "B"), listOf("C", "D"), listOf("E")), pages)
+        }
+
+    private fun addSeries(
+        title: String,
+        addedAt: Instant = Instant.parse("2026-01-01T00:00:00Z"),
+        language: String = "en",
+        upstreamStatus: String? = null,
+        genres: List<String> = emptyList(),
+    ): Id {
+        val series = runBlocking { (repo.addToLibrary("mangadex", "ext-${Id.generate()}", autoDownload = false) as Result.Success).value }
+        transaction {
+            SeriesTable.update({ SeriesTable.id eq series.id.toString() }) {
+                it[SeriesTable.title] = title
+                it[SeriesTable.addedAt] = addedAt.toKotlinInstant()
+                it[SeriesTable.language] = language
+                it[SeriesTable.upstreamStatus] = upstreamStatus
+            }
+            genres.forEach { genre ->
+                SeriesGenresTable.insert {
+                    it[SeriesGenresTable.seriesId] = series.id.toString()
+                    it[SeriesGenresTable.genre] = genre
+                }
+            }
+        }
+        return series.id
+    }
+
+    private suspend fun titles(query: SeriesQuery): List<String> =
+        (repo.listSeries(query, PageRequest()) as Result.Success).value.items.map { it.title }
+
+    @Test
+    fun `titles are sorted without regard to case`() =
+        runBlocking {
+            listOf("banana", "Apple", "cherry", "Date").forEach { addSeries(it) }
+
+            assertEquals(listOf("Apple", "banana", "cherry", "Date"), titles(SeriesQuery()))
+            assertEquals(listOf("Date", "cherry", "banana", "Apple"), titles(SeriesQuery(descending = true)))
+        }
+
+    @Test
+    fun `sorting by date added puts the newest first unless ascending is asked for`() =
+        runBlocking {
+            val day = Instant.parse("2026-01-01T00:00:00Z")
+            addSeries("old", addedAt = day)
+            addSeries("new", addedAt = day.plusSeconds(7200))
+            addSeries("mid", addedAt = day.plusSeconds(3600))
+
+            assertEquals(listOf("new", "mid", "old"), titles(SeriesQuery(sort = SeriesSort.ADDED)))
+            assertEquals(listOf("old", "mid", "new"), titles(SeriesQuery(sort = SeriesSort.ADDED, descending = false)))
+        }
+
+    @Test
+    fun `pages sorted by date added stay stable when series were added at the same moment`() =
+        runBlocking {
+            repeat(5) { addSeries("same-$it") }
+
+            val ids =
+                (0..2).flatMap {
+                    (repo.listSeries(SeriesQuery(sort = SeriesSort.ADDED), PageRequest(it, 2)) as Result.Success).value.items.map { s ->
+                        s.id.toString()
+                    }
+                }
+
+            assertEquals(5, ids.toSet().size)
+            assertEquals(ids.sorted(), ids)
+        }
+
+    @Test
+    fun `genre, language and upstream status filters each match their series and combine`() =
+        runBlocking {
+            addSeries("match", language = "ja", upstreamStatus = "ONGOING", genres = listOf("Action", "Drama"))
+            addSeries("other genre", language = "ja", upstreamStatus = "ONGOING", genres = listOf("Romance"))
+            addSeries("other language", language = "en", upstreamStatus = "ONGOING", genres = listOf("Action"))
+            addSeries("other status", language = "ja", upstreamStatus = "COMPLETED", genres = listOf("Action"))
+
+            assertEquals(listOf("match", "other language", "other status"), titles(SeriesQuery(genre = "Action")))
+            assertEquals(listOf("match", "other genre", "other status"), titles(SeriesQuery(language = "ja")))
+            assertEquals(listOf("other status"), titles(SeriesQuery(upstreamStatus = "COMPLETED")))
+            val page =
+                (
+                    repo.listSeries(
+                        SeriesQuery(genre = "Action", language = "ja", upstreamStatus = "ONGOING"),
+                        PageRequest(),
+                    ) as Result.Success
+                ).value
+            assertEquals(listOf("match"), page.items.map { it.title })
+            assertEquals(1L, page.totalItems)
+        }
+
+    @Test
+    fun `ids and title filters combine with a genre`() =
+        runBlocking {
+            val alphaOne = addSeries("Alpha one", genres = listOf("Action", "Adventure"))
+            val alphaTwo = addSeries("Alpha two", genres = listOf("Romance"))
+            addSeries("Beta", genres = listOf("Action"))
+
+            assertEquals(listOf("Alpha one"), titles(SeriesQuery(ids = listOf(alphaOne, alphaTwo), genre = "Action")))
+            assertEquals(listOf("Alpha one"), titles(SeriesQuery(titleContains = "alpha", genre = "Action")))
+            assertEquals(emptyList(), titles(SeriesQuery(ids = emptyList())))
         }
 
     @Test

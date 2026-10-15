@@ -4,6 +4,8 @@ import dev.koenv.chaptervault.kernel.api.ChapterWithSeries
 import dev.koenv.chaptervault.kernel.api.GenreCount
 import dev.koenv.chaptervault.kernel.api.LanguageCount
 import dev.koenv.chaptervault.kernel.api.RecentlyReadEntry
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
+import dev.koenv.chaptervault.kernel.api.SeriesSort
 import dev.koenv.chaptervault.kernel.api.StatusCount
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
@@ -39,7 +41,8 @@ class FeedBuilder {
                         title = "Library Updates",
                         updated = now,
                         content = "Recently added chapters",
-                        links = listOf(OpdsLink(rel = "subsection", href = "/opds/v1/library-updates", type = TYPE_ACQUISITION)),
+                        // OPDS 1.2 section 6.2: a feed of newly added items, newest first
+                        links = listOf(OpdsLink(rel = REL_SORT_NEW, href = "/opds/v1/library-updates", type = TYPE_ACQUISITION)),
                     ),
                     OpdsEntry(
                         id = "urn:chaptervault:library:genres",
@@ -71,19 +74,22 @@ class FeedBuilder {
         size: Int,
         totalItems: Long,
         now: String,
+        sort: SeriesSort = SeriesSort.TITLE,
     ): OpdsFeed {
         val totalPages = if (size > 0) (totalItems + size - 1) / size else 1
+        val base = "/opds/v1/catalog?sort=${sort.param}"
         return OpdsFeed(
             id = "urn:chaptervault:catalog",
             title = "ChapterVault Library",
             updated = series.maxOfOrNull { it.updatedAt }?.toString() ?: now,
-            selfHref = "/opds/v1/catalog?page=$page&size=$size",
+            selfHref = "$base&page=$page&size=$size",
             kind = "acquisition",
-            nextHref = if (page + 1 < totalPages) "/opds/v1/catalog?page=${page + 1}&size=$size" else null,
-            prevHref = if (page > 0) "/opds/v1/catalog?page=${page - 1}&size=$size" else null,
+            nextHref = if (page + 1 < totalPages) "$base&page=${page + 1}&size=$size" else null,
+            prevHref = if (page > 0) "$base&page=${page - 1}&size=$size" else null,
             totalResults = totalItems,
             itemsPerPage = size,
             startIndex = page * size + 1,
+            facets = sortFacets("", sort),
             entries = series.map { buildSeriesEntry(it) },
         )
     }
@@ -242,10 +248,12 @@ class FeedBuilder {
         size: Int,
         totalItems: Long,
         now: String,
-        genre: String? = null,
-        language: String? = null,
-        upstreamStatus: String? = null,
+        query: SeriesQuery = SeriesQuery(),
     ): OpdsFeed {
+        val genre = query.genre
+        val language = query.language
+        val upstreamStatus = query.upstreamStatus
+        val sort = query.sort
         val totalPages = if (size > 0) (totalItems + size - 1) / size else 1
         val filterParams =
             buildList {
@@ -253,7 +261,7 @@ class FeedBuilder {
                 language?.let { add("language=${encodeParam(it)}") }
                 upstreamStatus?.let { add("upstreamStatus=${encodeParam(it)}") }
             }.joinToString("&")
-        val baseQuery = if (filterParams.isNotEmpty()) "$filterParams&" else ""
+        val baseQuery = (if (filterParams.isNotEmpty()) "$filterParams&" else "") + "sort=${sort.param}&"
         val facets =
             buildList {
                 genre?.let {
@@ -289,6 +297,7 @@ class FeedBuilder {
                     )
                     add(OpdsFacet(title = "All Statuses", href = "/opds/v1/library/status", group = "Status"))
                 }
+                addAll(sortFacets(filterParams, sort))
             }
         return OpdsFeed(
             id = "urn:chaptervault:catalog:filtered",
@@ -415,6 +424,19 @@ class FeedBuilder {
         val firstPageMimeType: String,
     )
 
+    // OPDS 1.2 section 4: facets that reorder an acquisition feed; they keep the active filters and start at the first page
+    private fun sortFacets(
+        filterParams: String,
+        active: SeriesSort,
+    ): List<OpdsFacet> {
+        val prefix = if (filterParams.isNotEmpty()) "$filterParams&" else ""
+        return listOf(SeriesSort.TITLE to "Title", SeriesSort.ADDED to "Recently added").map { (sort, title) ->
+            OpdsFacet(title = title, href = "/opds/v1/catalog?${prefix}sort=${sort.param}", group = "Sort", isActive = sort == active)
+        }
+    }
+
+    private val SeriesSort.param get() = name.lowercase()
+
     private fun encodeParam(value: String): String = URLEncoder.encode(value, "UTF-8")
 
     companion object {
@@ -425,6 +447,7 @@ class FeedBuilder {
         const val REL_IMAGE_THUMBNAIL = "http://opds-spec.org/image/thumbnail"
         const val REL_ACQUISITION = "http://opds-spec.org/acquisition/open-access"
         const val REL_PSE = "http://vaemendis.net/opds-pse/stream"
+        const val REL_SORT_NEW = "http://opds-spec.org/sort/new"
         const val TYPE_OPENSEARCH_DESCRIPTION = "application/opensearchdescription+xml"
         const val SEARCH_DESCRIPTION_HREF = "/opds/v1/search.xml"
     }

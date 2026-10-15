@@ -35,12 +35,6 @@ data class StatusCount(
     val seriesCount: Int,
 )
 
-data class OpdsSeriesFilter(
-    val genre: String? = null,
-    val language: String? = null,
-    val upstreamStatus: String? = null,
-)
-
 interface OpdsReadApi {
     suspend fun listReadHistory(
         userId: Id,
@@ -54,9 +48,4 @@ interface OpdsReadApi {
     suspend fun listLanguages(): Result<List<LanguageCount>>
 
     suspend fun listUpstreamStatuses(): Result<List<StatusCount>>
-
-    suspend fun listSeriesFiltered(
-        filter: OpdsSeriesFilter,
-        request: PageRequest,
-    ): Result<Pagination<Series>>
 }

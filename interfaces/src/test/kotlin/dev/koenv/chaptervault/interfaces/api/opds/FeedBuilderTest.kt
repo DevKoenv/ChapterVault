@@ -4,6 +4,8 @@ import dev.koenv.chaptervault.kernel.api.ChapterWithSeries
 import dev.koenv.chaptervault.kernel.api.GenreCount
 import dev.koenv.chaptervault.kernel.api.LanguageCount
 import dev.koenv.chaptervault.kernel.api.RecentlyReadEntry
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
+import dev.koenv.chaptervault.kernel.api.SeriesSort
 import dev.koenv.chaptervault.kernel.api.StatusCount
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
@@ -69,7 +71,7 @@ class FeedBuilderTest {
     }
 
     @Test
-    fun `catalog feeds do not offer sort facets the server ignores`() {
+    fun `catalog feeds offer one sort facet per sort the server supports`() {
         val catalog = builder.buildCatalogFeed(listOf(fakeSeries()), 0, 20, 1, now)
         val filtered =
             builder.buildFilteredCatalogFeed(
@@ -78,13 +80,12 @@ class FeedBuilderTest {
                 20,
                 1,
                 now,
-                genre = "Action",
-                language = null,
-                upstreamStatus = null,
+                query = SeriesQuery(genre = "Action"),
             )
 
-        assertEquals(emptyList(), catalog.facets.filter { "sort=" in it.href })
-        assertEquals(emptyList(), filtered.facets.filter { "sort=" in it.href })
+        val supported = SeriesSort.entries.map { "sort=${it.name.lowercase()}" }
+        assertEquals(supported, catalog.facets.filter { it.group == "Sort" }.map { it.href.substringAfterLast('?') })
+        assertEquals(supported, filtered.facets.filter { it.group == "Sort" }.map { it.href.substringAfterLast('&') })
     }
 
     // ── buildNavigationFeed ────────────────────────────────────────────────
@@ -269,9 +270,7 @@ class FeedBuilderTest {
                 size = 20,
                 totalItems = 0L,
                 now = now,
-                genre = "Action",
-                language = "en",
-                upstreamStatus = "ONGOING",
+                query = SeriesQuery(genre = "Action", language = "en", upstreamStatus = "ONGOING"),
             )
         assertContains(feed.selfHref, "genre=Action")
         assertContains(feed.selfHref, "language=en")
@@ -287,7 +286,7 @@ class FeedBuilderTest {
                 size = 5,
                 totalItems = 10L,
                 now = now,
-                genre = "Action",
+                query = SeriesQuery(genre = "Action"),
             )
         assertNotNull(feed.nextHref)
         assertContains(feed.nextHref!!, "genre=Action")

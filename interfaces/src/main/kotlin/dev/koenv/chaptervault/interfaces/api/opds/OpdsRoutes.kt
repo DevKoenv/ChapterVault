@@ -9,7 +9,8 @@ import dev.koenv.chaptervault.interfaces.api.rest.respondError
 import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.OpdsReadApi
-import dev.koenv.chaptervault.kernel.api.OpdsSeriesFilter
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
+import dev.koenv.chaptervault.kernel.api.SeriesSort
 import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.shared.result.AppError
@@ -67,49 +68,37 @@ fun Application.opdsRoutes(
             }
 
             get("/opds/v1/catalog") {
+                val params = call.request.queryParameters
+                val sort =
+                    params["sort"]?.let { value ->
+                        SeriesSort.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
+                            ?: return@get call.respondBadRequest("Invalid sort value")
+                    } ?: SeriesSort.TITLE
+                val genre = params["genre"]
+                val language = params["language"]
+                val upstreamStatus = params["upstreamStatus"]
                 val pageRequest = call.pageRequest(defaultSize = 20)
-                val page = pageRequest.page
-                val genre = call.request.queryParameters["genre"]
-                val language = call.request.queryParameters["language"]
-                val upstreamStatus = call.request.queryParameters["upstreamStatus"]
-                val now = Instant.now().toString()
-
-                if (genre != null || language != null || upstreamStatus != null) {
-                    val filter = OpdsSeriesFilter(genre = genre, language = language, upstreamStatus = upstreamStatus)
-                    when (val result = opdsRead.listSeriesFiltered(filter, pageRequest)) {
-                        is Result.Success -> {
-                            val p = result.value
-                            val feed =
+                val query = SeriesQuery(sort = sort, genre = genre, language = language, upstreamStatus = upstreamStatus)
+                when (val result = libraryRead.listSeries(query, pageRequest)) {
+                    is Result.Success -> {
+                        val p = result.value
+                        val now = Instant.now().toString()
+                        val feed =
+                            if (genre != null || language != null || upstreamStatus != null) {
                                 feedBuilder.buildFilteredCatalogFeed(
                                     series = p.items,
-                                    page = page,
+                                    page = pageRequest.page,
                                     size = p.size,
                                     totalItems = p.totalItems,
                                     now = now,
-                                    genre = genre,
-                                    language = language,
-                                    upstreamStatus = upstreamStatus,
+                                    query = query,
                                 )
-                            call.respondText(opdsV1.serialize(feed), opdsContentType(call))
-                        }
-                        is Result.Failure -> call.respondError(result.error)
+                            } else {
+                                feedBuilder.buildCatalogFeed(p.items, pageRequest.page, p.size, p.totalItems, now, sort)
+                            }
+                        call.respondText(opdsV1.serialize(feed), opdsContentType(call))
                     }
-                } else {
-                    when (val result = libraryRead.listSeries(pageRequest)) {
-                        is Result.Success -> {
-                            val p = result.value
-                            val feed =
-                                feedBuilder.buildCatalogFeed(
-                                    series = p.items,
-                                    page = page,
-                                    size = p.size,
-                                    totalItems = p.totalItems,
-                                    now = now,
-                                )
-                            call.respondText(opdsV1.serialize(feed), opdsContentType(call))
-                        }
-                        is Result.Failure -> call.respondError(result.error)
-                    }
+                    is Result.Failure -> call.respondError(result.error)
                 }
             }
 

@@ -9,6 +9,8 @@ import dev.koenv.chaptervault.kernel.api.ChapterPageSource
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.ReadingStatusApi
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
+import dev.koenv.chaptervault.kernel.api.SeriesSort
 import dev.koenv.chaptervault.kernel.auth.Permission
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
@@ -29,6 +31,7 @@ import dev.koenv.chaptervault.shared.utils.Id
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.principal
 import io.ktor.server.request.header
 import io.ktor.server.response.respond
@@ -51,76 +54,12 @@ fun Route.libraryRoutes(
 ) {
     get("/library/series/search") {
         val principal = call.requirePermission(Permission.READ_LIBRARY) ?: return@get
-        val q = call.request.queryParameters["q"] ?: ""
-        when (val result = libraryRead.searchLibrary(q, call.pageRequest(defaultSize = 20))) {
-            is Result.Success -> {
-                val statusMap = readingStatusApi.getAllStatuses(principal.user.id, result.value.items.map { it.id })
-                call.respond(
-                    HttpStatusCode.OK,
-                    PaginatedResponse(
-                        items = result.value.items.map { it.toDto(statusMap[it.id]) },
-                        page = result.value.page,
-                        size = result.value.size,
-                        totalItems = result.value.totalItems,
-                        totalPages = result.value.totalPages,
-                        hasNext = result.value.hasNext,
-                        hasPrevious = result.value.hasPrevious,
-                    ),
-                )
-            }
-            is Result.Failure -> call.respondError(result.error)
-        }
+        call.respondSeriesList(principal.user.id, call.request.queryParameters["q"] ?: "", libraryRead, readingStatusApi)
     }
 
     get("/library/series") {
         val principal = call.requirePermission(Permission.READ_LIBRARY) ?: return@get
-        val pageRequest = call.pageRequest(defaultSize = 20)
-        val statusFilter =
-            call.request.queryParameters["readingStatus"]?.let { s ->
-                runCatching { ReadingStatus.valueOf(s.uppercase()) }.getOrNull() ?: run {
-                    call.respondBadRequest("Invalid readingStatus value")
-                    return@get
-                }
-            }
-
-        if (statusFilter != null) {
-            val matchingIds = readingStatusApi.getSeriesIdsWithStatus(principal.user.id, statusFilter)
-            when (val result = libraryRead.listSeriesByIds(matchingIds, pageRequest)) {
-                is Result.Success ->
-                    call.respond(
-                        HttpStatusCode.OK,
-                        PaginatedResponse(
-                            items = result.value.items.map { it.toDto(statusFilter) },
-                            page = result.value.page,
-                            size = result.value.size,
-                            totalItems = result.value.totalItems,
-                            totalPages = result.value.totalPages,
-                            hasNext = result.value.hasNext,
-                            hasPrevious = result.value.hasPrevious,
-                        ),
-                    )
-                is Result.Failure -> call.respondError(result.error)
-            }
-        } else {
-            when (val result = libraryRead.listSeries(pageRequest)) {
-                is Result.Success -> {
-                    val statusMap = readingStatusApi.getAllStatuses(principal.user.id, result.value.items.map { it.id })
-                    call.respond(
-                        HttpStatusCode.OK,
-                        PaginatedResponse(
-                            items = result.value.items.map { it.toDto(statusMap[it.id]) },
-                            page = result.value.page,
-                            size = result.value.size,
-                            totalItems = result.value.totalItems,
-                            totalPages = result.value.totalPages,
-                            hasNext = result.value.hasNext,
-                            hasPrevious = result.value.hasPrevious,
-                        ),
-                    )
-                }
-                is Result.Failure -> call.respondError(result.error)
-            }
-        }
+        call.respondSeriesList(principal.user.id, null, libraryRead, readingStatusApi)
     }
 
     get("/library/series/{id}") {
@@ -441,5 +380,65 @@ fun Route.libraryRoutes(
             is Result.Success -> call.respond(HttpStatusCode.OK, result.value.toDto())
             is Result.Failure -> call.respondError(result.error)
         }
+    }
+}
+
+// GET /library/series and /library/series/search take the same sort, order and filters; a reading status is the caller's own
+private suspend fun ApplicationCall.respondSeriesList(
+    userId: Id,
+    titleContains: String?,
+    libraryRead: LibraryReadApi,
+    readingStatusApi: ReadingStatusApi,
+) {
+    val params = request.queryParameters
+    val sort =
+        params["sort"]?.let { value ->
+            SeriesSort.entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: return respondBadRequest("Invalid sort value")
+        } ?: SeriesSort.TITLE
+    val descending =
+        when (params["order"]?.lowercase()) {
+            null -> sort.defaultDescending
+            "asc" -> false
+            "desc" -> true
+            else -> return respondBadRequest("Invalid order value")
+        }
+    val upstreamStatus =
+        params["upstreamStatus"]?.let { value ->
+            UpstreamStatus.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }?.name
+                ?: return respondBadRequest("Invalid upstreamStatus value")
+        }
+    val readingStatus =
+        params["readingStatus"]?.let { value ->
+            ReadingStatus.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
+                ?: return respondBadRequest("Invalid readingStatus value")
+        }
+    val query =
+        SeriesQuery(
+            sort = sort,
+            descending = descending,
+            ids = readingStatus?.let { readingStatusApi.getSeriesIdsWithStatus(userId, it) },
+            titleContains = titleContains,
+            genre = params["genre"]?.takeIf { it.isNotBlank() },
+            language = params["language"]?.takeIf { it.isNotBlank() },
+            upstreamStatus = upstreamStatus,
+        )
+    when (val result = libraryRead.listSeries(query, pageRequest(defaultSize = 20))) {
+        is Result.Success -> {
+            val page = result.value
+            val statuses = if (readingStatus != null) emptyMap() else readingStatusApi.getAllStatuses(userId, page.items.map { it.id })
+            respond(
+                HttpStatusCode.OK,
+                PaginatedResponse(
+                    items = page.items.map { it.toDto(readingStatus ?: statuses[it.id]) },
+                    page = page.page,
+                    size = page.size,
+                    totalItems = page.totalItems,
+                    totalPages = page.totalPages,
+                    hasNext = page.hasNext,
+                    hasPrevious = page.hasPrevious,
+                ),
+            )
+        }
+        is Result.Failure -> respondError(result.error)
     }
 }

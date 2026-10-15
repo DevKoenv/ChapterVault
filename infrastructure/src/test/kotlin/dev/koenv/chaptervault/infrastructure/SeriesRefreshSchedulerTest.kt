@@ -1,6 +1,7 @@
 package dev.koenv.chaptervault.infrastructure
 
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
@@ -54,6 +55,11 @@ class SeriesRefreshSchedulerTest {
             Result.Success(
                 Pagination(all.drop(request.page * request.size).take(request.size), request.page, request.size, all.size.toLong()),
             )
+
+        override suspend fun listSeries(
+            query: SeriesQuery,
+            request: PageRequest,
+        ): Result<Pagination<Series>> = error("unused")
 
         override suspend fun getSeries(id: Id): Result<Series> = error("unused")
 

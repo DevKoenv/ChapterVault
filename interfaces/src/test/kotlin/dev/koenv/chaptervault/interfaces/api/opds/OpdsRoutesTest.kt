@@ -7,8 +7,9 @@ import dev.koenv.chaptervault.kernel.api.GenreCount
 import dev.koenv.chaptervault.kernel.api.LanguageCount
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
 import dev.koenv.chaptervault.kernel.api.OpdsReadApi
-import dev.koenv.chaptervault.kernel.api.OpdsSeriesFilter
 import dev.koenv.chaptervault.kernel.api.RecentlyReadEntry
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
+import dev.koenv.chaptervault.kernel.api.SeriesSort
 import dev.koenv.chaptervault.kernel.api.StatusCount
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
@@ -114,10 +115,12 @@ class OpdsRoutesTest {
                     Result.Failure(AppError.NotFound("Series", id.toString()))
                 }
 
-            override suspend fun listSeries(request: PageRequest) =
-                Result.Success(
-                    Pagination(items = listOf(fakeSeries), page = 0, size = 20, totalItems = 1L),
-                )
+            override suspend fun listSeries(
+                query: SeriesQuery,
+                request: PageRequest,
+            ) = Result.Success(
+                Pagination(items = listOf(fakeSeries), page = 0, size = 20, totalItems = 1L),
+            )
 
             override suspend fun searchLibrary(
                 query: String,
@@ -177,13 +180,6 @@ class OpdsRoutesTest {
             override suspend fun listLanguages() = Result.Success(emptyList<LanguageCount>())
 
             override suspend fun listUpstreamStatuses() = Result.Success(emptyList<StatusCount>())
-
-            override suspend fun listSeriesFiltered(
-                filter: OpdsSeriesFilter,
-                request: PageRequest,
-            ) = Result.Success(
-                Pagination(items = emptyList<dev.koenv.chaptervault.kernel.library.Series>(), page = 0, size = 20, totalItems = 0L),
-            )
         }
 
     private val fakePageSource =
@@ -321,7 +317,10 @@ class OpdsRoutesTest {
             object : LibraryReadApi {
                 override suspend fun getSeries(id: Id) = Result.Failure(AppError.InternalError("db error"))
 
-                override suspend fun listSeries(request: PageRequest) = Result.Failure(AppError.InternalError("db error"))
+                override suspend fun listSeries(
+                    query: SeriesQuery,
+                    request: PageRequest,
+                ) = Result.Failure(AppError.InternalError("db error"))
 
                 override suspend fun searchLibrary(
                     query: String,
@@ -549,8 +548,10 @@ class OpdsRoutesTest {
             object : LibraryReadApi {
                 override suspend fun getSeries(id: Id) = Result.Failure(AppError.NotFound("Series", id.toString()))
 
-                override suspend fun listSeries(request: PageRequest) =
-                    Result.Success(Pagination(items = emptyList<Series>(), page = 0, size = 20, totalItems = 0L))
+                override suspend fun listSeries(
+                    query: SeriesQuery,
+                    request: PageRequest,
+                ) = Result.Success(Pagination(items = emptyList<Series>(), page = 0, size = 20, totalItems = 0L))
 
                 override suspend fun searchLibrary(
                     query: String,
@@ -597,10 +598,12 @@ class OpdsRoutesTest {
             object : LibraryReadApi {
                 override suspend fun getSeries(id: Id) = Result.Success(fakeSeries)
 
-                override suspend fun listSeries(request: PageRequest) =
-                    Result.Success(
-                        Pagination(items = List(request.size) { fakeSeries }, page = request.page, size = request.size, totalItems = 25L),
-                    )
+                override suspend fun listSeries(
+                    query: SeriesQuery,
+                    request: PageRequest,
+                ) = Result.Success(
+                    Pagination(items = List(request.size) { fakeSeries }, page = request.page, size = request.size, totalItems = 25L),
+                )
 
                 override suspend fun searchLibrary(
                     query: String,
@@ -866,28 +869,16 @@ class OpdsRoutesTest {
     // filtered catalog
 
     @Test
-    fun `catalog with genre filter uses filtered path`() {
-        val opdsWithFilter =
-            object : OpdsReadApi by fakeOpdsRead {
-                override suspend fun listSeriesFiltered(
-                    filter: OpdsSeriesFilter,
-                    request: PageRequest,
-                ) = Result.Success(
-                    Pagination(
-                        items = listOf(fakeSeries),
-                        page = 0,
-                        size = 20,
-                        totalItems = 1L,
-                    ),
-                )
-            }
-        testAppWithOpds(opdsWithFilter) {
-            val res = client.get("/opds/v1/catalog?genre=Action") { basicAuth("user", "pass") }
+    fun `catalog filters reach the library query`() {
+        val seen = mutableListOf<SeriesQuery>()
+        testAppWith(capturingLibrary(seen)) {
+            val res = client.get("/opds/v1/catalog?genre=Action&language=ja&upstreamStatus=ONGOING") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.OK, res.status)
             val body = res.bodyAsText()
             assertContains(body, "Test Series")
             assertContains(body, "genre=Action")
         }
+        assertEquals(listOf(SeriesQuery(genre = "Action", language = "ja", upstreamStatus = "ONGOING")), seen)
     }
 
     @Test
@@ -896,6 +887,73 @@ class OpdsRoutesTest {
             val res = client.get("/opds/v1/catalog?page=0&size=20") { basicAuth("user", "pass") }
             assertEquals(HttpStatusCode.OK, res.status)
             assertContains(res.bodyAsText(), "Test Series")
+        }
+
+    // sorting: OPDS 1.2 section 4, facets that reorder the publications of an acquisition feed
+
+    private fun capturingLibrary(
+        seen: MutableList<SeriesQuery>,
+        total: Long = 1L,
+    ) = object : LibraryReadApi by fakeLibraryRead {
+        override suspend fun listSeries(
+            query: SeriesQuery,
+            request: PageRequest,
+        ): Result<Pagination<Series>> {
+            seen += query
+            return Result.Success(Pagination(listOf(fakeSeries), request.page, request.size, total))
+        }
+    }
+
+    private fun links(xml: String): List<Element> {
+        val nodes = parseXml(xml).getElementsByTagNameNS(ATOM_NS, "link")
+        return (0 until nodes.length).map { nodes.item(it) as Element }
+    }
+
+    private fun sortFacets(xml: String): List<Element> =
+        links(xml).filter { it.getAttribute("rel") == "http://opds-spec.org/facet" && it.getAttributeNS(OPDS_NS, "facetGroup") == "Sort" }
+
+    @Test
+    fun `the catalog offers title and recently added as sort facets with exactly one active`() {
+        val seen = mutableListOf<SeriesQuery>()
+        testAppWith(capturingLibrary(seen)) {
+            val byTitle = sortFacets(client.get("/opds/v1/catalog") { basicAuth("user", "pass") }.bodyAsText())
+            assertEquals(listOf("/opds/v1/catalog?sort=title", "/opds/v1/catalog?sort=added"), byTitle.map { it.getAttribute("href") })
+            assertEquals(listOf("Title", "Recently added"), byTitle.map { it.getAttribute("title") })
+            assertEquals(listOf("true", ""), byTitle.map { it.getAttributeNS(OPDS_NS, "activeFacet") })
+            byTitle.forEach { assertEquals(FeedBuilder.TYPE_ACQUISITION, it.getAttribute("type")) }
+
+            val byAdded = sortFacets(client.get("/opds/v1/catalog?sort=added") { basicAuth("user", "pass") }.bodyAsText())
+            assertEquals(listOf("", "true"), byAdded.map { it.getAttributeNS(OPDS_NS, "activeFacet") })
+        }
+        assertEquals(listOf(SeriesQuery(), SeriesQuery(sort = SeriesSort.ADDED)), seen)
+    }
+
+    @Test
+    fun `sort and filters are kept together in facet and paging links`() {
+        val seen = mutableListOf<SeriesQuery>()
+        testAppWith(capturingLibrary(seen, total = 45L)) {
+            val body = client.get("/opds/v1/catalog?genre=Action&sort=added&page=0&size=20") { basicAuth("user", "pass") }.bodyAsText()
+            assertEquals(
+                listOf("/opds/v1/catalog?genre=Action&sort=title", "/opds/v1/catalog?genre=Action&sort=added"),
+                sortFacets(body).map { it.getAttribute("href") },
+            )
+            assertContains(body, "href=\"/opds/v1/catalog?genre=Action&amp;sort=added&amp;page=1&amp;size=20\"")
+        }
+        assertEquals(listOf(SeriesQuery(sort = SeriesSort.ADDED, genre = "Action")), seen)
+    }
+
+    @Test
+    fun `an unknown catalog sort is a bad request`() =
+        testApp {
+            assertEquals(HttpStatusCode.BadRequest, client.get("/opds/v1/catalog?sort=popular") { basicAuth("user", "pass") }.status)
+        }
+
+    @Test
+    fun `the library updates entry uses the OPDS sort new relation`() =
+        testApp {
+            val body = client.get("/opds/v1") { basicAuth("user", "pass") }.bodyAsText()
+            val toUpdates = links(body).filter { it.getAttribute("href") == "/opds/v1/library-updates" }
+            assertEquals(listOf("http://opds-spec.org/sort/new"), toUpdates.map { it.getAttribute("rel") })
         }
 
     // search: OPDS 1.2 section 3 points to an OpenSearch 1.1 description document
@@ -1014,5 +1072,7 @@ class OpdsRoutesTest {
 
     private companion object {
         const val OPENSEARCH_NS = "http://a9.com/-/spec/opensearch/1.1/"
+        const val ATOM_NS = "http://www.w3.org/2005/Atom"
+        const val OPDS_NS = "http://opds-spec.org/2010/catalog"
     }
 }

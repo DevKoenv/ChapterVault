@@ -8,7 +8,6 @@ import dev.koenv.chaptervault.kernel.api.ChapterWithSeries
 import dev.koenv.chaptervault.kernel.api.GenreCount
 import dev.koenv.chaptervault.kernel.api.LanguageCount
 import dev.koenv.chaptervault.kernel.api.OpdsReadApi
-import dev.koenv.chaptervault.kernel.api.OpdsSeriesFilter
 import dev.koenv.chaptervault.kernel.api.RecentlyReadEntry
 import dev.koenv.chaptervault.kernel.api.StatusCount
 import dev.koenv.chaptervault.kernel.library.Chapter
@@ -25,13 +24,11 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.toJavaInstant
 import org.jetbrains.exposed.sql.JoinType
-import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.Transaction
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -186,39 +183,6 @@ class OpdsReadRepository : OpdsReadApi {
                         StatusCount(raw, row[countExpr].toInt())
                     }
             Result.Success(statuses)
-        }
-
-    override suspend fun listSeriesFiltered(
-        filter: OpdsSeriesFilter,
-        request: PageRequest,
-    ): Result<Pagination<Series>> =
-        dbQuery {
-            var condition: Op<Boolean> = Op.TRUE
-
-            filter.genre?.let { genre ->
-                val ids =
-                    SeriesGenresTable
-                        .select(SeriesGenresTable.seriesId)
-                        .where { SeriesGenresTable.genre eq genre }
-                        .map { it[SeriesGenresTable.seriesId] }
-                condition = condition and (SeriesTable.id inList ids)
-            }
-            filter.language?.let { condition = condition and (SeriesTable.language eq it) }
-            filter.upstreamStatus?.let { condition = condition and (SeriesTable.upstreamStatus eq it) }
-
-            val total = SeriesTable.selectAll().where { condition }.count()
-            val rows =
-                SeriesTable
-                    .selectAll()
-                    .where { condition }
-                    .orderBy(SeriesTable.title, SortOrder.ASC)
-                    .limit(request.size, (request.page * request.size).toLong())
-                    .toList()
-
-            val genreMap = genresForIds(rows.map { it[SeriesTable.id] })
-            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
-
-            Result.Success(Pagination(items, request.page, request.size, total))
         }
 
     private fun Transaction.genresForIds(ids: List<String>): Map<String, List<String>> {

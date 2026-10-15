@@ -5,7 +5,6 @@ import dev.koenv.chaptervault.infrastructure.database.entities.SeriesGenresTable
 import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserSeriesProgressTable
 import dev.koenv.chaptervault.infrastructure.database.entities.UserTable
-import dev.koenv.chaptervault.kernel.api.OpdsSeriesFilter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.SeriesStatus
 import dev.koenv.chaptervault.shared.paging.PageRequest
@@ -277,48 +276,5 @@ class OpdsReadRepositoryTest {
             assertEquals(2, statuses.size)
             val ongoing = statuses.first { it.status == "ONGOING" }.seriesCount
             assertEquals(2, ongoing)
-        }
-
-    @Test
-    fun `listSeriesFiltered returns all series when no filter set`() =
-        runBlocking {
-            insertSeries()
-            insertSeries()
-
-            val page = (repo.listSeriesFiltered(OpdsSeriesFilter(), PageRequest()) as Result.Success).value
-            assertEquals(2L, page.totalItems)
-        }
-
-    @Test
-    fun `listSeriesFiltered filters by genre`() =
-        runBlocking {
-            val s1 = insertSeries()
-            val s2 = insertSeries()
-            insertGenre(s1, "Action")
-            insertGenre(s2, "Romance")
-
-            val page = (repo.listSeriesFiltered(OpdsSeriesFilter(genre = "Action"), PageRequest()) as Result.Success).value
-            assertEquals(1L, page.totalItems)
-            assertEquals(s1.toString(), page.items[0].id.toString())
-        }
-
-    @Test
-    fun `listSeriesFiltered filters by language`() =
-        runBlocking {
-            insertSeries(language = "en")
-            insertSeries(language = "ja")
-
-            val page = (repo.listSeriesFiltered(OpdsSeriesFilter(language = "ja"), PageRequest()) as Result.Success).value
-            assertEquals(1L, page.totalItems)
-        }
-
-    @Test
-    fun `listSeriesFiltered filters by upstreamStatus`() =
-        runBlocking {
-            insertSeries(upstreamStatus = "ONGOING")
-            insertSeries(upstreamStatus = "COMPLETED")
-
-            val page = (repo.listSeriesFiltered(OpdsSeriesFilter(upstreamStatus = "ONGOING"), PageRequest()) as Result.Success).value
-            assertEquals(1L, page.totalItems)
         }
 }

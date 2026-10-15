@@ -3,6 +3,7 @@ package dev.koenv.chaptervault.interfaces.api.rest
 import dev.koenv.chaptervault.infrastructure.connectors.DefaultConnectorRegistry
 import dev.koenv.chaptervault.infrastructure.connectors.MockConnector
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.kernel.auth.UserPrincipal
 import dev.koenv.chaptervault.kernel.connector.ConnectorRegistry
@@ -36,6 +37,11 @@ class ConnectorRoutesTest {
     private fun stubLibrary(inLibraryIds: Set<String> = emptySet()): LibraryReadApi =
         object : LibraryReadApi {
             override suspend fun getSeries(id: Id): Result<Series> = error("not used")
+
+            override suspend fun listSeries(
+                query: SeriesQuery,
+                request: PageRequest,
+            ): Result<Pagination<Series>> = error("not used")
 
             override suspend fun listSeries(request: PageRequest): Result<Pagination<Series>> = error("not used")
 

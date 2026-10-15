@@ -6,6 +6,8 @@ import dev.koenv.chaptervault.infrastructure.database.entities.SeriesTable
 import dev.koenv.chaptervault.infrastructure.storage.FileStorage
 import dev.koenv.chaptervault.kernel.api.LibraryCommandApi
 import dev.koenv.chaptervault.kernel.api.LibraryReadApi
+import dev.koenv.chaptervault.kernel.api.SeriesQuery
+import dev.koenv.chaptervault.kernel.api.SeriesSort
 import dev.koenv.chaptervault.kernel.library.Chapter
 import dev.koenv.chaptervault.kernel.library.DownloadStatus
 import dev.koenv.chaptervault.kernel.library.Series
@@ -21,14 +23,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.LikePattern
+import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inSubQuery
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.update
@@ -51,13 +57,26 @@ class SeriesRepository(
             Result.Success(row.toSeries(genresFor(id.toString())))
         }
 
-    override suspend fun listSeries(request: PageRequest): Result<Pagination<Series>> =
+    override suspend fun listSeries(
+        query: SeriesQuery,
+        request: PageRequest,
+    ): Result<Pagination<Series>> =
         dbQuery {
-            val total = SeriesTable.selectAll().count()
+            if (query.ids?.isEmpty() == true) return@dbQuery Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
+            val condition = query.condition()
+            val order = if (query.descending) SortOrder.DESC else SortOrder.ASC
+            val sortKey =
+                when (query.sort) {
+                    // SQLite compares text case-sensitively by default ("Z" before "a"); LOWER folds ASCII letters only
+                    SeriesSort.TITLE -> SeriesTable.title.lowerCase()
+                    SeriesSort.ADDED -> SeriesTable.addedAt
+                }
+            val total = SeriesTable.selectAll().where { condition }.count()
             val rows =
                 SeriesTable
                     .selectAll()
-                    .orderBy(SeriesTable.title to SortOrder.ASC, SeriesTable.id to SortOrder.ASC)
+                    .where { condition }
+                    .orderBy(sortKey to order, SeriesTable.id to SortOrder.ASC)
                     .limit(request.size, (request.page * request.size).toLong())
                     .toList()
             val ids = rows.map { it[SeriesTable.id] }
@@ -66,47 +85,21 @@ class SeriesRepository(
             Result.Success(Pagination(items, request.page, request.size, total))
         }
 
-    override suspend fun listSeriesByIds(
-        ids: Collection<Id>,
-        request: PageRequest,
-    ): Result<Pagination<Series>> =
-        dbQuery {
-            if (ids.isEmpty()) return@dbQuery Result.Success(Pagination(emptyList(), request.page, request.size, 0L))
-            val idStrings = ids.map { it.toString() }
-            val total = SeriesTable.selectAll().where { SeriesTable.id inList idStrings }.count()
-            val rows =
-                SeriesTable
-                    .selectAll()
-                    .where { SeriesTable.id inList idStrings }
-                    .orderBy(SeriesTable.title to SortOrder.ASC, SeriesTable.id to SortOrder.ASC)
-                    .limit(request.size, (request.page * request.size).toLong())
-                    .toList()
-            val rowIds = rows.map { it[SeriesTable.id] }
-            val genreMap = genresForIds(rowIds)
-            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
-            Result.Success(Pagination(items, request.page, request.size, total))
-        }
-
-    override suspend fun searchLibrary(
-        query: String,
-        request: PageRequest,
-    ): Result<Pagination<Series>> =
-        dbQuery {
+    private fun SeriesQuery.condition(): Op<Boolean> {
+        var condition: Op<Boolean> = Op.TRUE
+        ids?.let { ids -> condition = condition and (SeriesTable.id inList ids.map { it.toString() }) }
+        titleContains?.let { q ->
             // SQLite has no default LIKE escape character, so the escape has to be declared (ESCAPE '\')
-            val pattern = LikePattern("%" + LikePattern.ofLiteral(query).pattern + "%", '\\')
-            val total = SeriesTable.selectAll().where { SeriesTable.title like pattern }.count()
-            val rows =
-                SeriesTable
-                    .selectAll()
-                    .where { SeriesTable.title like pattern }
-                    .orderBy(SeriesTable.title to SortOrder.ASC, SeriesTable.id to SortOrder.ASC)
-                    .limit(request.size, (request.page * request.size).toLong())
-                    .toList()
-            val ids = rows.map { it[SeriesTable.id] }
-            val genreMap = genresForIds(ids)
-            val items = rows.map { it.toSeries(genreMap[it[SeriesTable.id]].orEmpty()) }
-            Result.Success(Pagination(items, request.page, request.size, total))
+            condition = condition and (SeriesTable.title like LikePattern("%" + LikePattern.ofLiteral(q).pattern + "%", '\\'))
         }
+        genre?.let { g ->
+            val withGenre = SeriesGenresTable.select(SeriesGenresTable.seriesId).where { SeriesGenresTable.genre eq g }
+            condition = condition and (SeriesTable.id inSubQuery withGenre)
+        }
+        language?.let { condition = condition and (SeriesTable.language eq it) }
+        upstreamStatus?.let { condition = condition and (SeriesTable.upstreamStatus eq it) }
+        return condition
+    }
 
     override suspend fun getChapter(id: Id): Result<Chapter> =
         dbQuery {
