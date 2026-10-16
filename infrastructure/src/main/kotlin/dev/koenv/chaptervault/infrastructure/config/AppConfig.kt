@@ -66,7 +66,9 @@ data class DatabaseConfig(
     // only used by server-based drivers such as PostgreSQL; SQLite's URL carries no credentials
     val username: String? = null,
     val password: String? = null,
-    val maxPoolSize: Int = 10,
+    // a single-user self-hosted server needs little concurrency; kept low so a crash-restart loop
+    // against a remote database cannot multiply into a large burst of connections
+    val maxPoolSize: Int = 2,
 )
 
 data class StorageConfig(

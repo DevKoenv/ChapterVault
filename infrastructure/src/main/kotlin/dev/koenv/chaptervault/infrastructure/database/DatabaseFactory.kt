@@ -35,10 +35,19 @@ object DatabaseFactory {
                 username = config.username
                 password = config.password
                 maximumPoolSize = config.maxPoolSize
+                // Hikari defaults minimumIdle to maximumPoolSize, which opens every pooled connection at once
+                // on every startup; a crash-restart loop then multiplies that burst by however many restarts
+                // happen before the loop is stopped. Keep startup down to (at most) one connection instead.
+                minimumIdle = minOf(1, config.maxPoolSize)
                 // SQLite allows exactly one writer at a time; PRAGMAs below plus busy_timeout make
                 // concurrent transactions wait for each other instead of failing with SQLITE_BUSY.
                 if (isSqlite) {
                     connectionInitSql = "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL"
+                } else {
+                    // proactively pings idle connections so a silently dropped network path (e.g. a VPN hiccup)
+                    // is noticed and the connection replaced before the app tries to use it, rather than only
+                    // on the next real query
+                    keepaliveTime = 2 * 60 * 1000
                 }
             }
         return HikariDataSource(hikariConfig)

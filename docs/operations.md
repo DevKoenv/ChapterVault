@@ -103,8 +103,13 @@ database:
   url: "jdbc:postgresql://db.example.com:5432/chaptervault"
   username: "chaptervault"
   password: "change-me"
-  maxPoolSize: 10
+  maxPoolSize: 2
 ```
+
+A small pool is intentional, not a placeholder: a single-user server needs little concurrency, and HikariCP opens
+`minimumIdle` connections immediately on every start, so a crash-restart loop (systemd's `Restart=on-failure`, for
+example) multiplies that burst by however many restarts happen before something notices — a lower ceiling bounds how
+bad that gets. Raise it only if you actually see connections queuing under real load.
 
 Or the equivalent environment variables (`CHAPTERVAULT_DATABASE_PASSWORD` kept out of the config file is the better
 choice for a secret):
@@ -114,7 +119,7 @@ CHAPTERVAULT_DATABASE_DRIVER=org.postgresql.Driver
 CHAPTERVAULT_DATABASE_URL=jdbc:postgresql://db.example.com:5432/chaptervault
 CHAPTERVAULT_DATABASE_USERNAME=chaptervault
 CHAPTERVAULT_DATABASE_PASSWORD=change-me
-CHAPTERVAULT_DATABASE_MAX_POOL_SIZE=10
+CHAPTERVAULT_DATABASE_MAX_POOL_SIZE=2
 ```
 
 The target database must already exist (`CREATE DATABASE chaptervault;`); ChapterVault creates its own tables in it on

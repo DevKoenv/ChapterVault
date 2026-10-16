@@ -283,7 +283,7 @@ object ConfigLoader {
         #   url: "jdbc:postgresql://db.example.com:5432/chaptervault"
         #   username: "chaptervault"
         #   password: "change-me"
-        #   maxPoolSize: 10
+        #   maxPoolSize: 2
 
         storage:
           # How downloaded chapters are stored on disk.
