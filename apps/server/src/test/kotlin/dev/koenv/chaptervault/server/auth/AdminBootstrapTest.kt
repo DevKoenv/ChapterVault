@@ -7,6 +7,7 @@ import dev.koenv.chaptervault.kernel.api.Credentials
 import dev.koenv.chaptervault.kernel.auth.Role
 import dev.koenv.chaptervault.shared.result.Result
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -27,6 +28,11 @@ class AdminBootstrapTest {
         DatabaseFactory.init(DatabaseConfig(url = "jdbc:sqlite:${dir.resolve("bootstrap.db")}"))
         users = UserRepository()
         announcements.clear()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        DatabaseFactory.close()
     }
 
     private fun bootstrap(env: Map<String, String> = emptyMap()) =

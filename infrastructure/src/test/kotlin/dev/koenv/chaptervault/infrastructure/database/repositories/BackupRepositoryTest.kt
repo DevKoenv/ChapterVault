@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -53,6 +54,11 @@ class BackupRepositoryTest {
         bob = (users.register(Credentials("bob", "password-bob")) as Result.Success).value.id
         seriesId = (series.addToLibrary("mangadex", "ext-1", "en", false) as Result.Success).value.id
         chapterId = (chapters.insertChapter(seriesId, "Chapter 1", 1.0, "ch-1") as Result.Success).value.id
+    }
+
+    @AfterEach
+    fun tearDown() {
+        DatabaseFactory.close()
     }
 
     private fun backup(

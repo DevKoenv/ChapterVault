@@ -82,6 +82,7 @@ class BootstrapIntegrationTest {
     @AfterAll
     fun stopServices() {
         stopKoin()
+        DatabaseFactory.close()
         runCatching { dir.toFile().deleteRecursively() }
     }
 

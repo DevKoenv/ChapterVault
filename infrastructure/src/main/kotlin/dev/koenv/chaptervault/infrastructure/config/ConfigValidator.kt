@@ -14,6 +14,7 @@ internal fun AppConfig.validate() {
     }
 
     if (database.url.isBlank()) errors += "database.url must not be blank"
+    if (database.maxPoolSize < 1) errors += "database.maxPoolSize must be >= 1 (got ${database.maxPoolSize})"
 
     if (storage.libraryPath.isBlank()) errors += "storage.libraryPath must not be blank"
     if (storage.thumbnailsPath.isBlank()) errors += "storage.thumbnailsPath must not be blank"

@@ -1,23 +1,47 @@
 package dev.koenv.chaptervault.infrastructure.database
 
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import dev.koenv.chaptervault.infrastructure.config.DatabaseConfig
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 
+private const val SQLITE_URL_PREFIX = "jdbc:sqlite:"
+
 object DatabaseFactory {
+    private var dataSource: HikariDataSource? = null
+
     fun init(config: DatabaseConfig) {
-        val database =
-            Database.connect(
-                url = withImmediateTransactions(config.url),
-                driver = config.driver,
-                setupConnection = { conn ->
-                    conn.createStatement().use { it.execute("PRAGMA foreign_keys = ON") }
-                    conn.createStatement().use { it.execute("PRAGMA busy_timeout = 5000") }
-                    conn.createStatement().use { it.execute("PRAGMA journal_mode = WAL") }
-                },
-            )
-        DatabaseMigrations.migrate(database)
+        close()
+        val ds = buildDataSource(config)
+        dataSource = ds
+        val database = Database.connect(ds)
+        DatabaseMigrations.migrate(database, config.username, config.password)
+    }
+
+    /** Releases the connection pool. Safe to call when nothing was initialized, and more than once. */
+    fun close() {
+        dataSource?.close()
+        dataSource = null
+    }
+
+    private fun buildDataSource(config: DatabaseConfig): HikariDataSource {
+        val isSqlite = config.url.startsWith(SQLITE_URL_PREFIX)
+        val hikariConfig =
+            HikariConfig().apply {
+                jdbcUrl = if (isSqlite) withImmediateTransactions(config.url) else config.url
+                driverClassName = config.driver
+                username = config.username
+                password = config.password
+                maximumPoolSize = config.maxPoolSize
+                // SQLite allows exactly one writer at a time; PRAGMAs below plus busy_timeout make
+                // concurrent transactions wait for each other instead of failing with SQLITE_BUSY.
+                if (isSqlite) {
+                    connectionInitSql = "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL"
+                }
+            }
+        return HikariDataSource(hikariConfig)
     }
 
     /**
@@ -27,7 +51,7 @@ object DatabaseFactory {
      */
     internal fun withImmediateTransactions(url: String): String =
         when {
-            !url.startsWith("jdbc:sqlite:") || "transaction_mode" in url -> url
+            !url.startsWith(SQLITE_URL_PREFIX) || "transaction_mode" in url -> url
             "?" in url -> "$url&transaction_mode=IMMEDIATE"
             else -> "$url?transaction_mode=IMMEDIATE"
         }

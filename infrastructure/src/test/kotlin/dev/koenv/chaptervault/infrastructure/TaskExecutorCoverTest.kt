@@ -34,6 +34,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -86,6 +87,11 @@ class TaskExecutorCoverTest {
                 ): Result<DownloadResult> = TODO()
             },
         )
+    }
+
+    @AfterEach
+    fun tearDown() {
+        DatabaseFactory.close()
     }
 
     private fun png(): ByteArray {

@@ -14,6 +14,7 @@ import kotlinx.datetime.toKotlinInstant
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -37,6 +38,11 @@ class UserLifecycleTest {
     ) {
         DatabaseFactory.init(DatabaseConfig(url = "jdbc:sqlite:${dir.resolve("lifecycle.db")}"))
         repo = UserRepository()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        DatabaseFactory.close()
     }
 
     private fun <T> Result<T>.value(): T = (this as Result.Success).value

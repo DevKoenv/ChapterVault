@@ -63,6 +63,10 @@ data class ServerConfig(
 data class DatabaseConfig(
     val driver: String = "org.sqlite.JDBC",
     val url: String = "jdbc:sqlite:data/db/chaptervault.db",
+    // only used by server-based drivers such as PostgreSQL; SQLite's URL carries no credentials
+    val username: String? = null,
+    val password: String? = null,
+    val maxPoolSize: Int = 10,
 )
 
 data class StorageConfig(

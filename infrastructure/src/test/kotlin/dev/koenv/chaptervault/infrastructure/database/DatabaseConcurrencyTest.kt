@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -19,6 +20,11 @@ import java.time.Instant
 import kotlin.test.assertEquals
 
 class DatabaseConcurrencyTest {
+    @AfterEach
+    fun tearDown() {
+        DatabaseFactory.close()
+    }
+
     /**
      * Repositories read and then write inside one transaction. With SQLite's default deferred transactions, a second
      * writer committing in between makes the first one fail at once with SQLITE_BUSY (the busy timeout does not apply

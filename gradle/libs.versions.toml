@@ -4,6 +4,8 @@ ktor = "3.0.3"
 koin = "4.0.4"
 exposed = "0.57.0"
 sqlite-jdbc = "3.47.2.0"
+postgresql-jdbc = "42.7.12"
+hikaricp = "7.1.0"
 kotlinx-coroutines = "1.9.0"
 kotlinx-serialization = "1.7.3"
 logback = "1.5.38"
@@ -57,7 +59,10 @@ exposed-kotlin-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datet
 # Database
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-sqlite = { module = "org.flywaydb:flyway-database-nc-sqlite", version.ref = "flyway" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+postgresql-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgresql-jdbc" }
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 
 # Kotlin extensions
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

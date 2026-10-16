@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class DatabaseMigrationsTest {
     private val shipped =
         Path
-            .of(javaClass.classLoader.getResource("db/migration")!!.toURI())
+            .of(javaClass.classLoader.getResource("db/migration/sqlite")!!.toURI())
             .let { folder -> Files.list(folder).use { s -> s.map { it.fileName.toString() }.filter { it.endsWith(".sql") }.toList() } }
 
     private fun open(dir: Path) = Database.connect("jdbc:sqlite:${dir.resolve("test.db")}", "org.sqlite.JDBC")

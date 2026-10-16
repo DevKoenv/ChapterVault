@@ -44,13 +44,37 @@ class ConfigLoaderWarningsTest {
     }
 
     @Test
-    fun `log level and pool size are no longer settings and are reported as unknown`(
+    fun `log level is no longer a setting and is reported as unknown`(
         @TempDir dir: Path,
     ) {
-        load(dir, "log:\n  level: DEBUG\ndatabase:\n  maxPoolSize: 10\n")
+        load(dir, "log:\n  level: DEBUG\n")
 
         assertTrue(warnings.any { "log" in it && "Unknown setting" in it }, warnings.toString())
-        assertTrue(warnings.any { "database.maxPoolSize" in it && "Unknown setting" in it }, warnings.toString())
+    }
+
+    @Test
+    fun `database settings for a remote server such as PostgreSQL are accepted without warnings`(
+        @TempDir dir: Path,
+    ) {
+        val config =
+            load(
+                dir,
+                """
+                database:
+                  driver: "org.postgresql.Driver"
+                  url: "jdbc:postgresql://db.example.com:5432/chaptervault"
+                  username: "chaptervault"
+                  password: "secret"
+                  maxPoolSize: 20
+                """.trimIndent(),
+            )
+
+        assertEquals("org.postgresql.Driver", config.database.driver)
+        assertEquals("jdbc:postgresql://db.example.com:5432/chaptervault", config.database.url)
+        assertEquals("chaptervault", config.database.username)
+        assertEquals("secret", config.database.password)
+        assertEquals(20, config.database.maxPoolSize)
+        assertEquals(emptyList(), warnings)
     }
 
     @Test

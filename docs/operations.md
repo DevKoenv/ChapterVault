@@ -89,6 +89,42 @@ folder that also holds other files is safe for this reason, but not recommended.
 Interrupted downloads leave `*.part` files, which are removed at the next start. A chapter is only visible once it is
 complete.
 
+## Using PostgreSQL instead of SQLite
+
+SQLite is the default and needs no setup. Point ChapterVault at a PostgreSQL server instead when the data directory
+itself is not durable (an SD card on a Raspberry Pi, for example) and you want the database on separate, reliable
+storage.
+
+In `config.yaml`:
+
+```yaml
+database:
+  driver: "org.postgresql.Driver"
+  url: "jdbc:postgresql://db.example.com:5432/chaptervault"
+  username: "chaptervault"
+  password: "change-me"
+  maxPoolSize: 10
+```
+
+Or the equivalent environment variables (`CHAPTERVAULT_DATABASE_PASSWORD` kept out of the config file is the better
+choice for a secret):
+
+```
+CHAPTERVAULT_DATABASE_DRIVER=org.postgresql.Driver
+CHAPTERVAULT_DATABASE_URL=jdbc:postgresql://db.example.com:5432/chaptervault
+CHAPTERVAULT_DATABASE_USERNAME=chaptervault
+CHAPTERVAULT_DATABASE_PASSWORD=change-me
+CHAPTERVAULT_DATABASE_MAX_POOL_SIZE=10
+```
+
+The target database must already exist (`CREATE DATABASE chaptervault;`); ChapterVault creates its own tables in it on
+first start, the same way it does for a fresh SQLite file. Connections go through a pool (HikariCP), so a brief network
+blip to a remote server is retried rather than crashing the server outright.
+
+`library/`, `thumbnails/` and `extensions/` still live under `CHAPTERVAULT_DATA_DIR` either way — only the database
+itself moves. The `db/chaptervault.db.pre-V<N>` SQLite backup described above does not apply to PostgreSQL; back up a
+remote database with your own `pg_dump`/snapshot process instead.
+
 ## Reverse proxy and TLS
 
 ChapterVault speaks plain HTTP. Anything that is not a private network you trust should reach it through a proxy that
@@ -182,7 +218,8 @@ What each thing covers:
 
 For a full backup, stop the server and copy the data directory (or, while it runs, copy the library and
 thumbnails, and take the database with `sqlite3 db/chaptervault.db ".backup 'backup.db'"`; copying the `.db` file of a
-running server can produce a torn copy because of the write-ahead log).
+running server can produce a torn copy because of the write-ahead log). On PostgreSQL the data directory copy no longer
+includes the database (see "Using PostgreSQL instead of SQLite" above) — back that up separately with `pg_dump`.
 
 To restore: stop the server, put the directory back, start. To move to a new machine, copy the data directory and keep the
 same version or newer.

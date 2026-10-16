@@ -94,6 +94,7 @@ class TaskExecutorConcurrencyTest {
     fun tearDown() {
         runBlocking { startedExecutors.forEach { it.cancelAndJoin() } }
         scope.coroutineContext[Job]?.cancel()
+        DatabaseFactory.close()
     }
 
     /** One connector whose behaviour the test controls. */

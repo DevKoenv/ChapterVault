@@ -160,6 +160,9 @@ object ConfigLoader {
     ) = DatabaseConfig(
         driver = s.string("driver", d.driver),
         url = s.string("url", d.url),
+        username = s.string("username", d.username ?: "").ifBlank { null } ?: d.username,
+        password = s.string("password", d.password ?: "").ifBlank { null } ?: d.password,
+        maxPoolSize = s.int("maxPoolSize", d.maxPoolSize),
     ).also { s.finish() }
 
     private fun storageFrom(
@@ -273,6 +276,15 @@ object ConfigLoader {
           # Unset = taken from each request. Set it behind a reverse proxy that serves HTTPS.
           # publicUrl: "https://manga.example.com"
 
+        # Default: a local SQLite file under dataDir. To use a remote PostgreSQL database instead
+        # (e.g. the data directory lives on storage that will not survive, such as an SD card):
+        # database:
+        #   driver: "org.postgresql.Driver"
+        #   url: "jdbc:postgresql://db.example.com:5432/chaptervault"
+        #   username: "chaptervault"
+        #   password: "change-me"
+        #   maxPoolSize: 10
+
         storage:
           # How downloaded chapters are stored on disk.
           # CBZ    - single zip archive per chapter (default, space-efficient)
@@ -365,7 +377,11 @@ object ConfigLoader {
                 ),
             database =
                 base.database.copy(
+                    driver = env("CHAPTERVAULT_DATABASE_DRIVER") ?: base.database.driver,
                     url = env("CHAPTERVAULT_DATABASE_URL") ?: base.database.url,
+                    username = env("CHAPTERVAULT_DATABASE_USERNAME") ?: base.database.username,
+                    password = env("CHAPTERVAULT_DATABASE_PASSWORD") ?: base.database.password,
+                    maxPoolSize = int("CHAPTERVAULT_DATABASE_MAX_POOL_SIZE") ?: base.database.maxPoolSize,
                 ),
             storage =
                 base.storage.copy(

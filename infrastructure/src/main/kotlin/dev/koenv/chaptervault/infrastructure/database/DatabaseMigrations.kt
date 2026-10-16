@@ -22,16 +22,32 @@ private const val SQLITE_URL_PREFIX = "jdbc:sqlite:"
  * A database made by a pre-release build (it has a `schema_version` table but no Flyway history) is adopted as version 1.
  */
 object DatabaseMigrations {
-    private const val CLASSPATH_LOCATION = "classpath:db/migration"
+    // every dialect ships its own migration set under db/migration/<vendor>/
     private const val LEGACY_TABLE = "schema_version"
 
-    fun migrate(db: Database) = migrate(db, CLASSPATH_LOCATION)
+    fun migrate(
+        db: Database,
+        username: String? = null,
+        password: String? = null,
+    ) = migrate(db, "classpath:db/migration/${vendorOf(db.url)}", username, password)
+
+    private fun vendorOf(url: String): String =
+        when {
+            url.startsWith(SQLITE_URL_PREFIX) -> "sqlite"
+            url.startsWith("jdbc:postgresql:") -> "postgresql"
+            else -> error("No migration location known for database URL: $url")
+        }
 
     internal fun migrate(
         db: Database,
         location: String,
+        username: String? = null,
+        password: String? = null,
     ) {
-        val adoptLegacy = hasTable(db.url, LEGACY_TABLE) && !hasTable(db.url, "flyway_schema_history")
+        // the pre-Flyway schema_version table only ever existed in SQLite installs; a PostgreSQL database is
+        // always a fresh, Flyway-managed one
+        val isSqlite = db.url.startsWith(SQLITE_URL_PREFIX)
+        val adoptLegacy = isSqlite && hasTable(db.url, LEGACY_TABLE) && !hasTable(db.url, "flyway_schema_history")
         check(!adoptLegacy || legacyVersions(db.url) == listOf(1)) {
             "This database was made by a pre-release build and cannot be upgraded in place. " +
                 "Export your reading progress and start with an empty data directory, see \"Upgrading\" in docs/operations.md."
@@ -39,12 +55,12 @@ object DatabaseMigrations {
         val flyway =
             Flyway
                 .configure()
-                .dataSource(db.url, null, null)
+                .dataSource(db.url, username, password)
                 .locations(location)
                 .group(true)
                 .baselineOnMigrate(adoptLegacy)
                 .baselineVersion("1")
-                .initSql("PRAGMA foreign_keys = ON")
+                .apply { if (isSqlite) initSql("PRAGMA foreign_keys = ON") }
                 .load()
 
         val info = flyway.info()
